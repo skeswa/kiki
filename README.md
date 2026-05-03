@@ -69,7 +69,7 @@ Several of the harder design questions reduce to one: when an ancestor revision 
 
 The honest answer is that current agent harnesses were not designed with this case in mind. Sending the agent a SIGINT and restarting it via `--resume` is reliable but disruptive — it loses the in-flight reasoning and forces a fresh framing of the work. What we want is something gentler: a mechanism that interrupts the agent at a moment when the interruption is cheap, hands it the new context in a form it already knows how to read, and lets it carry on.
 
-Claude Code's `PreToolUse` hook turns out to be exactly that mechanism. The hook fires immediately before any tool invocation, can return arbitrary text that the agent reads as the tool's result, and can block the in-flight tool. kiki uses this primitive as a gate. When the op-log watcher observes a change that requires rebasing a descendant thread, the daemon does not run `jj rebase` immediately. Instead it bumps the thread's `cascade_seq` counter and queues the rebase as pending work. On the agent's next tool call, the `PreToolUse` hook fires, blocks the tool, and signals the daemon to apply the rebase under the hook's protection. With the rebase complete, the hook returns a synthetic tool result of the form _"Your base was rebased onto X. Files {a, b} have new contents. Re-read them before continuing."_ The agent reads it, replans, and proceeds. The blast radius is at most one tool-call interval, and the agent never sees a working copy it didn't expect.
+Claude Code's `PreToolUse` hook turns out to be exactly that mechanism. The hook fires immediately before any tool invocation, can return arbitrary text that the agent reads as the tool's result, and can block the in-flight tool. kiki uses this primitive as a gate. When the op-log watcher observes a change that requires rebasing a descendant thread, the daemon does not run `jj rebase` immediately. Instead it bumps the thread's `pending_cascade_seq` counter and enqueues a cascade message. On the agent's next tool call, `PreToolUse` claims the cascade lock, asks the daemon to apply the rebase under the hook's protection, advances `applied_cascade_seq`, _reads_ the cascade queue, releases the lock, and returns a synthetic tool result of the form _"Your base was rebased onto X. Files {a, b} have new contents. Re-read them before continuing."_ The hook then — and only then, after the synthetic result has actually been emitted on stdout — issues a separate `MarkDelivered` RPC to set the per-session `delivered_in_flight_seq`. This ordering is the load-bearing detail of the protocol: writing the marker last means every crash window degrades to _double delivery_ (next PreToolUse re-delivers from the un-drained queue) rather than _false acknowledgement_ (queue drained for a cascade the agent never saw). When the agent's follow-up tool call eventually comes — and that follow-up is the strongest signal that the agent has actually integrated the synthetic result — that next `PreToolUse` runs an acknowledgement step first, promoting `delivered_in_flight_seq` into the thread's `acknowledged_cascade_seq` and draining the queue up to that point. Only then does it consider whether to deliver another cascade. PostToolUse is deliberately not part of this state machine: Claude Code does not fire PostToolUse for tools that PreToolUse blocked, so tying acknowledgement to PostToolUse would silently lose every cascade. If the agent crashes between delivery and the follow-up tool call, the queue is undrained and a fresh `--resume` session — initialized with `delivered_in_flight_seq=0` — will see `pending_cascade_seq > acknowledged_cascade_seq` and re-deliver the cascade idempotently. The blast radius is at most one tool-call interval, and the agent never sees a working copy it didn't expect or silently misses a cascade.
 
 The invariant that falls out of this ordering is the property that makes the whole design defensible: a thread's working copy is rebased only when the agent is at a tool boundary — never when it is mid-edit. The daemon does not perform the rebase until the hook fires; the hook fires only at tool boundaries; and tool boundaries are by construction moments when no edit is in flight. When the rebase fails — that is, when it produces a textual conflict the agent must consciously resolve — kiki escalates: SIGINT the agent, restart with `--resume` and a framing message that tells it what happened, and notify the human. The cascade does not silently advance through conflicts.
 
@@ -83,14 +83,24 @@ sequenceDiagram
 
     agentA->>kkd: amends ancestor revision X
     Note over kkd: op-log watcher detects op,<br/>identifies B as affected
-    kkd->>kkd: bump B.cascade_seq;<br/>queue pending rebase + ContextMessage
+    kkd->>kkd: bump B.pending_cascade_seq;<br/>enqueue ContextMessage<br/>(no jj rebase yet)
 
-    agentB->>hookB: issues next tool call
-    hookB->>kkd: cascade_seq vs last_seen_seq?
-    Note over kkd: differs — apply jj rebase now,<br/>drain queue
-    kkd-->>hookB: synthetic tool result:<br/>"base changed onto X'; diff is ..."
-    hookB-->>agentB: returns synthetic result<br/>(blocks original tool call)
-    Note over agentB: reads result as tool output;<br/>re-reads affected files; continues
+    agentB->>hookB: PreToolUse — issues next tool call
+    Note over hookB: ack step: delivered_in_flight_seq=0,<br/>nothing to acknowledge
+    hookB->>kkd: pending_cascade_seq > acknowledged_cascade_seq?
+    Note over kkd: yes — claim cascade lock,<br/>apply jj rebase, advance applied_cascade_seq,<br/>READ (don't drain) queue,<br/>release lock
+    kkd-->>hookB: synthetic tool result content:<br/>"base changed onto X'; diff is ..."
+    hookB-->>agentB: writes synthetic result to stdout<br/>(blocks original tool call)
+    Note over agentB: reads result as tool output;<br/>re-reads affected files; reasons further
+    hookB->>kkd: MarkDelivered(session_id, applied_cascade_seq)
+    Note over kkd: NOW set session.delivered_in_flight_seq<br/>(written AFTER stdout, so a crash here<br/>causes double-delivery, not false-ack)
+
+    agentB->>hookB: PreToolUse — issues follow-up tool call
+    Note over hookB: ack step: delivered_in_flight_seq>0,<br/>promote into acknowledged_cascade_seq,<br/>drain queue, clear delivered_in_flight_seq
+    hookB->>kkd: pending_cascade_seq > acknowledged_cascade_seq?
+    Note over kkd: no — fast-path pass-through
+    hookB-->>agentB: tool proceeds normally
+    Note over agentB,kkd: If agent crashes BEFORE the follow-up PreToolUse,<br/>fresh --resume session has delivered_in_flight_seq=0;<br/>queue is still undrained → idempotent re-delivery
 ```
 
 ## kiki does not gatekeep
