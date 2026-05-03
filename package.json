@@ -1,0 +1,14 @@
+{
+  "name": "kiki",
+  "private": true,
+  "scripts": {
+    "fmt": "oxfmt"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "oxfmt": "^0.47.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
