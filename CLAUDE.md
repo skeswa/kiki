@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Read this first
 
-The canonical design for what this repo is building lives at `docs/prds/0001-kiki.md`. It is long but exhaustive — read it before making any non-trivial change. Subsequent PRDs will be added as `docs/prds/000N-*.md`. Treat the PRD as the source of truth for behavior, scope, and v1 vs. v2 boundaries; if something in the code disagrees with the PRD, that is a finding to surface, not silently align with.
+The canonical spec for what this repo is building lives at `docs/prds/0001-kiki.md`. It is long but exhaustive — read it before making any non-trivial change. Subsequent PRDs will be added as `docs/prds/000N-*.md`. Treat the PRD as the source of truth for behavior, scope, and v1 vs. v2 boundaries; if something in the code disagrees with the PRD, that is a finding to surface, not silently align with.
 
 ## What kiki is, in one paragraph
 
