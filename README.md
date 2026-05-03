@@ -11,22 +11,10 @@
 <h4>A daemon-backed coordinator for multi-threaded coding with AI agents</h4>
 
 <p>
-  Built on
-  <a href="https://github.com/jj-vcs/jj"><b>jujutsu</b></a> ·
-  <a href="https://github.com/tmux/tmux"><b>tmux</b></a> ·
-  <a href="https://claude.com/claude-code"><b>Claude Code</b></a> ·
-  <a href="https://cli.github.com"><b>GitHub CLI</b></a>
-</p>
-
-<p>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <a href="docs/prds/0001-kiki.md"><img alt="Status: pre-alpha" src="https://img.shields.io/badge/status-pre--alpha-orange" /></a>
   <a href="https://github.com/jj-vcs/jj"><img alt="VCS: jujutsu" src="https://img.shields.io/badge/vcs-jujutsu-purple" /></a>
   <a href="https://claude.com/claude-code"><img alt="Harness: Claude Code" src="https://img.shields.io/badge/harness-claude_code-9b59ff" /></a>
-</p>
-
-<p>
-  <a href="docs/prds/0001-kiki.md"><b>Read the spec&nbsp;→</b></a>
 </p>
 
 <br />
@@ -34,6 +22,25 @@
 </div>
 
 ---
+
+```mermaid
+graph TD
+    main[("main")]:::trunk
+
+    A["<b>thread:</b> payment-refactor<br/><sub>jj workspace · tmux · Claude Code</sub>"]
+    B["<b>thread:</b> add-tests<br/><sub>jj workspace · tmux · Claude Code</sub><br/><i>follows payment-refactor</i>"]
+    C["<b>thread:</b> bug-investigation<br/><sub>jj workspace · tmux · Claude Code</sub>"]
+
+    main --> A
+    main --> C
+    A --> B
+
+    A -. ancestor evolves<br/>auto-rebase + inform agent .-> B
+
+    classDef trunk fill:#1a1a1a,stroke:#888,color:#fff
+```
+
+<p align="center"><sub><i>Each thread is its own jj workspace, tmux session, and agent. When a parent thread evolves, kiki rebases its descendants and tells their agents at the next safe boundary.</i></sub></p>
 
 The complete spec lives in [`docs/prds/0001-kiki.md`](docs/prds/0001-kiki.md). At the time of writing, none of the runtime described below has been implemented; the repository contains the PRD, a small TypeScript+Bun scaffold for tooling experiments, and the artifacts of one Codex review pass over the spec. This README describes the shape the v1 is committing to.
 
@@ -61,7 +68,7 @@ Threads can be related: `kk new add-tests --follows payment-refactor` records a 
 
 When the work is ready to leave the local machine, `kk publish` opens an editor with an AI-drafted PR title and body and creates a pull request against the parent thread's branch. If the parent itself has not been published yet, kiki publishes it first, walking up the stack and opening an editor for each, so that the human reviews each PR as it lands. When the PR merges upstream, kiki auto-archives the thread; when a parent merges, descendants are rebased onto `main`, force-pushed with `--force-with-lease`, and detached from the merged parent's follow-edge.
 
-`kk close` is non-destructive. It removes the thread's workspace and tmux session and hides it from default listings, but the bookmark and revisions stay in the repository; `kk reopen` restores the workspace, rebuilds the tmux session, and resumes the agent via its session-id. There is also a `kk thread destroy` for the case where the user genuinely wants the bookmark gone — but it is gated behind explicit confirmation, because data loss should be deliberate.
+`kk close` is non-destructive. It removes the thread's workspace and tmux session and hides it from default listings, but the bookmark and revisions stay in the repository; `kk reopen` restores the workspace, rebuilds the tmux session, and resumes the agent via its session-id. (A separate `kk thread destroy` exists for actually removing the bookmark, gated behind explicit confirmation.)
 
 ## How an agent learns its base just changed
 
@@ -136,7 +143,7 @@ Cleanly stated: `kkd` is a single user-scoped daemon (one process per user, opte
 
 State is partitioned. `~/.kiki/state.db` is the user-scoped registry of which repositories are managed and where the daemon is reachable. `<repo>/.kiki/state.db` holds the per-repository runtime state — threads, workspaces, agent sessions, hook state, the AI queue, the metadata-ownership ledger, the op-attribution dedupe table. Removing one repository's `.kiki/` directory wipes that repository's kiki state without disturbing any other.
 
-The implementation language for `kkd` and its CLI clients, per the PRD, is Rust. The choice is not aesthetic; it is driven by the long-term path to embedding [jj-lib](https://github.com/jj-vcs/jj) directly in the daemon (Go and TypeScript have no equivalent), by the Send/Sync compile-time guarantees that the cascade-coordination code wants, and by the maturity of the relevant Rust ecosystem (`tonic` for gRPC, `notify` for fsnotify, `rusqlite`/`sqlx` for SQLite, `ratatui` for the TUI). The repository as it stands is a Bun+TypeScript scaffold for tooling experiments; the language decision is the first major implementation milestone, and the proof-of-concept that gates that decision is described in the PRD's _Suggested build sequencing_ section.
+The implementation language for `kkd` and its CLI clients, per the PRD, is Rust — driven by the long-term path to embedding [jj-lib](https://github.com/jj-vcs/jj) directly in the daemon, by the Send/Sync guarantees the cascade-coordination code wants, and by the maturity of `tonic`/`notify`/`rusqlite`/`ratatui`. The repository as it stands is a Bun+TypeScript scaffold for tooling experiments; the language decision is the first major implementation milestone, gated by the proof-of-concept described in the PRD's _Suggested build sequencing_ section.
 
 ## A small worked example
 
