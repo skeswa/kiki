@@ -98,7 +98,7 @@ sequenceDiagram
     Note over kkd: yes — claim cascade lock<br>apply jj rebase, advance applied_cascade_seq<br>read but do not drain the queue<br>release lock
     kkd-->>hookB: synthetic tool result content
     hookB-->>agentB: writes synthetic result to stdout<br>and blocks original tool call
-    Note over agentB: reads result as tool output<br>re-reads affected files; reasons further
+    Note over agentB: reads result as tool output<br>re-reads affected files — reasons further
     hookB->>kkd: MarkDelivered with session_id and applied_cascade_seq
     Note over kkd: NOW set session.delivered_in_flight_seq<br>written AFTER stdout — a crash here<br>causes double-delivery, not false-ack
 
@@ -107,7 +107,7 @@ sequenceDiagram
     hookB->>kkd: is pending_cascade_seq > acknowledged_cascade_seq?
     Note over kkd: no — fast-path pass-through
     hookB-->>agentB: tool proceeds normally
-    Note over agentB,kkd: If agent crashes BEFORE the follow-up PreToolUse,<br>fresh --resume session has delivered_in_flight_seq=0;<br>queue is still undrained → idempotent re-delivery
+    Note over agentB,kkd: If agent crashes BEFORE the follow-up PreToolUse,<br>fresh --resume session has delivered_in_flight_seq=0<br>queue is still undrained → idempotent re-delivery
 ```
 
 ## kiki does not gatekeep
