@@ -117,22 +117,42 @@ A design choice that pervades the rest of the system: kiki watches the jj op log
 
 This is not a small choice. Building kiki as a gatekeeper — wrapping every jj invocation, intercepting every tmux command — would be a substantial undertaking and would degrade the user's existing relationship with those tools. Building it as an ambient coordinator that observes and reacts is harder in some ways (the daemon must distinguish its own operations from external ones to avoid self-triggered loops; it must coalesce rapid-fire op storms into single cascades) but produces a tool that is additive rather than invasive. The tmux-server analogy is exact: tmux does not refuse to let you `cd` somewhere weird in a pane, and it does not get upset if you launch a process outside a session. kiki holds the same posture.
 
+## A durable record of what was said
+
+Diffs are a record of what changed; they are not a record of what was _said_. That distinction matters more than it sounds. If you spent forty minutes investigating a bug, watched the agent trace through three dead ends, and finally landed on the right two-line change — the diff captures the two lines. The reasoning, the false starts, the user prompts that nudged the investigation, the moment the agent noticed that the test was wrong rather than the code: all of it lives in the agent's session and dies with the agent's session.
+
+kiki keeps it.
+
+For each thread, kkd captures the interleaved text exchange between the user and the agent — what the user typed, what the agent said back, the synthetic tool results kiki itself injected during cascade — and binds each message to the jj change-id that was `@` when the message was captured. The result is a log that travels with the work: change-ids are preserved by `jj rebase`, so when a descendant cascades onto a new base its message bindings come along for free, no re-anchoring required. When the agent crashes and `kk reopen` brings it back, kkd seeds the resumed session with a catch-up message synthesized from the log, so the resume is not a cold start.
+
+Two things the log is _not_. It is not a published artifact: messages live in `<repo>/.kiki/state.db`, gitignored, and never leave the local machine — agent prose contains dead ends, tool errors, and quoted file contents that should not surface in a PR description. And it is not a structured event log: it captures the narrative (`source: user | agent`, `text`), not the token-streaming deltas, the tool-call arguments, or the extended-thinking blocks. The diff still tells you _what_; the log tells you _why_.
+
+Two surfaces read it. The human reads the log via `kk thread log [<change>]`, with full-text search over the whole thread. The agent reads its own thread's log via a small MCP server kkd hosts — four tools, all read-only, all bounded to the calling thread. Cross-thread reads are deliberately a v2 concern: an agent in B reading agent A's transcript is a pleasing idea with a quiet failure mode (context pollution, prompt leakage between threads), and v1 is the wrong place to ship it without the v2 substrate's safety mechanisms.
+
+The log feeds back into AI-driven kiki features only at _local_ boundaries — the `kk reopen` catch-up, the agent's own MCP query mid-task. It is deliberately _not_ read by `kk publish`'s PR-drafter or by auto-describe / auto-rename. A boring PR description costs you nothing irreversible; a PR description that quotes "the user said their boss is being unreasonable about the deadline" costs you a hard-to-undo embarrassment. The local-only stance only holds if local-only-features is a discipline, not a default.
+
+The capture path itself is abstracted behind a `TranscriptAdapter` trait — Claude Code is the v1 implementor, Codex slots in for v2 — so the schema and read API stay harness-neutral while the way bytes flow into the log can vary per harness.
+
 ## Architecture
 
 ```mermaid
 graph TD
     kkd["<b>kkd</b> daemon<br/>Owns all state and behavior<br/>Single user-scoped process"]
     socket[/"Stable gRPC contract over ~/.kiki/kkd.sock"/]
+    mcp[/"Read-only MCP over ~/.kiki/kkd-mcp.sock<br/>(thread-log tools, calling thread only)"/]
     cli["<b>kk</b> CLI"]
     tui["<b>kk</b> TUI<br/>(ratatui)"]
     hook["<b>kk-hook</b><br/>PreToolUse sidecar"]
+    agent["agent<br/>(Claude Code)"]
     gui["Conductor-style<br/>native macOS GUI"]
-    remote["web · MCP · remote ..."]
+    remote["web · remote ..."]
 
     kkd === socket
+    kkd === mcp
     socket --> cli
     socket --> tui
     socket --> hook
+    mcp --> agent
     socket -.-> gui
     socket -.-> remote
 
@@ -140,7 +160,7 @@ graph TD
     class gui,remote future
 ```
 
-Cleanly stated: `kkd` is a single user-scoped daemon (one process per user, opted into per-repository via `kk init`) that owns all state and behavior — thread lifecycle, the jj op-log watcher, the cascade orchestrator, the agent harness adapters, the AI background queue, the GitHub poller. `kk`, the TUI (a subcommand of `kk`), and the small `kk-hook` PreToolUse sidecar are clients of a stable gRPC contract over a unix socket. There is no privileged internal API. A native macOS GUI written next year will consume the same surface they do; that is the property that makes the design durable.
+Cleanly stated: `kkd` is a single user-scoped daemon (one process per user, opted into per-repository via `kk init`) that owns all state and behavior — thread lifecycle, the jj op-log watcher, the cascade orchestrator, the agent harness adapters, the thread-log capture path, the AI background queue, the GitHub poller. `kk`, the TUI (a subcommand of `kk`), and the small `kk-hook` PreToolUse sidecar are clients of a stable gRPC contract over a unix socket. The agent itself is a client of a sibling socket: a narrowly-scoped read-only MCP server exposing exactly the thread-log retrieval tools, bounded to the calling thread (broader cross-thread MCP is the v2 substrate). There is no privileged internal API. A native macOS GUI written next year will consume the same gRPC surface today's clients do; that is the property that makes the design durable.
 
 State is partitioned. `~/.kiki/state.db` is the user-scoped registry of which repositories are managed and where the daemon is reachable. `<repo>/.kiki/state.db` holds the per-repository runtime state — threads, workspaces, agent sessions, hook state, the AI queue, the metadata-ownership ledger, the op-attribution dedupe table. Removing one repository's `.kiki/` directory wipes that repository's kiki state without disturbing any other.
 
@@ -181,9 +201,9 @@ A persistent tmux status-line strip surfaces threads needing attention; OS-nativ
 
 | Milestone              | Highlights                                                                                                                                                                                                                                                                                                                  |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **v1 — the demo**      | Thread atom, live-follow cascade, PreToolUse-based pause-propagate-resume, AI auto-rename and auto-describe with content-hash ownership ledger, `kk publish` with stack recursion, `kk close`/`kk reopen`, ratatui TUI, GitHub PR auto-archive on merge, Claude Code adapter. Estimated 6–9 weeks of focused work.          |
+| **v1 — the demo**      | Thread atom, live-follow cascade, PreToolUse-based pause-propagate-resume, AI auto-rename and auto-describe with content-hash ownership ledger, change-id-aligned thread log with same-thread read-only MCP surface and `kk reopen` catch-up, `kk publish` with stack recursion, `kk close`/`kk reopen`, ratatui TUI, GitHub PR auto-archive on merge, Claude Code adapter. Estimated 7–10 weeks of focused work.          |
 | **v1.x**               | Polish: hook-config diagnostics, op-log watcher edge cases, more `kk thread` subcommands, status-line themes.                                                                                                                                                                                                               |
-| **v2 — the substrate** | kkd as MCP server: agents in one thread can post messages to siblings, spawn children, request human review — with causal-chain cycle detection, depth and branching caps, and a complete audit trail. Codex harness adapter. Native macOS GUI. Direct GitHub REST/GraphQL. PR review-comment ingestion into agent context. |
+| **v2 — the substrate** | MCP surface expanded beyond v1's read-only same-thread log: agents in one thread can post messages to siblings, spawn children, request human review — with causal-chain cycle detection, depth and branching caps, and a complete audit trail. Codex harness adapter (slotting into the v1 `TranscriptAdapter` trait). Native macOS GUI. Direct GitHub REST/GraphQL. PR review-comment ingestion into agent context. |
 | **v3+**                | jj-lib embedded directly in kkd. Web dashboard. Cross-repository coordinated agent tasks.                                                                                                                                                                                                                                   |
 
 The full spec — including v2's MCP design, captured in the same document so it is not lost between revisions — lives in [`docs/prds/0001-kiki.md`](docs/prds/0001-kiki.md).
@@ -222,6 +242,7 @@ A few principles, stated up front, because the PRD's coherence depends on them:
 4. **High cohesion, low coupling.** kkd owns state and behavior; UIs are pure views. Internally, per-thread controllers are isolated from cross-cutting concerns, so killing one thread never destabilizes the daemon.
 5. **Fail loud, not silent.** Cycle detection, force-push reconciliation, parent-thread-abandoned prompts: when the system genuinely cannot determine the right action, it stops and asks rather than guessing.
 6. **No resource policing.** kiki does not cap concurrent agents, model spend, or laptop CPU. Those are the user's decisions, made with the user's tools.
+7. **Local recall, never silent leak.** The thread log is captured for human and agent recall and lives only on the local machine. It feeds back into AI features only at local boundaries (`kk reopen` catch-up, agent self-query); it does not feed into features that produce externally-published artifacts (PR drafts, auto-described revisions). The local-only stance only holds if local-only-features is a discipline, not a default.
 
 ## Built on the shoulders of
 
