@@ -34,6 +34,18 @@ Structural keys such as default harness and daemon socket path require daemon re
 
 Cosmetic keys may hot-reload.
 
+## Sections
+
+The top-level config sections expected in v1:
+
+- `[agent]` — default harness, harness-specific args.
+- `[github]` — backend selection (default `gh` shell-out), poll cadence.
+- `[autorename]` — auto-describe / auto-rename triggers and cadence (stretch execution loop; the v1-required foundation is the `MetadataLedger` ownership ledger).
+- `[notifications]` — per-event behavior (loud / soft / silent) for the attention-event vocabulary (agent permission prompts, cascade conflict, parent merged, parent abandoned, PR check failed, etc.). Cosmetic; hot-reload.
+- `[ui]` — personal-preference keys for the overlay TUI and persistent sidebar (table below).
+- `[reopen]` — `catchup_pairs` (default `10`) controls the size of the `kk reopen` catch-up message.
+- `[paths]` — overrides for state and socket paths.
+
 ## UI keys
 
 All `[ui]` keys are personal preference. They are valid in user and per-thread config, but invalid in repo-shared config. If set in repo-shared config, kiki warns and ignores them.

@@ -1,18 +1,6 @@
-# v1 spec index
+# v1 invariants
 
-These files are the normative v1 implementation contract.
-
-- [CLI](cli.md)
-- [Thread lifecycle](thread-lifecycle.md)
-- [Cascade](cascade.md)
-- [Transcript](transcript.md)
-- [Auth](auth.md)
-- [Publishing](publishing.md)
-- [Config](config.md)
-- [TUI](tui.md)
-- [Testing](testing.md)
-
-## Non-negotiable invariants
+These are the non-negotiable behavioral promises of v1. They cut across multiple specs and any implementation that violates one is wrong, regardless of which spec file the implementation work nominally belongs to.
 
 - A thread has a stable `thread_id`. Bookmark names, workspace paths, tmux sessions, and harness sessions are mutable projections.
 - Thread workspaces provide cooperative separation only; they are not a filesystem security boundary.

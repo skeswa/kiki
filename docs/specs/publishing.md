@@ -29,8 +29,8 @@ After PR creation, title/body are human territory. Kiki does not silently overwr
 
 v1 may poll GitHub through `gh`.
 
-- merged PR: close/archive with undo grace if auto-archive ships
-- closed without merge: notify only
-- CI state change: notify only
-- review comment: expose read-only through `kk thread comments`
-- external force-push: mark remote divergence and require explicit reconciliation
+- merged PR: close/archive with a 5000ms (5-second) undo grace, if auto-archive ships. The TUI surfaces the grace as an actionable toast with an `undo` action.
+- closed without merge: notify only.
+- CI state change: notify only.
+- review comment: expose read-only through `kk thread comments`.
+- external force-push: mark remote divergence and require explicit reconciliation.

@@ -12,7 +12,7 @@ Tests should target observable behavior and persisted state, not private impleme
 - `ContextDiscovery`
 - `AICompose`
 - `AuthEnforcer`
-- `TranscriptStore`
+- `ThreadTranscriptStore`
 - `LogRenderer`
 - `StatusRenderer`
 - `SidebarController` if TUI/sidebar ships
