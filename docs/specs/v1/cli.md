@@ -13,7 +13,7 @@ If no thread resolves but the command is repo-scoped, the command may fall back 
 
 ## `kk`
 
-Bare `kk` opens the interactive TUI when the TUI ships. Before the TUI ships, it may print a concise command summary and point to `kk ls`.
+Bare `kk` opens the overlay TUI in `NAVIGATE` mode (see `tui.md`) when the TUI ships. Before the TUI ships, it prints a concise command summary and points to `kk ls`. Outside a registered repo, even after the TUI ships, `kk` falls back to the command summary plus `kk ls` rather than opening an empty overlay.
 
 ## `kk ls`
 

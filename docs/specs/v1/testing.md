@@ -17,6 +17,9 @@ Tests should target observable behavior and persisted state, not private impleme
 - `StatusRenderer`
 - `SidebarController` if TUI/sidebar ships
 - `PaneLifecycle` if persistent sidebar ships
+- `OverlayController` if overlay TUI ships — open/close, NAVIGATE-mode transitions, preview-mode toggling (`t`/`d`/`c`), chord-ribbon adaptation by selection, narrow-terminal degradation, mouse click-to-focus
+- `ToastQueue` if overlay TUI ships — TTL expiry, hover-dismiss, coalescing of cascade-applied events
+- `FormController` if overlay TUI ships — spawn-card field navigation, destructive-confirmation modal flow
 
 ## Regression tests for resolved spec conflicts
 
