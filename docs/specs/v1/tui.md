@@ -10,7 +10,7 @@ The TUI is not required for the first core implementation slice. This is the v1 
 - **Activity section** — the same threads, flat-listed by most-recent agent event (descending). Cursor moves here for triage.
 - **Preview pane** — the right two-thirds of the overlay. Renders one of: transcript tail, working-copy diff, PR comments. Toggled by `t` / `d` / `c`.
 - **Chord ribbon** — a one-line keybinding hint at the bottom edge of the overlay. Toggled by `?`. Adapts to current selection (e.g. hides `c` for a thread without a PR).
-- **Inlined status** — the per-thread status block the Stack section renders under the *current* thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see `cli.md`). Single source of truth.
+- **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see `cli.md`). Single source of truth.
 - **Context strip** — the bottom-most line of the overlay or the persistent sidebar pane. One compressed sentence with TUI-specific content. Two forms by context: the overlay form carries repo + bookmark + cascade glyph + agent model + ctx % + last op age; the persistent-sidebar form is shorter (bookmark + cascade glyph + agent glyph) because the agent pane next to it already surfaces model and ctx. Distinct from the inlined status — the context strip is a TUI footer, not a `StatusRenderer` projection.
 - **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms per PRD line 352, overriding the default). Carries at most one optional named action (e.g., `undo`); never opens a confirmation card.
 - **Card** — a centered modal panel with title, body, and one or two action buttons. Used for spawn and destructive confirmation.
@@ -19,17 +19,17 @@ The TUI is not required for the first core implementation slice. This is the v1 
 
 Two glyphs per row, max. PR appears inline as `#NNNN` only if set.
 
-| state                | glyph | color  |
-|----------------------|-------|--------|
-| cascade in sync      | `──`  | dim    |
-| cascade pending      | `●●○` | amber  |
-| cascade conflicted   | `◐`   | red    |
-| agent idle           | `○`   | dim    |
-| agent working        | `●`   | amber  |
-| agent finished       | `✓`   | green  |
-| agent blocked        | `◐`   | red    |
-| follows arrow        | `←●`  | dim    |
-| current thread mark  | `▸`   | accent |
+| state               | glyph | color  |
+| ------------------- | ----- | ------ |
+| cascade in sync     | `──`  | dim    |
+| cascade pending     | `●●○` | amber  |
+| cascade conflicted  | `◐`   | red    |
+| agent idle          | `○`   | dim    |
+| agent working       | `●`   | amber  |
+| agent finished      | `✓`   | green  |
+| agent blocked       | `◐`   | red    |
+| follows arrow       | `←●`  | dim    |
+| current thread mark | `▸`   | accent |
 
 The cascade indicator and the agent-state indicator share the same three-valued state model as `kk status` (`in sync`, `pending`, `conflicted`). The CLI prints the textual state per `cli.md`; the TUI projects each state to a glyph from the table above. The state model is the source of truth — the textual and glyph forms are two presentations.
 
@@ -269,7 +269,7 @@ Toasts are non-modal pills in the overlay's top-right corner, stacking downward.
 Two subtypes share the surface:
 
 - **Notification toast** — no interactive action. The body may include hint text naming an overlay verb (e.g., "tap T to read transcript"); the verb is fielded by the overlay's normal keymap, the toast does not intercept it.
-- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the *only* keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge per PRD line 352). Toasts never open a confirmation card.
+- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge per PRD line 352). Toasts never open a confirmation card.
 
 Dismissal rules (apply to both subtypes):
 
@@ -324,35 +324,35 @@ Forms are pure ratatui widgets; they do not call `kkd` until `enter` is pressed.
 
 Overlay (`NAVIGATE` mode):
 
-| key       | verb                                                          |
-|-----------|---------------------------------------------------------------|
-| `↑` / `k` | move cursor up                                                |
-| `↓` / `j` | move cursor down                                              |
-| `tab`     | jump cursor between Stack and Activity                        |
-| `enter`   | switch to cursored thread (dismisses overlay)                 |
-| `space`   | toggle preview pane on the cursored thread                    |
-| `t`       | preview-mode = transcript tail                                |
-| `d`       | preview-mode = working-copy diff                              |
-| `c`       | preview-mode = PR comments  (preview only — not close)        |
-| `T`       | open full-screen transcript reader                            |
-| `n`       | spawn modal (new thread, no follow)                           |
-| `N`       | spawn modal (new thread, follows cursored)                    |
-| `p`       | publish cursored thread (`kk publish`)                        |
-| `x`       | close cursored thread (opens confirmation card)               |
-| `i`       | interrupt cursored thread's agent (opens confirmation card)   |
+| key       | verb                                                                            |
+| --------- | ------------------------------------------------------------------------------- |
+| `↑` / `k` | move cursor up                                                                  |
+| `↓` / `j` | move cursor down                                                                |
+| `tab`     | jump cursor between Stack and Activity                                          |
+| `enter`   | switch to cursored thread (dismisses overlay)                                   |
+| `space`   | toggle preview pane on the cursored thread                                      |
+| `t`       | preview-mode = transcript tail                                                  |
+| `d`       | preview-mode = working-copy diff                                                |
+| `c`       | preview-mode = PR comments (preview only — not close)                           |
+| `T`       | open full-screen transcript reader                                              |
+| `n`       | spawn modal (new thread, no follow)                                             |
+| `N`       | spawn modal (new thread, follows cursored)                                      |
+| `p`       | publish cursored thread (`kk publish`)                                          |
+| `x`       | close cursored thread (opens confirmation card)                                 |
+| `i`       | interrupt cursored thread's agent (opens confirmation card)                     |
 | `r`       | reopen cursored thread (only meaningful when thread is closed; otherwise no-op) |
-| `?`       | toggle chord ribbon                                           |
-| `q`       | dismiss overlay                                               |
-| `esc`     | dismiss overlay                                               |
-| click     | (mouse) move cursor to clicked row, or switch preview tab     |
-| scroll    | (mouse) scroll the focused pane (sidebar list or preview)     |
+| `?`       | toggle chord ribbon                                                             |
+| `q`       | dismiss overlay                                                                 |
+| `esc`     | dismiss overlay                                                                 |
+| click     | (mouse) move cursor to clicked row, or switch preview tab                       |
+| scroll    | (mouse) scroll the focused pane (sidebar list or preview)                       |
 
 Note: `c` is **preview-PR-comments**, not close. Close is `x`. The two are deliberately disjoint because `c` would otherwise collide with the more-frequent comments-preview action.
 
 Persistent sidebar pane:
 
 | key             | verb                                |
-|-----------------|-------------------------------------|
+| --------------- | ----------------------------------- |
 | `↑` `↓` `j` `k` | move cursor                         |
 | `tab`           | jump between Stack and Activity     |
 | `enter`         | switch to cursored thread           |
@@ -373,7 +373,7 @@ One line at the bottom of the overlay. Order, left to right:
 
 The persistent sidebar's context strip is a shortened form: `<bookmark>[*]  <cascade-glyph cascade-state>  <agent-glyph>`. Model and ctx are omitted because the agent pane next to it already surfaces them.
 
-The context strip is a TUI-specific footer and is **not** a `StatusRenderer` projection. The `StatusRenderer`-fed artifact is the *inlined status* under the current thread's bookmark line in the Stack section; that artifact is byte-identical with `kk status --no-jj` per `testing.md` (`StatusRenderer` shared-renderer test).
+The context strip is a TUI-specific footer and is **not** a `StatusRenderer` projection. The `StatusRenderer`-fed artifact is the _inlined status_ under the current thread's bookmark line in the Stack section; that artifact is byte-identical with `kk status --no-jj` per `testing.md` (`StatusRenderer` shared-renderer test).
 
 ## Degradation
 

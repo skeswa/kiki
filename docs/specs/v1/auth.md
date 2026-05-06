@@ -13,7 +13,7 @@ kiki's v1 authorization model reduces accidental and buggy agent blast radius. I
 
 - bound to one thread
 - written to `<workspace>/.kiki/hook-cred`
-- read by `kk-hook`, sidebar, and same-thread MCP client
+- read by `kk-hook`, sidebar, and the same-thread MCP client when MCP ships
 - rotated on close and reopen
 
 ## Thread-scoped permissions
@@ -39,7 +39,7 @@ The persistent sidebar may need same-repo sibling summaries. This is the only v1
 
 Allowed fields are summary-only: name, status, PR number, last description, and similar one-line display data. No transcripts, diffs, cascade counters, or write operations are included.
 
-The same scope serves both the overlay's Stack and Activity sections and the persistent sidebar's two sections — they are one renderer reading one row set. The Activity section adds *ordering* (most-recent agent event), not new fields.
+The same scope serves both the overlay's Stack and Activity sections and the persistent sidebar's two sections — they are one renderer reading one row set. The Activity section adds _ordering_ (most-recent agent event), not new fields.
 
 ## Audit
 

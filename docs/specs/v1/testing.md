@@ -18,7 +18,7 @@ Tests should target observable behavior and persisted state, not private impleme
 - `SidebarController` if TUI/sidebar ships
 - `PaneLifecycle` if persistent sidebar ships
 - `OverlayController` if overlay TUI ships — open/close, NAVIGATE-mode transitions, preview-mode toggling (`t`/`d`/`c`), chord-ribbon adaptation by selection, narrow-terminal degradation, mouse click-to-focus
-- `ToastQueue` if overlay TUI ships — TTL expiry, hover-dismiss, coalescing of cascade-applied events
+- `ToastQueue` if overlay TUI ships — TTL expiry, click dismiss, action-invocation dismiss, row-focus acknowledgement dismiss, coalescing of cascade-applied events
 - `FormController` if overlay TUI ships — spawn-card field navigation, destructive-confirmation modal flow
 
 ## Regression tests for resolved spec conflicts
@@ -28,7 +28,7 @@ Tests should target observable behavior and persisted state, not private impleme
 - Cooperative workspace isolation is documented and no test claims security isolation.
 - Kiki-owned workspace files under `.kiki/` do not block `kk close`.
 - User-created untracked or ignored files still block or prompt during `kk close`.
-- Stop hook behavior is either specified and tested or not installed.
+- Stop hook is not installed in v1 unless behavior is specified and tested.
 
 ## Cascade crash tests
 
