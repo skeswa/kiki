@@ -19,7 +19,7 @@
 
 ## What the daemon does NOT own
 
-- Active-thread focus. "Which thread am I in?" is discovered by the CLI's `ContextDiscovery` (env -> tmux session name -> cwd). `kk switch` is a tmux client operation, so `AuthEnforcer` does not gate switch on `Admin` — see [Authority](../05-authority.md).
+- Active-thread focus. "Which thread am I in?" is discovered by the CLI's `ContextDiscovery` (env -> tmux session name -> cwd). `kk switch` is a tmux client operation, so `AuthEnforcer` does not gate switch on `Admin` — see [Authority](../06-authority.md).
 - The terminal. tmux owns sessions, panes, copy mode, scrollback. `kkd` creates panes and switches focus through the tmux CLI; it does not multiplex.
 - jj revisions. `jj` owns revisions; `kkd` reacts to op-log events and issues thread-aware porcelain. Users can run `jj` directly any time and `kkd` reacts to whatever it sees.
 
@@ -32,4 +32,4 @@
 - On daemon crash, in-flight gRPC calls fail; clients reconnect. The cascade state machine's crash-safety guarantees come from the `cascade_outbox` + `MarkDelivered` ordering, not from the daemon staying up.
 - On daemon restart, the op-log catch-up (read `jj op log` since the last persisted cursor) runs _before_ JSONL backfill, so anchor lookups see a current `op_history`.
 - `kkd` is intended to be resurrectable by launchd or systemd-user. Restart recovery reads sqlite state; thread identity and persisted lifecycle state survive reboots.
-- A same-UID adversary can read credentials and invoke `kk` directly. The daemon's authorization model reduces accidental and buggy agent blast radius; it does not defend against active malice — see [Authority](../05-authority.md).
+- A same-UID adversary can read credentials and invoke `kk` directly. The daemon's authorization model reduces accidental and buggy agent blast radius; it does not defend against active malice — see [Authority](../06-authority.md).

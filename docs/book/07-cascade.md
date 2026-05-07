@@ -69,6 +69,28 @@ The follows link is dropped only after local and remote updates succeed.
 
 If an externally initiated `jj abandon` removes a parent bookmark, kiki marks affected children as requiring human attention. It does not silently choose a new parent.
 
+## State transitions
+
+```mermaid
+stateDiagram-v2
+    [*] --> FollowingParent: child has follows link
+    FollowingParent --> CascadePending: parent bookmark advances\nor ancestor revision amended
+    CascadePending --> FollowingParent: PreToolUse applies rebase\nand agent acknowledges
+    CascadePending --> Conflicted: textual conflict
+    Conflicted --> FollowingParent: human/agent resolves\nand cascade resumes
+    DetachedMovedToDefault --> [*]: child rebased to default\nbranch/PR base updated\nfollows link dropped
+    FollowingParent --> ParentMergePending: parent merged\ntransition started
+    ParentMergePending --> DetachedMovedToDefault: local rebase + remote updates succeed
+    ParentMergePending --> Conflicted: local rebase conflicts
+    ParentMergePending --> RemoteUpdateFailed: force-push or PR-base update fails
+    RemoteUpdateFailed --> DetachedMovedToDefault: retry/reconcile succeeds
+    FollowingParent --> DetachedPinned: parent closed
+    FollowingParent --> NeedsHumanDecision: parent abandoned
+    NeedsHumanDecision --> DetachedPinned: detach
+    NeedsHumanDecision --> DetachedPinned: keep pinned
+    NeedsHumanDecision --> Destroyed: abandon child
+```
+
 ## Detach and graph surgery
 
 `kk thread detach` is the v1 escape hatch for breaking a live follows link if it ships with the CLI surface. Broader graph surgery, including attach and reparent, is deferred beyond v1 unless promoted by a later spec change.

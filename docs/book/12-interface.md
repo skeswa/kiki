@@ -4,15 +4,15 @@ The TUI is not required for the first core implementation slice. This is the v1 
 
 ## Vocabulary
 
-- **Overlay** — the full-screen TUI invoked by bare `kk` (inside a registered repo) or tmux `prefix+k`. Transient. Dismissed on switch, on `q` or `esc`, or on completing a verb. Outside a registered repo, bare `kk` falls back to the command summary plus `kk ls` (see [Commands](10-commands.md)).
+- **Overlay** — the full-screen TUI invoked by bare `kk` (inside a registered repo) or tmux `prefix+k`. Transient. Dismissed on switch, on `q` or `esc`, or on completing a verb. Outside a registered repo, bare `kk` falls back to the command summary plus `kk ls` (see [Commands](11-commands.md)).
 - **Persistent sidebar** — an opt-in tmux pane spawned at thread birth. Always-on, navigation-only. Lives next to the agent pane until the user kills it.
 - **Stack section** — the threads in the current repo, rendered as a follows-aware tree in `kk log` order. Cursor moves here for navigation.
 - **Activity section** — the same threads, flat-listed by most-recent agent event (descending). Cursor moves here for triage.
 - **Preview pane** — the right two-thirds of the overlay. Renders one of: transcript tail, working-copy diff, PR comments. Toggled by `t` / `d` / `c`.
 - **Chord ribbon** — a one-line keybinding hint at the bottom edge of the overlay. Toggled by `?`. Adapts to current selection (e.g. hides `c` for a thread without a PR).
-- **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](10-commands.md)). Single source of truth.
+- **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](11-commands.md)). Single source of truth.
 - **Context strip** — the bottom-most line of the overlay or the persistent sidebar pane. One compressed sentence with TUI-specific content. Two forms by context: the overlay form carries repo + bookmark + cascade glyph + agent model + ctx % + last op age; the persistent-sidebar form is shorter (bookmark + cascade glyph + agent glyph) because the agent pane next to it already surfaces model and ctx. This is a TUI footer, separate from the `StatusRenderer`-backed inlined status.
-- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms, overriding the default — see [Publishing](08-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens a confirmation card.
+- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms, overriding the default — see [Publishing](09-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens a confirmation card.
 - **Card** — a centered modal panel with title, body, and one or two action buttons. Used for spawn and destructive confirmation.
 
 ## Glyph language
@@ -269,11 +269,11 @@ Toasts are non-modal pills in the overlay's top-right corner, stacking downward.
 Two subtypes share the surface:
 
 - **Notification toast** — no interactive action. The body may include hint text naming an overlay verb (e.g., "tap T to read transcript"); the verb is fielded by the overlay's normal keymap, the toast does not intercept it.
-- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge — see [Publishing](08-publishing.md)). Toasts never open a confirmation card.
+- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge — see [Publishing](09-publishing.md)). Toasts never open a confirmation card.
 
 Dismissal rules (apply to both subtypes):
 
-- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms; specific triggers may override, e.g., auto-archive undo grace = 5000ms — see [Publishing](08-publishing.md))
+- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms; specific triggers may override, e.g., auto-archive undo grace = 5000ms — see [Publishing](09-publishing.md))
 - click anywhere on the toast pill (excluding the action label, which runs the action) dismisses it
 - moving the keyboard cursor onto the row that issued the toast, or clicking that row, dismisses the toast (treated as "user acknowledged")
 - invoking the toast's action (actionable toasts only) dismisses the toast on completion
@@ -285,9 +285,9 @@ Toast triggers (v1):
 - cascade conflict on a non-current thread (`◐`) — notification
 - cascade applied to a child thread (`──`, only when ≥ 2 children rebased to coalesce noise) — notification
 - config-set warning that won't take effect until next `kk new` / `kk reopen` — notification
-- auto-archive on PR-merge (`✓`) with `undo` action (5s grace — see [Publishing](08-publishing.md)) — actionable
+- auto-archive on PR-merge (`✓`) with `undo` action (5s grace — see [Publishing](09-publishing.md)) — actionable
 
-Toasts are overlay-only. The persistent sidebar is navigation-only, and stacking toast UI beside the live agent pane would be ambiguous. When the overlay is closed, OS-native notifications (configured via `[notifications]` — see [Configuration](12-configuration.md)) carry the same events.
+Toasts are overlay-only. The persistent sidebar is navigation-only, and stacking toast UI beside the live agent pane would be ambiguous. When the overlay is closed, OS-native notifications (configured via `[notifications]` — see [Configuration](13-configuration.md)) carry the same events.
 
 ### Wireframe — conflicted-thread toast in overlay
 
@@ -401,7 +401,7 @@ If `[ui] mouse_enabled = false`, kiki does not request mouse capture from the te
 
 `[ui]` keys introduced or referenced by this spec:
 
-- `persistent_sidebar` (bool, default `false`) — covered in [Configuration](12-configuration.md)
+- `persistent_sidebar` (bool, default `false`) — covered in [Configuration](13-configuration.md)
 - `sidebar_width` (int, default `32`)
 - `sidebar_min_terminal_cols` (int, default `100`)
 - `mouse_enabled` (bool, default `true`)
@@ -409,7 +409,7 @@ If `[ui] mouse_enabled = false`, kiki does not request mouse capture from the te
 - `toast_ttl_ms` (int, default `4000`)
 - `theme` (string, default `"soft-dark"`)
 
-All `[ui]` keys are personal preference: valid in user and per-thread config, invalid in repo-shared config (warned-and-ignored). Hot-reload semantics (matching [Configuration](12-configuration.md)):
+All `[ui]` keys are personal preference: valid in user and per-thread config, invalid in repo-shared config (warned-and-ignored). Hot-reload semantics (matching [Configuration](13-configuration.md)):
 
 - `mouse_enabled`, `toast_ttl_ms`, and `theme` are cosmetic and hot-reload.
 - `persistent_sidebar`, `sidebar_width`, `sidebar_min_terminal_cols`, and `overlay_min_cols` take effect on the next lifecycle event (`kk new`, `kk reopen`, or next overlay open) — they do not retroactively reshape live sessions.

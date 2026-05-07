@@ -62,6 +62,38 @@ Close is intentionally boring. It should be possible to close a thread with conf
 
 After close, the tmux client switches to the parent thread if that session exists. Otherwise it returns to the previously focused thread if possible, or detaches.
 
+```mermaid
+flowchart TD
+    A[kk close requested] --> B[Preflight: no destructive mutation]
+    B --> C{Tracked work preserved\nand untracked policy satisfied?}
+    C -- no --> D[Abort or ask human\nthread remains Active]
+    C -- yes --> E[Commit phase]
+    E --> F[Stop agent and kill tmux session]
+    F --> G[Post-stop loss-prevention recheck]
+    G --> K{Still safe to delete?}
+    K -- no --> L[Abort\nworkspace remains present\nthread remains Active]
+    K -- yes --> M[Detach following children\nwith notification]
+    M --> H[jj workspace forget]
+    H --> I[Delete materialized workspace dir]
+    I --> J[Mark thread Closed]
+```
+
+## Lifecycle states
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active: kk new
+    Active --> ClosePreflight: kk close
+    ClosePreflight --> Active: preflight fails / user cancels\n(no mutation)
+    ClosePreflight --> CloseCommit: preflight passes
+    CloseCommit --> Active: post-stop recheck fails\n(workspace preserved)
+    CloseCommit --> Closed: forget workspace\ndelete materialized dir
+    Closed --> Active: kk reopen\nrecreate workspace + tmux\nresume or respawn agent
+    Active --> Destroyed: kk thread destroy
+    Closed --> Destroyed: kk thread destroy
+    Destroyed --> [*]
+```
+
 ## Reopen
 
 `kk reopen <thread>` restores a closed thread by recreating the workspace, tmux session, hook credentials, and harness process.

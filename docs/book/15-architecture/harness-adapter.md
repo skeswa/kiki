@@ -59,7 +59,7 @@ The `structured` field carries diff payloads, file lists, etc. for richer agent 
 - Fast-path round-trip target: <5ms typical, imperceptible to agents.
 - Slow path (rebase + payload compose) is bounded by `jj rebase` plus a small constant.
 
-The hook's exact behavior — outbox lookup, decision step, post-stdout `MarkDelivered` — lives in [Cascade](../06-cascade.md).
+The hook's exact behavior — outbox lookup, decision step, post-stdout `MarkDelivered` — lives in [Cascade](../07-cascade.md).
 
 ## Hook chaining
 
@@ -89,7 +89,7 @@ Cascade-injection row writes are NOT part of this trait — they are performed b
 
 ## Spawn lifecycle
 
-`kk new` performs an atomic spawn. If any step fails, `kkd` unwinds prior steps to avoid orphaned state. The full sequence — kept here for the harness-adapter context; the canonical lifecycle description lives in [Threads](../04-threads.md):
+`kk new` performs an atomic spawn. If any step fails, `kkd` unwinds prior steps to avoid orphaned state. The full sequence — kept here for the harness-adapter context; the canonical lifecycle description lives in [Threads](../05-threads.md):
 
 1. Resolve name/prompt/follows/harness/sidebar options.
 2. Insert the sqlite thread row (the stable `thread_id` other steps attach to).

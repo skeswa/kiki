@@ -17,16 +17,16 @@ The proto is partitioned by capability class. Every method declares the minimum 
 | Repo registry      | `RegisterRepo`, `UnregisterRepo`, `ListRepos`              | `Admin`                                                                                               |
 | Thread lifecycle   | `NewThread`, `Close`, `Reopen`, `Destroy`                  | `Admin`                                                                                               |
 | Thread reads (own) | `GetThreadState`, `StreamThreadEvents`, `ReadContextQueue` | `ThreadScoped<T>`                                                                                     |
-| Repo summaries     | `RepoThreadSummaries` (server-streaming)                   | `ThreadScoped<T>` (read-only sibling summaries, same-repo only — see [Authority](../05-authority.md)) |
+| Repo summaries     | `RepoThreadSummaries` (server-streaming)                   | `ThreadScoped<T>` (read-only sibling summaries, same-repo only — see [Authority](../06-authority.md)) |
 | Cascade hook       | `PreToolUseDecision`, `MarkDelivered`                      | `ThreadScoped<T>`                                                                                     |
 | Transcript         | `ReadTranscript`, `SearchTranscript`                       | `Admin` (human CLI / TUI)                                                                             |
 | Publish            | `Publish`                                                  | `Admin`                                                                                               |
 | Audit              | `GetAuditLog`, `GetThreadAudit`                            | `Admin`                                                                                               |
 | Config             | `GetConfig`, `SetConfig`                                   | `Admin`                                                                                               |
 
-There is **no** `Switch` RPC. `kkd` does not own focus. The CLI decomposes switch into (i) a read-only `RepoThreadSummaries`-class lookup of the target thread's tmux session name (any valid credential, including `ThreadScoped<other>`, suffices) and (ii) a `tmux switch-client -t <session>` invocation. See [Authority](../05-authority.md).
+There is **no** `Switch` RPC. `kkd` does not own focus. The CLI decomposes switch into (i) a read-only `RepoThreadSummaries`-class lookup of the target thread's tmux session name (any valid credential, including `ThreadScoped<other>`, suffices) and (ii) a `tmux switch-client -t <session>` invocation. See [Authority](../06-authority.md).
 
-(The MCP transcript surface, when it ships, lives on a separate socket — see [Roadmap](../17-roadmap.md).)
+(The MCP transcript surface, when it ships, lives on a separate socket — see [Roadmap](../18-roadmap.md).)
 
 ## Streaming events
 

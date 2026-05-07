@@ -58,4 +58,4 @@ Definitions of the load-bearing terms in kiki's reference. When a term is used i
 
 ## v2 / future
 
-- **Causal chain** — UUID stamped on each MCP-driven post, used to detect cycles, depth excess, and branch fan-out in inter-thread messaging. See [Roadmap](17-roadmap.md).
+- **Causal chain** — UUID stamped on each MCP-driven post, used to detect cycles, depth excess, and branch fan-out in inter-thread messaging. See [Roadmap](18-roadmap.md).

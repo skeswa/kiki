@@ -35,14 +35,14 @@ The list below is table-level. Column-level definitions are derived from the beh
 - `thread_config` — per-thread config layer key/value/updated_at.
 - `credentials` — `(cred_id, kind: 'Admin' | 'ThreadScoped', thread_id?, issued_at, revoked_at?)`.
 - `audit_log` — append-only `(timestamp, cred_id, declared_scope, method, args_summary, outcome)`.
-- `thread_messages` — per-thread transcript rows. `(thread_id, change_id?, commit_id?, op_id?, session_id, seq, captured_at, author, direction, text, dedup_key, synthesized, anchor_unknown)` with `UNIQUE (thread_id, dedup_key)` and an FTS5 virtual table over `text`. CHECK constraint binding `anchor_unknown` to nullability of the `(change_id, commit_id, op_id)` triple. See [Transcript](../07-transcript.md).
+- `thread_messages` — per-thread transcript rows. `(thread_id, change_id?, commit_id?, op_id?, session_id, seq, captured_at, author, direction, text, dedup_key, synthesized, anchor_unknown)` with `UNIQUE (thread_id, dedup_key)` and an FTS5 virtual table over `text`. CHECK constraint binding `anchor_unknown` to nullability of the `(change_id, commit_id, op_id)` triple. See [Transcript](../08-transcript.md).
 - `thread_changes` — per-(thread, change_id) row carrying `tombstoned_at?` (abandon) and `redirected_to?` (squash).
 - `transcript_offsets` — per-(thread, session_id) `(byte_offset, last_row_uuid)` for crash-safe tail resumption. Both fields advance in the same transaction as the corresponding `thread_messages` insert.
 - `pending_kkd_prepends` — TTL-bounded `(prepend_id PRIMARY KEY, thread_id, text_sha256, inserted_at)`. Duplicate `(thread_id, text_sha256)` rows are allowed and consumed FIFO. Match key omits `session_id` so fresh-session reopens match correctly.
 
 ### v2-only
 
-- `causal_chains`, `causal_chain_visits` — deferred until the broader MCP substrate ships. See [Roadmap](../17-roadmap.md).
+- `causal_chains`, `causal_chain_visits` — deferred until the broader MCP substrate ships. See [Roadmap](../18-roadmap.md).
 
 ## CHECK constraints worth calling out
 

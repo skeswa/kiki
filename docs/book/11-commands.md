@@ -28,11 +28,11 @@ It verifies prerequisites:
 
 ## `kk`
 
-Bare `kk` opens the overlay TUI in `NAVIGATE` mode (see [Interface](11-interface.md)) when the TUI ships. Before the TUI ships, it prints a concise command summary and points to `kk ls`. Outside a registered repo, even after the TUI ships, `kk` falls back to the command summary plus `kk ls`.
+Bare `kk` opens the overlay TUI in `NAVIGATE` mode (see [Interface](12-interface.md)) when the TUI ships. Before the TUI ships, it prints a concise command summary and points to `kk ls`. Outside a registered repo, even after the TUI ships, `kk` falls back to the command summary plus `kk ls`.
 
 ## `kk new`
 
-`kk new` creates a thread as specified in [Threads](04-threads.md).
+`kk new` creates a thread as specified in [Threads](05-threads.md).
 
 Important flags:
 
@@ -44,7 +44,7 @@ Important flags:
 
 ## `kk switch`
 
-`kk switch <thread>` switches the tmux client to the target thread's tmux session. It does not mutate daemon focus state; see [Authority](05-authority.md).
+`kk switch <thread>` switches the tmux client to the target thread's tmux session. It does not mutate daemon focus state; see [Authority](06-authority.md).
 
 ## `kk ls`
 

@@ -9,22 +9,23 @@ Read it as a small spec book: first the reason for the tool, then the model, the
 1. [Abstract](book/00-abstract.md)
 2. [Orientation](book/01-orientation.md)
 3. [Glossary](book/02-glossary.md)
-4. [Invariants](book/03-invariants.md)
-5. [Threads](book/04-threads.md)
-6. [Authority](book/05-authority.md)
-7. [Cascade](book/06-cascade.md)
-8. [Transcript](book/07-transcript.md)
-9. [Publishing](book/08-publishing.md)
-10. [Metadata Evolution](book/09-metadata.md)
-11. [Commands](book/10-commands.md)
-12. [Interface](book/11-interface.md)
-13. [Configuration](book/12-configuration.md)
-14. [Observability](book/13-observability.md)
-15. [Architecture](book/14-architecture/)
-16. [Testing](book/15-testing.md)
-17. [Build Sequencing](book/16-build-sequencing.md)
-18. [Roadmap](book/17-roadmap.md)
-19. [Naming](book/18-naming.md)
+4. [User Stories](book/03-user-stories.md)
+5. [Invariants](book/04-invariants.md)
+6. [Threads](book/05-threads.md)
+7. [Authority](book/06-authority.md)
+8. [Cascade](book/07-cascade.md)
+9. [Transcript](book/08-transcript.md)
+10. [Publishing](book/09-publishing.md)
+11. [Metadata Evolution](book/10-metadata.md)
+12. [Commands](book/11-commands.md)
+13. [Interface](book/12-interface.md)
+14. [Configuration](book/13-configuration.md)
+15. [Observability](book/14-observability.md)
+16. [Architecture](book/15-architecture/)
+17. [Testing](book/16-testing.md)
+18. [Build Sequencing](book/17-build-sequencing.md)
+19. [Roadmap](book/18-roadmap.md)
+20. [Naming](book/19-naming.md)
 
 Appendices contain design notes and historical PRD stubs:
 
@@ -37,11 +38,12 @@ The numbered chapters are the live contract. Appendices explain why the contract
 
 When two live chapters appear to conflict, use this order:
 
-1. [Invariants](book/03-invariants.md)
-2. Behavioral chapters: [Threads](book/04-threads.md), [Authority](book/05-authority.md), [Cascade](book/06-cascade.md), [Transcript](book/07-transcript.md), [Publishing](book/08-publishing.md), [Metadata Evolution](book/09-metadata.md), [Commands](book/10-commands.md), [Interface](book/11-interface.md), [Configuration](book/12-configuration.md), and [Observability](book/13-observability.md)
-3. [Architecture](book/14-architecture/)
-4. [Testing](book/15-testing.md), [Build Sequencing](book/16-build-sequencing.md), [Roadmap](book/17-roadmap.md), and [Naming](book/18-naming.md)
-5. Appendices
+1. [Invariants](book/04-invariants.md)
+2. Behavioral chapters: [Threads](book/05-threads.md), [Authority](book/06-authority.md), [Cascade](book/07-cascade.md), [Transcript](book/08-transcript.md), [Publishing](book/09-publishing.md), [Metadata Evolution](book/10-metadata.md), [Commands](book/11-commands.md), [Interface](book/12-interface.md), [Configuration](book/13-configuration.md), and [Observability](book/14-observability.md)
+3. [User Stories](book/03-user-stories.md), as product intent that the stricter chapters must satisfy
+4. [Architecture](book/15-architecture/)
+5. [Testing](book/16-testing.md), [Build Sequencing](book/17-build-sequencing.md), [Roadmap](book/18-roadmap.md), and [Naming](book/19-naming.md)
+6. Appendices
 
 The original PRD path remains as a historical stub. The numbered chapters carry the contract.
 
