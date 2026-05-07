@@ -12,7 +12,7 @@
 
 <p>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
-  <a href="docs/prds/0001-kiki.md"><img alt="Status: pre-alpha" src="https://img.shields.io/badge/status-pre--alpha-orange" /></a>
+  <a href="docs/README.md"><img alt="Status: pre-alpha" src="https://img.shields.io/badge/status-pre--alpha-orange" /></a>
   <a href="https://github.com/jj-vcs/jj"><img alt="VCS: jujutsu" src="https://img.shields.io/badge/vcs-jujutsu-purple" /></a>
   <a href="https://claude.com/claude-code"><img alt="Harness: Claude Code" src="https://img.shields.io/badge/harness-claude_code-9b59ff" /></a>
 </p>
@@ -45,7 +45,7 @@ graph TD
 
 kiki is a single workflow for working on several pieces of code at once, with several AI agents at once. It ties together [jujutsu (jj)](https://github.com/jj-vcs/jj), [tmux](https://github.com/tmux/tmux), [Claude Code](https://claude.com/claude-code), and the GitHub CLI behind a single command, `kk`. Each thread — the atom of the system, sketched above — is isolated on disk so concurrent edits don't stomp on each other, and related in history so a refactor and the test-writing it implies can run alongside one another instead of one after the other. When the ground shifts under a thread, kiki rebases it and tells its agent without losing the agent's in-flight reasoning; that mechanism gets its own section below.
 
-The complete spec is at [`docs/prds/0001-kiki.md`](docs/prds/0001-kiki.md); what's actually built today is captured in the [Status](#status) section below.
+The complete reference book is at [`docs/README.md`](docs/README.md); what's actually built today is captured in the [Status](#status) section below.
 
 ## What problem is being solved
 
@@ -164,7 +164,7 @@ Cleanly stated: `kkd` is a single user-scoped daemon (one process per user, opte
 
 State is partitioned. `~/.kiki/state.db` is the user-scoped registry of which repositories are managed and where the daemon is reachable. `<repo>/.kiki/state.db` holds the per-repository runtime state — threads, workspaces, agent sessions, hook state, the AI queue, the metadata-ownership ledger, the op-attribution dedupe table. Removing one repository's `.kiki/` directory wipes that repository's kiki state without disturbing any other.
 
-The implementation language for `kkd` and its CLI clients, per the PRD, is Rust — driven by the long-term path to embedding [jj-lib](https://github.com/jj-vcs/jj) directly in the daemon, by the Send/Sync guarantees the cascade-coordination code wants, and by the maturity of `tonic`/`notify`/`rusqlite`/`ratatui`. The repository as it stands is a Bun+TypeScript scaffold for tooling experiments; the language decision is the first major implementation milestone, gated by the proof-of-concept described in the PRD's _Suggested build sequencing_ section.
+The implementation language for `kkd` and its CLI clients, per the reference book, is Rust — driven by the long-term path to embedding [jj-lib](https://github.com/jj-vcs/jj) directly in the daemon, by the Send/Sync guarantees the cascade-coordination code wants, and by the maturity of `tonic`/`notify`/`rusqlite`/`ratatui`. The repository as it stands is a Bun+TypeScript scaffold for tooling experiments; the language decision is the first major implementation milestone, gated by the proof-of-concept described in [Build Sequencing](docs/book/16-build-sequencing.md).
 
 ## A small worked example
 
@@ -206,7 +206,7 @@ A persistent tmux status-line strip surfaces threads needing attention; OS-nativ
 | **v2 — the substrate** | MCP surface expanded beyond v1's read-only same-thread log: agents in one thread can post messages to siblings, spawn children, request human review — with causal-chain cycle detection, depth and branching caps, and a complete audit trail. Codex harness adapter (slotting into the v1 `TranscriptAdapter` trait). Native macOS GUI. Direct GitHub REST/GraphQL. PR review-comment ingestion into agent context. |
 | **v3+**                | jj-lib embedded directly in kkd. Web dashboard. Cross-repository coordinated agent tasks.                                                                                                                                                                                                                                                                                                                             |
 
-The full spec — including v2's MCP design, captured in the same document so it is not lost between revisions — lives in [`docs/prds/0001-kiki.md`](docs/prds/0001-kiki.md).
+The full spec — including v2's MCP design — lives in the [`docs/`](docs/README.md) reference book.
 
 ## On the name
 
@@ -218,9 +218,9 @@ The second reason is more important. A [_kiki_](<https://en.wikipedia.org/wiki/K
 
 ## Status
 
-Pre-alpha. Spec phase. The PRD is complete and has survived one Codex review pass; implementation has not begun. The repository's TypeScript scaffolding is provisional and exists to make tooling decisions easier; the production code is slated to be Rust per the spec, and the language decision will be revisited at the gating proof-of-concept.
+Pre-alpha. Spec phase. The reference book has absorbed the original PRD and survived one Codex review pass; implementation has not begun. The repository's TypeScript scaffolding is provisional and exists to make tooling decisions easier; the production code is slated to be Rust per the spec, and the language decision will be revisited at the gating proof-of-concept.
 
-If this looks like a tool that would change how you work, the most useful thing you can do today is read the PRD and file an issue on anything that strikes you as wrong, missing, or under-specified. The spec is durable enough that pre-implementation feedback is genuinely actionable.
+If this looks like a tool that would change how you work, the most useful thing you can do today is read the reference book and file an issue on anything that strikes you as wrong, missing, or under-specified. The spec is durable enough that pre-implementation feedback is genuinely actionable.
 
 ## Building
 
@@ -234,7 +234,7 @@ Once the v1 build begins this section will gain `cargo build`, `cargo test`, and
 
 ## Design principles, explicit
 
-A few principles, stated up front, because the PRD's coherence depends on them:
+A few principles, stated up front, because the reference book's coherence depends on them:
 
 1. **Be additive, not invasive.** The user can keep using jj, gh, and tmux as they always have. kiki reacts to what they do; it does not refuse, intercept, or wrap.
 2. **Trust human prose.** Auto-rename and auto-describe are useful, but the moment a human types their own description, kiki steps off permanently. There is no path where kiki silently overwrites human-authored content.
@@ -253,10 +253,10 @@ A few principles, stated up front, because the PRD's coherence depends on them:
 
 ## Contributing
 
-The PRD is [`docs/prds/0001-kiki.md`](docs/prds/0001-kiki.md). Some expectations for substantial changes:
+The reference book starts at [`docs/README.md`](docs/README.md). The original PRD path is now a historical stub at [`docs/appendix/prds/0001-kiki.md`](docs/appendix/prds/0001-kiki.md). Some expectations for substantial changes:
 
-1. Open an issue describing the change. PRDs for substantial work go in `docs/prds/`, numbered.
-2. PRDs in this repository are expected to survive a [Codex](https://github.com/openai/codex) review pass — the first PRD's review surfaced three v1-scope contradictions, all resolved in the same revision. Keep Out of Scope, User Stories, and Implementation Decisions consistent with each other.
+1. Open an issue describing the change. Substantial work should update the reference book directly; historical PRD stubs live under `docs/appendix/prds/`.
+2. Spec changes in this repository are expected to survive a [Codex](https://github.com/openai/codex) review pass — the first PRD's review surfaced three v1-scope contradictions, all resolved before its contents were folded into the book. Keep neighboring chapters consistent with each other.
 3. Commits follow a one-line imperative subject plus a multi-paragraph body; `jj log` has examples.
 4. Future Claude Code instances reading the repository should consult [`CLAUDE.md`](CLAUDE.md) first.
 

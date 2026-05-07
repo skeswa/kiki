@@ -1,4 +1,4 @@
-# Testing spec
+# Testing
 
 Tests should target observable behavior and persisted state, not private implementation details.
 
@@ -42,3 +42,22 @@ The cascade tests must cover:
 - resume with delivered-but-unacknowledged outbox row
 - multiple cascades before first hook coalescing into one delivery
 - `cascade_outbox` lookup ignores `delivered_at` and keys on `applied_cascade_seq > acknowledged_cascade_seq`
+
+## Fakes
+
+Deep-module tests should use fakes for:
+
+- `JjBackend`
+- `TmuxBackend`
+- `GitHubBackend`
+- `Harness`
+- `TranscriptAdapter`
+- notification sink
+- clock
+- filesystem event source
+
+The fakes should expose edge cases directly: op storms, hook crashes, JSONL rotation, out-of-order timestamps, remote divergence, and agent session restart.
+
+## Integration-only surfaces
+
+The real `jj`, `gh`, Claude Code, ratatui terminal loop, tmux pane wiring, and fsnotify watcher are smoke-tested or integration-tested. Their detailed behavior is dominated by upstream tools. Core interpretation logic belongs in deep-module tests against fakes.

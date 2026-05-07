@@ -1,37 +1,29 @@
-# Product overview
+# Orientation
 
-## Vision
+This chapter defines what kiki is. Later chapters define how it behaves.
+
+## The tool
 
 kiki (`kk`) is an agentic coding workflow coordinator. It gives a developer a first-class unit for a themed line of work: a jj-backed revision stack, an isolated workspace, a tmux session, and an agent session that can be paused, resumed, published, archived, and composed with related work.
 
-The core product belief is that parallel agentic work should feel cheap enough to use routinely. Today, switching between agent-led lines of inquiry requires manual stashes, branches, rebases, terminal reconstruction, and context reconstruction. kiki makes that work ambient: threads can branch from other threads, follow live ancestor changes, and carry enough local transcript and status context that the human can orient quickly.
+kiki exists to make parallel, recursive work patterns cheap enough that a developer can maximally utilize and collaborate with agents. Today, switching between agent-led lines of inquiry means stashes, branches, rebases, lost terminals, and reconstructed context. kiki makes that machinery ambient: threads branch from other threads, follow live ancestor changes, and carry enough local transcript and status context that the human can get oriented without needing to resort to archaeology.
 
-### Core principles
+## Principles
 
-- kiki is an ambient coordinator, not a gatekeeper. Developers can still use `jj`, `tmux`, and `gh` directly.
-- Threads are cooperative isolation, not a security boundary. v1 separates workspaces to prevent accidental interference; it does not sandbox same-UID processes.
+- kiki coordinates ambiently. Developers may still use `jj`, `tmux`, and `gh` directly.
+- Threads provide cooperative isolation. v1 separates workspaces to prevent accidental interference; it does not sandbox same-UID processes.
 - Human-authored prose is preserved. kiki may draft names, descriptions, and PR text, but it must not silently overwrite deliberate human edits.
-- Local transcript data stays local. v1 transcript rows can feed local recall and reopen catch-up, but they must not feed externally published artifacts.
+- Local transcript data stays local. v1 transcript rows may feed local recall and reopen catch-up; they must not feed externally published artifacts.
 - Cascade safety matters more than eagerness. Descendant workspaces move at agent boundaries or quiescence, not mid-edit.
 
-## v1 scope
+## v1 contract
 
 v1 is successful when kiki can create, switch, coordinate, publish, archive, reopen, and inspect agentic work threads without relying on the original PRD as the implementation contract.
 
-### Acceptance surface
+The v1 acceptance surface includes:
 
-The v1 acceptance slice includes:
-
-- `kk init`
-- `kk new`
-- `kk switch`
-- `kk ls`
-- `kk close`
-- `kk reopen`
-- `kk publish`
-- `kk log`
-- `kk status`
-- `kk thread transcript`
+- `kk init`, `kk new`, `kk switch`, `kk ls`, `kk close`, `kk reopen`
+- `kk publish`, `kk log`, `kk status`, `kk thread transcript`
 - per-user daemon with per-repo opt-in
 - jj workspace + bookmark backed thread identity
 - tmux session lifecycle
@@ -42,7 +34,7 @@ The v1 acceptance slice includes:
 - stack-aware publish flow
 - enough config layering for defaults, user, repo-local, per-thread, environment, and CLI flags
 
-### Deferred or stretch
+## Deferred or stretch
 
 These can deepen v1 but must not block the core acceptance slice unless explicitly promoted:
 
@@ -54,7 +46,7 @@ These can deepen v1 but must not block the core acceptance slice unless explicit
 - PR-merge auto-archive
 - read-only MCP transcript tools
 
-### Out of scope for v1
+## Out of scope for v1
 
 - filesystem sandboxing or security isolation between threads
 - resource caps for agents
@@ -65,7 +57,7 @@ These can deepen v1 but must not block the core acceptance slice unless explicit
 
 ## Non-goals
 
-v1 deliberately does not try to solve these problems:
+v1 leaves these problems alone:
 
 - kiki does not sandbox agents from each other. Per-thread workspaces provide cooperative separation only.
 - kiki does not manage CPU, memory, token, or model spend.

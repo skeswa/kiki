@@ -39,4 +39,4 @@ The cache is bounded by `op-log-size × workspace-count`, which jj keeps modest.
 
 ## Tests
 
-The watcher itself is tested via integration; the _logic_ of op-event interpretation is covered by `AncestryQuery` + `OpAttribution` deep-module tests (see [`../specs/testing.md`](../specs/testing.md)).
+The watcher itself is tested via integration; the _logic_ of op-event interpretation is covered by `AncestryQuery` + `OpAttribution` deep-module tests (see [Testing](../15-testing.md)).

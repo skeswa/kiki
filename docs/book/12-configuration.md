@@ -1,6 +1,8 @@
-# Config spec
+# Configuration
 
 Configuration is TOML and layered.
+
+Configuration must answer two questions clearly: what value is effective, and where did it come from. Anything else is a tax paid every time the user debugs a machine they forgot they configured.
 
 ## Precedence
 

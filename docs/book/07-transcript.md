@@ -1,6 +1,8 @@
-# Transcript spec
+# Transcript
 
 The thread transcript is a local recall surface for human-authored, agent-authored, and kiki-authored conversational text.
+
+It is a memory aid for the human and, at local boundaries, for the same thread's resumed agent. Code truth remains in jj and the filesystem.
 
 ## Storage
 
@@ -12,6 +14,8 @@ The transcript is local-only in v1. It must not feed:
 - auto-describe
 - auto-rename
 - any externally visible artifact
+
+This prohibition applies even when using the transcript would make the generated artifact better. The transcript contains dead ends, local reasoning, tool failures, and quoted material the user did not choose to publish.
 
 ## Row model
 
@@ -48,6 +52,8 @@ Not captured in v1:
 - extended-thinking blocks
 
 Backfill must anchor rows using per-workspace jj op history. If no reliable anchor exists, the row is inserted with `anchor_unknown=true`.
+
+Backfill must not stamp old messages with whatever `@` happens to be current when kiki restarts. That would make later change-aligned queries misleading.
 
 ## Reopen catch-up
 

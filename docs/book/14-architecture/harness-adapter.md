@@ -26,7 +26,7 @@ trait RunningAgent {
 
 ## Capabilities
 
-A typed struct, not a string list:
+Capabilities are a typed struct:
 
 ```
 struct Capabilities {
@@ -38,7 +38,7 @@ struct Capabilities {
 }
 ```
 
-Cascade behavior degrades cleanly when a capability is absent. A harness without `soft_pause` has `enqueue_context` lower into "queue and deliver on next `--resume`" rather than relying on a hook intercept. The daemon checks `capabilities` before deciding the cascade path.
+Cascade behavior degrades cleanly when a capability is absent. A harness without `soft_pause` has `enqueue_context` lower into "queue and deliver on next `--resume`". The daemon checks `capabilities` before deciding the cascade path.
 
 ## ContextMessage
 
@@ -59,7 +59,7 @@ The `structured` field carries diff payloads, file lists, etc. for richer agent 
 - Fast-path round-trip target: <5ms typical, imperceptible to agents.
 - Slow path (rebase + payload compose) is bounded by `jj rebase` plus a small constant.
 
-The hook's exact behavior — outbox lookup, decision step, post-stdout `MarkDelivered` — lives in [`../specs/cascade.md`](../specs/cascade.md).
+The hook's exact behavior — outbox lookup, decision step, post-stdout `MarkDelivered` — lives in [Cascade](../06-cascade.md).
 
 ## Hook chaining
 
@@ -89,7 +89,7 @@ Cascade-injection row writes are NOT part of this trait — they are performed b
 
 ## Spawn lifecycle
 
-`kk new` performs an atomic spawn. If any step fails, `kkd` unwinds prior steps to avoid orphaned state. The full sequence — kept here for the harness-adapter context; the canonical lifecycle description lives in [`../specs/thread-lifecycle.md`](../specs/thread-lifecycle.md):
+`kk new` performs an atomic spawn. If any step fails, `kkd` unwinds prior steps to avoid orphaned state. The full sequence — kept here for the harness-adapter context; the canonical lifecycle description lives in [Threads](../04-threads.md):
 
 1. Resolve name/prompt/follows/harness/sidebar options.
 2. Insert the sqlite thread row (the stable `thread_id` other steps attach to).

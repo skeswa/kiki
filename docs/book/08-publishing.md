@@ -1,6 +1,8 @@
-# Publishing spec
+# Publishing
 
 `kk publish` publishes a thread to GitHub through `gh`.
+
+Publishing is the point where local work becomes reviewer-facing. That boundary is why PR prose is human territory and why the transcript is not input to the drafter.
 
 ## Defaults
 
@@ -9,6 +11,7 @@
 - PR base is the parent thread's branch when stacked.
 - Unstacked, detached, or parentless threads base on the repo default branch.
 - If a parent is unpublished, `kk publish` publishes unpublished ancestors first, top-down.
+- Each PR in a stack publish gets its own editor session, top-down.
 
 ## PR text
 
@@ -25,6 +28,8 @@ After PR creation, title/body are human territory. Kiki does not silently overwr
 - `-m "<title>"`: set title inline.
 - `--downstack`: publish current thread plus unpublished descendants.
 
+`kk publish --refresh` is the explicit regeneration path for PR text after creation.
+
 ## GitHub events
 
 v1 may poll GitHub through `gh`.
@@ -34,3 +39,5 @@ v1 may poll GitHub through `gh`.
 - CI state change: notify only.
 - review comment: expose read-only through `kk thread comments`.
 - external force-push: mark remote divergence and require explicit reconciliation.
+
+v1 uses `gh` as the GitHub backend. The architecture keeps this behind a `GitHubBackend` trait so a direct REST or GraphQL backend can replace it later.

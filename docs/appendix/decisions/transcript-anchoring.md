@@ -10,7 +10,7 @@ While kiki is running, JSONL entries are anchored to the workspace's current `@`
 
 ## Backfill
 
-If kiki was down while an agent ran, entries must not be stamped with whatever `@` happens to be current when kiki restarts. Backfill reconstructs the anchor from per-workspace jj op history.
+If kiki was down while an agent ran, restart-time `@` is the wrong anchor for old entries. Backfill reconstructs the anchor from per-workspace jj op history.
 
 The per-workspace dimension is required because jj's op log is repo-shared while `@` is workspace-local.
 

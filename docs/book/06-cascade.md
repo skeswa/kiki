@@ -1,10 +1,12 @@
-# Cascade spec
+# Cascade
 
 Cascade is the v1 safety-critical feature. A child following a parent must pick up ancestor changes without letting the agent operate on stale disk state.
 
 ## Invariant
 
 A thread's working copy is rebased onto live ancestor state at an agent boundary or quiescence, never while the agent is mid-edit.
+
+The implementation may delay a cascade to preserve this invariant. It must not violate the invariant to appear responsive.
 
 ## Trigger
 
@@ -14,6 +16,8 @@ For a child with a follows link, kiki enqueues a cascade when:
 - a revision in the child's ancestry is amended.
 
 Kiki watches jj operations regardless of origin: human, agent, or kiki. Kiki must dedupe its own jj operations by op attribution.
+
+Rapid jj op storms should coalesce so a burst of ancestor changes produces one cascade per affected child where possible.
 
 ## State counters
 
@@ -41,6 +45,8 @@ After stdout delivery, `kk-hook` calls `MarkDelivered`. That handler atomically 
 
 This ordering is required. It prevents false acknowledgement and phantom transcript rows. Crash recovery may duplicate delivery; it must not silently drop delivery.
 
+Delivery and visibility are separate states. A transcript row that says kiki told the agent something must be written only after the hook has actually emitted that content and called `MarkDelivered`.
+
 ## Conflicts and escalation
 
 If rebase produces textual conflicts, the thread becomes `Conflicted`, a notification fires, and the agent is restarted with conflict framing.
@@ -51,8 +57,18 @@ Hard escalation is allowed when:
 - the agent is in long tool-less reasoning with no upcoming hook boundary, or
 - the human invokes `kk thread interrupt`.
 
+Escalation is a correctness mechanism. Its job is to put the agent back into a context where filesystem changes are safe to resume.
+
 ## Parent merged
 
 When a parent merges, kiki rebases the child onto the repo default branch, force-pushes with `--force-with-lease` if needed, updates the child PR base if needed, then drops the follows link.
 
 The follows link is dropped only after local and remote updates succeed.
+
+## Parent abandoned
+
+If an externally initiated `jj abandon` removes a parent bookmark, kiki marks affected children as requiring human attention. It does not silently choose a new parent.
+
+## Detach and graph surgery
+
+`kk thread detach` is the v1 escape hatch for breaking a live follows link if it ships with the CLI surface. Broader graph surgery, including attach and reparent, is deferred beyond v1 unless promoted by a later spec change.

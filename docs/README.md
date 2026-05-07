@@ -1,64 +1,50 @@
-# kiki docs
+# The kiki Reference
 
-This directory separates product intent, normative v1 behavior, architectural structure, design rationale, and roadmap.
+This directory is the implementation reference for kiki (`kk`).
 
-## Where to read
+Read it as a small spec book: first the reason for the tool, then the model, then the safety rules, then the user surfaces and machinery. The book is normative. It defines kiki's permitted behavior, prohibited behavior, and v1 boundaries. Ambiguity should be treated as a documentation bug to fix.
 
-- [Product overview](product/overview.md) — vision, v1 scope, non-goals.
-- [v1 invariants](specs/invariants.md) — non-negotiable behavioral promises that cut across multiple specs.
-- [v1 specs](specs/) — normative implementation contract for v1 behavior.
-- [Architecture](architecture/) — structural decisions: crates, gRPC surface, schema, daemon shape, op-log watcher, harness adapter.
-- [Glossary](glossary.md) — canonical definitions for the load-bearing terms.
-- [Decisions](decisions/) — design rationale and rejected alternatives.
-- [Roadmap](roadmap/) — v2 surfaces deliberately deferred.
-- [PRDs](prds/) — historical source documents. Frozen once their content has migrated into specs and architecture.
+## Reading order
 
-## Authority model
+1. [Abstract](book/00-abstract.md)
+2. [Orientation](book/01-orientation.md)
+3. [Glossary](book/02-glossary.md)
+4. [Invariants](book/03-invariants.md)
+5. [Threads](book/04-threads.md)
+6. [Authority](book/05-authority.md)
+7. [Cascade](book/06-cascade.md)
+8. [Transcript](book/07-transcript.md)
+9. [Publishing](book/08-publishing.md)
+10. [Metadata Evolution](book/09-metadata.md)
+11. [Commands](book/10-commands.md)
+12. [Interface](book/11-interface.md)
+13. [Configuration](book/12-configuration.md)
+14. [Observability](book/13-observability.md)
+15. [Architecture](book/14-architecture/)
+16. [Testing](book/15-testing.md)
+17. [Build Sequencing](book/16-build-sequencing.md)
+18. [Roadmap](book/17-roadmap.md)
+19. [Naming](book/18-naming.md)
 
-If two docs conflict, use this order:
+Appendices contain design notes and historical PRD stubs:
 
-1. `specs/invariants.md`
-2. `specs/*`
-3. `architecture/*`
-4. `product/overview.md`
-5. `decisions/*`
-6. `roadmap/*`
-7. `prds/*`
+- [Decisions](appendix/decisions/)
+- [PRDs](appendix/prds/)
 
-The PRD remains source material for many details, but implementation should be checked against the spec files and the architecture docs.
+## Authority
 
-## Layout
+The numbered chapters are the live contract. Appendices explain why the contract looks the way it does. The numbered chapters remain authoritative.
 
-```
-docs/
-├── README.md
-├── glossary.md
-├── product/
-│   └── overview.md
-├── specs/
-│   ├── invariants.md
-│   ├── cli.md
-│   ├── thread-lifecycle.md
-│   ├── cascade.md
-│   ├── transcript.md
-│   ├── auth.md
-│   ├── publishing.md
-│   ├── config.md
-│   ├── tui.md
-│   └── testing.md
-├── architecture/
-│   ├── crates.md
-│   ├── grpc.md
-│   ├── schema.md
-│   ├── daemon.md
-│   ├── op-log-watcher.md
-│   └── harness-adapter.md
-├── decisions/
-│   ├── cascade-outbox.md
-│   ├── transcript-anchoring.md
-│   └── rejected.md
-├── roadmap/
-│   └── mcp-v2.md
-└── prds/
-    └── 0001-kiki.md
-```
+When two live chapters appear to conflict, use this order:
+
+1. [Invariants](book/03-invariants.md)
+2. Behavioral chapters: [Threads](book/04-threads.md), [Authority](book/05-authority.md), [Cascade](book/06-cascade.md), [Transcript](book/07-transcript.md), [Publishing](book/08-publishing.md), [Metadata Evolution](book/09-metadata.md), [Commands](book/10-commands.md), [Interface](book/11-interface.md), [Configuration](book/12-configuration.md), and [Observability](book/13-observability.md)
+3. [Architecture](book/14-architecture/)
+4. [Testing](book/15-testing.md), [Build Sequencing](book/16-build-sequencing.md), [Roadmap](book/17-roadmap.md), and [Naming](book/18-naming.md)
+5. Appendices
+
+The original PRD path remains as a historical stub. The numbered chapters carry the contract.
+
+## Language
+
+The words **must**, **must not**, **may**, and **should** are normative in the ordinary RFC sense. The voice is plain by design: kiki coordinates expensive, stateful work, and the docs should say exactly what they mean.

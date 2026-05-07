@@ -24,6 +24,7 @@ kiki is a Cargo workspace with four crates. The split exists so the gRPC service
 - `ConfigLoader` — layered TOML + per-thread sqlite.
 - `AuthEnforcer` — Admin / ThreadScoped capability check on every gRPC call.
 - `ThreadTranscriptStore` — JSONL tail, projection, FTS5 read API.
+- `JjBackend` — v1 `JjCli` implementation shells out to `jj` and parses structured template output. A later `JjLib` implementation can swap behind the same trait.
 
 This split keeps "killing thread foo's tmux session" from becoming entangled with global daemon state and leaves room to extract per-thread supervisors into separate processes later without rewriting business logic.
 
