@@ -42,9 +42,50 @@ There is no test runner, linter, or build step configured yet; the project is pr
 
 This repo uses **jujutsu (jj) colocated with git**. Both `.jj/` and `.git/` exist; `git` operations work but `jj` is the primary interface. Conventions:
 
-- Use `jj describe -m "<subject>\n\n<body>"` for revision descriptions. Recent commits use a one-line subject in imperative mood plus a multi-paragraph body — match that style.
+- Use `jj describe -m '<message>'` for revision descriptions, where `<message>` is a one-line subject in imperative mood, a blank line, then a multi-paragraph body — match the style of recent commits. Build multi-line messages with real newlines (heredoc or ANSI-C quoting; see "Multi-line `-m` messages" below) — never `"subject\n\nbody"`, since `\n` doesn't expand inside double quotes.
 - The `main` bookmark is the trunk.
 - The repo uses GitHub (`origin git@github.com:skeswa/kiki.git`); pushes go via `jj git push` or `git push`.
+
+### One revision per individual change
+
+Land each individual change as its own jj revision, and describe every one. The idiomatic flow is `jj new` to start an empty change on top of the current revision, edit, then `jj describe -m '<message>'` once that change is coherent — or `jj commit -m '<message>'` as the shorthand for `describe + new`. Never leave the working copy parked on top of a previous revision and pile a second logical change into it; that produces the un-atomic "whoops, also fixed X" history that jj is designed to avoid.
+
+Concretely, when you're asked to make multiple changes in one turn:
+
+- Treat each logically distinct change (a refactor, a bugfix, a doc edit, a config tweak) as its own revision. If the diff would warrant a separate bullet in a PR description, it warrants its own revision.
+- Before starting the next change, run `jj new` (or `jj commit -m "..."` to describe-and-advance in one step) so the next edits land on a fresh empty revision rather than amending the prior one.
+- Always provide a description with `-m`. Match the imperative-subject + body style of recent commits — the body should explain *why*, not restate the diff. Never push or hand off an undescribed revision.
+- If you realize mid-edit that what you're doing is actually two changes, stop and split rather than describing it as one — see the non-interactive recipe below.
+
+> **Multi-line `-m` messages must use real newlines, not `\n`.** Backslash escapes do not expand inside `"..."` or `'...'`, so `-m "subject\n\nbody"` literally embeds the four characters `\n\n` in your description. Reliable bash forms (the Bash tool runs through bash, not the user's interactive fish):
+>
+> - Heredoc via command substitution (preferred for multi-paragraph bodies):
+>
+>   ```bash
+>   jj describe -m "$(cat <<'EOF'
+>   subject line
+>
+>   first body paragraph
+>
+>   second body paragraph
+>   EOF
+>   )"
+>   ```
+>
+> - ANSI-C quoting for short two-paragraph cases: `jj describe -m $'subject\n\nbody'`.
+>
+> Apply the same pattern to every `-m '<message>'` placeholder in the recipes below.
+
+### Agent-safe (non-interactive) jj recipes
+
+`jj split` and `jj squash` open an editor by default — never invoke them in their bare form from an agent session, or the command will hang. Use the explicit forms:
+
+- **Splitting by file paths:** `jj split <path>... -m '<message>'`. The original revision is replaced by a two-commit stack: a **first** (lower) commit containing the named paths, child of the original parent, with your `-m` description; and a **second** (upper) commit containing the remaining changes, child of the first, which keeps the original description. Descendants reattach to the second commit. If the original revision had a description and you omit `-m`, jj still pops an editor for the first commit's message, so always pass `-m`. Use `-p/--parallel` if you want the two halves to be siblings instead of stacked, or `-o`/`-A`/`-B` to extract the selected changes elsewhere while the rest stay in place.
+- **Squashing a working-copy change down into its parent:** `jj squash -r <rev> -m '<message>'`, or `jj squash --from <rev> --into <rev> -m '<message>'` for cross-revision moves. `-m` is required whenever both source and destination have non-empty descriptions, otherwise jj prompts for the combined message. Use `-u/--use-destination-message` instead of `-m` when you want to keep the destination's description verbatim.
+- **Squashing only specific paths:** add fileset arguments — `jj squash <path>... --from <rev> --into <rev> -m '<message>'`. Without paths and without `-i`, all changes move.
+- **Never pass `-i/--interactive`, `--tool`, or `--editor`** from an agent — those force the diff/message editor and will hang.
+
+Same principle applies to `jj describe` (use `-m`, never bare) and `jj commit` (use `-m`, never bare). Construct `<message>` with the heredoc or ANSI-C form above whenever it spans more than one line.
 
 ## Codex stop-time review gate
 
