@@ -19,10 +19,13 @@ If no thread resolves but the command is repo-scoped, the command may fall back 
 
 It verifies prerequisites:
 
-- jj is initialized;
-- `gh` is authenticated enough for publish operations;
-- Claude Code is available for the v1 harness;
-- the repo can store gitignored local state under `<repo>/.kiki/`.
+- jj is initialized — hard error if not, with a message naming `jj init --colocate` as the typical fix.
+- `gh` is authenticated enough for publish operations — hard error if not.
+- the repo can store gitignored local state under `<repo>/.kiki/` — hard error if not writable.
+
+`kk init` does **not** verify that any specific harness binary is installed. The harness contract is pluggable (see [Harness adapter](15-architecture/harness-adapter.md)); v1 ships only the `claude-code` adapter, but kiki does not refuse registration on a host that has not installed a harness yet. The check happens at `kk new` time instead: spawning a thread with the configured default harness errors if that harness's binary is missing.
+
+`kk init` is idempotent in an already-registered repo. It prints a status summary (registration path and time, active and closed thread counts, state.db location) and exits with status 0; no mutation. Re-registering after `kk repo unregister` is the explicit re-registration path.
 
 `kk init` does not create a starter thread. Thread creation is explicit.
 
@@ -38,9 +41,14 @@ Important flags:
 
 - `--follows <parent>` creates a live follows edge;
 - `--no-follow` suppresses contextual following;
+- `-m "<prompt>"` supplies an initial prompt delivered to the harness as the first user turn;
 - `--harness <name>` selects a harness for the thread;
 - `--harness-arg <arg>` passes harness-specific arguments;
 - `--sidebar` / `--no-sidebar` override persistent sidebar config for the thread.
+
+Initial prompt sources are `-m` and stdin. If both are supplied, `-m` wins. If neither is supplied, `kk new` proceeds without an initial prompt: the placeholder name becomes `unnamed-<short-hex>` (kk-owned) and the agent starts with no first-turn input. It is acceptable for the user to spawn a thread without yet knowing what it is about.
+
+The first-turn prompt is captured in the transcript as `author=human`, `direction=inbound_to_agent`.
 
 ## `kk switch`
 
@@ -104,4 +112,4 @@ Expected thread-management commands include:
 - `kk thread destroy`
 - `kk thread detach` if the v1 detach escape hatch ships
 
-`attach` and `reparent` are deferred graph-surgery commands.
+`attach`, `reparent`, and `restore --to <path>` (used to re-point an `Orphaned` thread at a moved workspace) are deferred graph-surgery and lifecycle commands.

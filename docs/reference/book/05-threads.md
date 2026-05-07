@@ -39,6 +39,16 @@ The follows graph is a DAG. kiki rejects a follows edge that would introduce a c
 
 Users may spawn any number of sibling threads. v1 does not rate-limit human-created threads.
 
+## Workspace layout
+
+Each thread's jj workspace is materialized as a sibling of the registered repo. The default path is `<parent>/<repo>-kiki-<slug>/`, where `<parent>` is the directory containing the repo, `<repo>` is the repo's directory name, and `<slug>` is the thread's bookmark slug. So a thread `cascade-recovery` in `~/code/kiki` materializes at `~/code/kiki-kiki-cascade-recovery/`.
+
+This default is overridable via `[paths] workspaces_root` (see [Configuration](13-configuration.md)). When set, kiki uses `<workspaces_root>/<repo>-kiki-<slug>/`.
+
+Sibling-of-repo is the default for two reasons: it matches jj's natural `jj workspace add ../<name>` ergonomics, and it leaves the workspace discoverable next to the repo without nesting another working copy inside the parent's working copy.
+
+Kiki creates `<workspace>/.kiki/` (mode `0700`) for the per-thread hook credential and harness config. Kiki also creates `<workspace>/kiki-errors.log` lazily when a client process (notably `kk-hook`) cannot reach `kkd` and needs to record a failure locally. Kiki does **not** auto-mutate `.gitignore` to exclude that log; whether to ignore it is the user's call.
+
 ## Workspace isolation
 
 Per-thread workspaces prevent accidental file interference during normal cooperative use. They do not prevent a same-UID process from reading or writing sibling workspaces, `~/.kiki`, or shared jj repository state.
@@ -89,10 +99,25 @@ stateDiagram-v2
     CloseCommit --> Active: post-stop recheck fails\n(workspace preserved)
     CloseCommit --> Closed: forget workspace\ndelete materialized dir
     Closed --> Active: kk reopen\nrecreate workspace + tmux\nresume or respawn agent
+    Active --> Orphaned: workspace dir missing\n(rm -rf, disk fill, manual move)
+    Orphaned --> Active: kk reopen / kk thread restore --to <path>
+    Orphaned --> Destroyed: kk thread destroy
     Active --> Destroyed: kk thread destroy
     Closed --> Destroyed: kk thread destroy
     Destroyed --> [*]
 ```
+
+## Orphaned
+
+A thread becomes `Orphaned` when kkd discovers that the materialized workspace directory is gone but the sqlite row still says `Active`. The check runs at daemon boot, at every `kk ls`, and before `kk switch` to that thread.
+
+When kkd transitions a thread to `Orphaned`, it fires one notification and surfaces the state in `kk ls` with a distinct glyph. Kiki does not auto-recreate the workspace and does not silently re-classify the thread as Closed. The user resolves explicitly:
+
+- `kk reopen <thread>` recreates the workspace from the bookmark and replays catch-up.
+- `kk thread destroy <thread>` removes the dangling state.
+- `kk thread restore <thread> --to <path>` (deferred command) re-points the thread at a workspace the user moved.
+
+Orphaned threads cannot be closed via `kk close`. There is no materialized workspace to close.
 
 ## Reopen
 

@@ -29,6 +29,12 @@ Tests should target observable behavior and persisted state, not private impleme
 - Kiki-owned workspace files under `.kiki/` do not block `kk close`.
 - User-created untracked or ignored files still block or prompt during `kk close`.
 - Stop hook is not installed in v1 unless behavior is specified and tested.
+- `kk init` is idempotent in an already-registered repo (status print + exit 0, no mutation).
+- `kk init` does not pre-validate harness binaries; missing-harness errors surface at `kk new` time only.
+- A thread whose workspace directory has been deleted out-of-band transitions to `Orphaned` at next daemon boot or `kk ls`, fires exactly one notification, and is not auto-recreated or auto-Closed.
+- `kk-hook` returns `continue` and writes to `<workspace>/kiki-errors.log` when it cannot reach `kkd` within its connect/overall budget; it does not block the agent's tool call. A cascade that was pending during the outage must still be delivered on the next successful PreToolUse round-trip after `kkd` returns — pass-through defers delivery, never drops it. The deferred state lives in `pending_cascade_seq` and `context_queue` when the watcher saw the trigger before the outage; otherwise the trigger is reconstructed from jj's op log by the daemon-restart op-log catch-up. `cascade_outbox` is asserted to remain empty for unapplied cascades — it only holds applied-but-not-yet-acknowledged rows.
+- Multi-hop cascade in A→B→C: amending A enqueues cascade only on B (via the watcher's external-op route). C's cascade is enqueued only after B's `PreToolUseDecision` applies the rebase, and the enqueue happens via the orchestrator's internal-propagation route — not by the watcher reacting to B's kkd-initiated rebase op (which must remain `op_attribution`-skipped). The internal-propagation enqueue must be in the same transaction as the `cascade_outbox` persist for B.
+- `LogRenderer` and `StatusRenderer` produce monochrome-distinguishable output when `NO_COLOR=1` is set; every state in the cascade, agent, and lifecycle vocabularies has a distinct glyph or label without color.
 
 ## Cascade crash tests
 

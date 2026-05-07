@@ -8,7 +8,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 
 1. As a developer, I want to install `kk` from a single binary distribution, so that getting started is one command.
 2. As a developer, I want to run `kk init` in a git+jj repository to opt that repo into kiki management, so that I am explicit about which repos kkd watches.
-3. As a developer, I want kk to verify prerequisites (jj initialized, gh authenticated, Claude Code installed) at `kk init`, so that I get clear errors instead of cryptic failures later.
+3. As a developer, I want kk to verify prerequisites at `kk init` — jj initialized and gh authenticated — so that I get clear errors instead of cryptic failures later. Harness binaries (e.g., Claude Code) are not pre-validated at init time; the architecture is BYO-harness, and the check happens at `kk new` time when a thread actually needs the configured harness.
 4. As a developer, I want kkd to start automatically the first time I invoke `kk`, so that I never have to think about daemon lifecycle.
 5. As a developer, I want kkd to recover from crashes by reading its sqlite state on restart, so that my threads survive daemon issues.
 6. As a developer, I want kkd to be resurrectable across system restarts via launchd/systemd-user, so that my threads survive reboots.

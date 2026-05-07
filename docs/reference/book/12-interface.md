@@ -33,6 +33,8 @@ Two glyphs per row, max. PR appears inline as `#NNNN` only if set.
 
 The cascade indicator and the agent-state indicator share the same three-valued state model as `kk status` (`in sync`, `pending`, `conflicted`). The CLI prints the textual state per `cli.md`; the TUI projects each state to a glyph from the table above. The state model is the source of truth — the textual and glyph forms are two presentations.
 
+Every state in this table must be distinguishable by glyph alone, not by color. Color is an accelerator: it makes scanning faster, but `NO_COLOR=1` and color-blind palettes must still convey the state. The `LogRenderer` and `StatusRenderer` projections strip color when `NO_COLOR=1` is set in the environment and rely on glyph + label to carry the signal. See [Invariants](04-invariants.md).
+
 ## Overlay
 
 Bare `kk` or tmux `prefix+k` opens the overlay in `NAVIGATE` mode, focused on the current thread (resolved via the standard CLI context-resolution chain). If no current thread resolves but the repo is registered, the cursor lands on the most-recently-active thread in the repo. If the repo has no threads, the overlay shows an empty-state placeholder ("no threads — press `n` to create one") with `n` and `?` as the only active verbs.

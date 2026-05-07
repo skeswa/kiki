@@ -18,7 +18,7 @@ A same-UID process can read sibling workspaces, `~/.kiki`, and shared jj reposit
 
 A following child is rebased onto ancestor changes only at an agent boundary or quiescence. kiki must not rewrite a thread's working copy while the agent is mid-edit.
 
-It is acceptable for cascade to wait for a safe boundary. It is not acceptable for cascade to move the working copy while the agent is mid-edit.
+It is acceptable for cascade to wait for a safe boundary. It is also acceptable for cascade to wait for `kkd` to become reachable when a daemon outage prevents delivery; in that mode, no rebase is applied and the working copy is left as-is. It is not acceptable for cascade to move the working copy while the agent is mid-edit, and it is not acceptable to silently drop a pending cascade.
 
 ## Cascade delivery is crash-safe
 
@@ -43,3 +43,9 @@ This is a confidentiality rule. Treat it accordingly.
 Destructive and cross-thread daemon mutations require `Admin`.
 
 Thread-scoped credentials may operate on their own thread and may read the narrow same-repo summary surface. They must not read sibling transcripts, inspect sibling diffs, or mutate sibling threads.
+
+## State is distinguishable without color
+
+Every state kiki surfaces in any UI must be distinguishable without color. Glyphs and labels carry the signal; color is an accelerator, never the only signal.
+
+Kiki honors `NO_COLOR=1` by emitting no ANSI color sequences. The shared `LogRenderer` and `StatusRenderer` projections must produce monochrome-distinguishable output for every state in the cascade, agent, and lifecycle vocabularies.

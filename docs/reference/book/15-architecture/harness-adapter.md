@@ -63,6 +63,21 @@ The `structured` field carries diff payloads, file lists, etc. for richer agent 
 
 The hook's exact behavior — outbox lookup, decision step, post-stdout `MarkDelivered` — lives in [Cascade](../07-cascade.md).
 
+## Hook degradation
+
+When `kkd` is unreachable (socket missing, connection refused, daemon mid-restart), the hook degrades to pass-through. The connect timeout is 200ms and the overall hook budget is 1s; on expiry the hook returns Claude Code's `continue` decision so the agent's tool call is not blocked, then appends one structured record to `<workspace>/kiki-errors.log`.
+
+`<workspace>/kiki-errors.log` is the catch-all for client-side errors that cannot reach `kkd`. It is created lazily at first failure. Kiki does not auto-mutate `.gitignore` to exclude the log; whether to ignore it is the user's call.
+
+Pass-through is not a violation of the cascade safety invariant; it is the explicit precondition's failure mode. The cascade invariant in [Invariants](../04-invariants.md) requires `kkd` to be reachable in order to apply a rebase at a safe boundary. When the daemon is unreachable, no rebase is applied — the working copy is left untouched — and the pending cascade state is durable elsewhere. Two cases:
+
+- The watcher saw the trigger op before the outage. `pending_cascade_seq` and any associated `context_queue` rows are already in sqlite; they survive the daemon stop.
+- The trigger op happened during the outage. The trigger lives in jj's op log (the upstream source of truth). On `kkd` restart, the op-log catch-up replays missed ops, populates `op_history`, and runs ancestry-impact evaluation — bumping `pending_cascade_seq` and enqueueing `context_queue` rows for affected followers exactly as the live watcher would have.
+
+Either way, the next successful PreToolUse round-trip after `kkd` returns sees `pending_cascade_seq > applied_cascade_seq`, applies the rebase, composes the synthetic payload, persists it to `cascade_outbox`, and emits it. `cascade_outbox` only ever holds applied-but-not-yet-acknowledged cascades; pending-but-not-yet-applied cascades are not stored there. Cascade delivery is deferred, not dropped.
+
+In the deferred window, the agent's tool call may run against a working copy that has not yet picked up an ancestor change. That is the trade-off: the hook prefers an agent that keeps moving over an agent that wedges on a daemon hiccup, and it relies on the queue to make sure the cascade is still delivered the moment `kkd` returns. When `kkd` returns and observes a non-empty `kiki-errors.log` for a thread, it surfaces a single notification per thread summarizing the gap.
+
 ## Hook chaining
 
 `kk-hook` is installed at thread spawn into a per-thread Claude Code config (scoped to the thread's workspace dir, not polluting user-global). It always runs first. After running the acknowledgement step, if `pending_cascade_seq <= acknowledged_cascade_seq`, the hook returns "continue" and Claude Code's hook chain proceeds to user-defined hooks. Reverted on thread close.
@@ -72,7 +87,7 @@ The hook's exact behavior — outbox lookup, decision step, post-stdout `MarkDel
 - Default per-repo via `agent.default_harness`.
 - Override per-thread via `kk new <name> --harness <name>` and `--harness-arg "..."`.
 - A thread cannot change harness mid-life; `kk thread restart <thread> --harness <new>` is the explicit path (terminates the current agent and respawns).
-- v1: only `claude-code` is accepted; any other harness name errors with a clear "unsupported harness" message.
+- v1: the `Harness` trait is the architectural seam, but only the `claude-code` adapter ships. `kk new --harness <other>` errors with `"unsupported harness in v1"`. `kk new` (no `--harness`) defaults to `claude-code` and errors at spawn time with `"claude-code not on PATH — install it or pass --harness <other> once another adapter ships"` if the binary is missing. `kk init` does not pre-validate the harness binary; the architecture is genuinely BYO-harness, even though v1 ships only one.
 
 `kk thread restart --harness <new>` is not part of the first acceptance slice unless promoted elsewhere; this chapter reserves the semantics so a future implementation does not mutate a thread's harness identity in place.
 
@@ -95,11 +110,11 @@ Cascade-injection row writes are NOT part of this trait — they are performed b
 
 `kk new` performs an atomic spawn. If any step fails, `kkd` unwinds prior steps to avoid orphaned state. The full sequence — kept here for the harness-adapter context; the canonical lifecycle description lives in [Threads](../05-threads.md):
 
-1. Resolve name/prompt/follows/harness/sidebar options.
+1. Resolve name/prompt/follows/harness/sidebar options. Initial prompt comes from `-m "<prompt>"` (winning if both are supplied) or stdin; absent both, the spawn proceeds without a first-turn prompt and the placeholder name is `unnamed-<short-hex>`.
 2. Insert the sqlite thread row (the stable `thread_id` other steps attach to).
-3. `jj workspace add`.
+3. `jj workspace add` at `<workspaces_root>/<repo>-kiki-<slug>/` (configurable; see [Configuration](../13-configuration.md)).
 4. Bookmark create.
 5. `jj new` on the bookmark.
 6. `tmux new-session -d` cd'd into the workspace path.
-7. Harness spawn with thread-id env injected and optional initial prompt delivered.
+7. Harness spawn through `Harness::spawn(SpawnOpts { thread_id, session_id, initial_prompt: Option<String>, harness_args })`. The harness adapter routes the optional initial prompt to the harness's first user-turn input; for Claude Code, this is the harness's startup-message contract.
 8. `ThreadScoped<thread_id>` credential written to `<workspace>/.kiki/hook-cred` (mode `0600`) and per-thread harness hook config installed (e.g., `<workspace>/.claude/settings.json` for Claude Code).

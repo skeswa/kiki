@@ -27,7 +27,7 @@ The v1 acceptance surface includes:
 - per-user daemon with per-repo opt-in
 - jj workspace + bookmark backed thread identity
 - tmux session lifecycle
-- Claude Code v1 harness integration
+- pluggable harness architecture; the `claude-code` adapter is the only one that ships in v1
 - PreToolUse hook IPC for cascade delivery
 - cascade pause, rebase, inject, acknowledge, and conflict handling
 - transcript capture and local read API

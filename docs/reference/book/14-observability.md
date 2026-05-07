@@ -28,6 +28,19 @@ Notification defaults:
 
 These defaults are configurable under `[notifications]`.
 
+## Notification transport
+
+The in-UI surface is the primary channel: while a kk overlay or persistent sidebar is focused, attention events render as toasts (see [Interface](12-interface.md)). OS-native notifications are the fallback for users who are away from the UI.
+
+The cross-platform default is the `notify-rust` crate. On macOS, where `notify-rust` requires a signed application bundle, kiki falls back to shelling out to `osascript -e 'display notification ...'`. The transport is configurable under `[notifications]`:
+
+- `os_provider`: `auto | notify-rust | osascript | tmux | off` (default `auto`).
+- `auto` resolves to `notify-rust` on Linux and Windows, and to `osascript` on macOS.
+- `tmux` routes notifications to `tmux display-message` on the user's running tmux client; useful when kiki is run inside a terminal that is always inside tmux.
+- `off` disables OS notifications entirely; the in-UI surface still fires.
+
+Per-event behavior (`loud | soft | silent`) is independent of transport and configured per-event under `[notifications]`.
+
 ## CI and PR comments
 
 CI status changes on a PR are informational. kiki surfaces them; it does not automatically attempt fixes.

@@ -8,7 +8,7 @@ Definitions of the load-bearing terms in kiki's reference. When a term is used i
 - **Bookmark** — jj's term for a named pointer to a revision. In kiki, the bookmark is the human-facing handle and the branch pushed to GitHub. Canonical identity stays with the stable sqlite `thread_id`.
 - **Follows** — a directed parent-thread link enabling live cascade.
 - **Ambient coordinator** — kiki's posture: it observes and reacts to jj/tmux/gh state without gatekeeping the underlying tools.
-- **Active / Closed / Destroyed** — thread lifecycle states. Active = workspace and (often) agent live. Closed = soft archive: jj forgets the workspace, kiki removes the materialized directory after loss-prevention preflight plus post-stop recheck, and bookmark + revisions + transcript remain reopenable. Destroyed = `jj abandon`, irreversible except via `jj op restore`.
+- **Active / Closed / Orphaned / Destroyed** — thread lifecycle states. Active = workspace and (often) agent live. Closed = soft archive: jj forgets the workspace, kiki removes the materialized directory after loss-prevention preflight plus post-stop recheck, and bookmark + revisions + transcript remain reopenable. Orphaned = the materialized workspace directory is missing while the thread row still says Active (e.g., user ran `rm -rf`, the disk filled, or the dir was moved); kiki notifies once and waits for explicit human resolution via `kk reopen`, `kk thread destroy`, or a future `kk thread restore --to <path>`. Destroyed = `jj abandon`, irreversible except via `jj op restore`.
 
 ## Cascade
 

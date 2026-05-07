@@ -64,7 +64,20 @@ If the lock cannot be acquired within 5 seconds, the attempt is abandoned and re
 - `enabled`: `true | false`
 - `cadence`: `idle-only | events | always | off`
 - `idle_ms`: quiescence delay before firing
-- `trailer`: whether to write the transparency trailer
+- `trailer`: whether to write the transparency trailer (default `false`; opt-in)
 - event toggles for creation, split, squash, and manual refresh
 
 Cost management remains outside v1. kiki does not cap model spend, concurrent agents, CPU, RAM, or token usage.
+
+## Provider
+
+Auto-describe and auto-rename go through a provider-agnostic `AICompose` seam. `[ai]` selects the backend:
+
+- `provider`: `anthropic | openai | local-ollama | ...`
+- `model`: provider-specific model identifier (defaults to a Haiku-class model for Anthropic).
+- `api_key_env`: env var holding the API key (default `ANTHROPIC_API_KEY` for Anthropic).
+- `api_key_path`: file path holding the API key (alternative to `api_key_env`).
+
+v1 ships only the Anthropic implementation. The trait surface is generic so additional providers can be added without touching the metadata ledger or the prompt-assembly logic.
+
+The auto-AI loop is opt-in. `[autorename] enabled = false` is the default, so a fresh install never calls a provider until the user configures one.

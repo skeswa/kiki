@@ -21,7 +21,7 @@ Rows are inserted only when an op produces a _new_ `@` for the workspace in ques
 
 `kkd` dedupes its own jj operations by recording every kk-initiated `op_id` in the `op_attribution` table and prefixing the op message with `kk:`. The watcher checks attribution before reacting; self-attributed ops do not re-trigger cascade.
 
-External ops (no `kk:` prefix, op_id not in `op_attribution`) pass through to ancestry impact evaluation. If the op affected any descendant thread's ancestry, cascade fires for those descendants.
+External ops (no `kk:` prefix, op_id not in `op_attribution`) pass through to ancestry impact evaluation. The watcher enqueues cascade only on **direct** descendants in the follows DAG. The watcher does not handle multi-hop propagation: when the cascade orchestrator later applies a rebase to that direct descendant, the resulting jj op is self-attributed and skipped here. Multi-hop propagation lives in the orchestrator's `PreToolUseDecision` handler, which synchronously bumps `pending_cascade_seq` on the rebased thread's direct descendants in the same transaction that persists the `cascade_outbox` row. This avoids racing rebases along a single chain and keeps op-attribution honest. See [Cascade](../07-cascade.md).
 
 ## Daemon-restart catch-up
 
