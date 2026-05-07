@@ -44,11 +44,13 @@ Cascade behavior degrades cleanly when a capability is absent. A harness without
 
 ```
 struct ContextMessage {
-    kind: MessageKind,    // RebaseAlert | ParentMerged | ConflictNoticed | UserNote | ...
+    kind: ContextMessageKind,
     text: String,
     structured: Option<JsonValue>,
 }
 ```
+
+`ContextMessageKind` includes at least `RebaseAlert`, `ParentMerged`, `ConflictNoticed`, and `UserNote`.
 
 The `structured` field carries diff payloads, file lists, etc. for richer agent re-orientation.
 
@@ -71,6 +73,8 @@ The hook's exact behavior — outbox lookup, decision step, post-stdout `MarkDel
 - Override per-thread via `kk new <name> --harness <name>` and `--harness-arg "..."`.
 - A thread cannot change harness mid-life; `kk thread restart <thread> --harness <new>` is the explicit path (terminates the current agent and respawns).
 - v1: only `claude-code` is accepted; any other harness name errors with a clear "unsupported harness" message.
+
+`kk thread restart --harness <new>` is not part of the first acceptance slice unless promoted elsewhere; this chapter reserves the semantics so a future implementation does not mutate a thread's harness identity in place.
 
 ## Capture
 

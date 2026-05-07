@@ -36,6 +36,10 @@ Structural keys such as default harness and daemon socket path require daemon re
 
 Cosmetic keys may hot-reload.
 
+Configuration is deserialized into strongly typed Rust structs. Each field declares reload behavior as `hot` or `restart`; the daemon uses that metadata to decide whether a changed value applies immediately or produces a warning naming the required restart or lifecycle event.
+
+Map-like config values merge by key across layers. List-like values replace as a unit unless a later chapter explicitly gives that key append semantics.
+
 ## Sections
 
 The top-level config sections expected in v1:
@@ -64,4 +68,4 @@ All `[ui]` keys are personal preference. They are valid in user and per-thread c
 
 `theme` selects the palette; the canonical alternates documented for v1 are `soft-dark` (default), `soft-light`, and `high-contrast`. Unknown theme values warn and fall back to `soft-dark`.
 
-The semantics, wireframes, and degradation rules for these keys live in `tui.md`.
+The semantics, wireframes, and degradation rules for these keys live in [Interface](12-interface.md).

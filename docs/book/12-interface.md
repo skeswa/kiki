@@ -322,6 +322,18 @@ Forms are pure ratatui widgets; they call `kkd` only after `enter`. The card sur
 
 ## Keymap
 
+## Overlay state machine
+
+The overlay is a small state machine:
+
+- `NAVIGATE`: default state. Sidebar cursor moves through Stack and Activity rows.
+- `PREVIEW`: right pane is pinned to transcript tail, diff, or PR comments for the cursored thread.
+- `CONFIRM`: destructive verbs such as close or interrupt wait for explicit confirmation.
+- `SPAWN`: spawn form collects thread name, follows target, and harness fields.
+- `VIEWER`: full-screen transcript reader opened by `T`.
+
+`q` and `esc` leave the overlay from `NAVIGATE` and return to the prior overlay state from sub-states. `enter` only switches threads from `NAVIGATE` on a bookmark row. Destructive actions are unavailable from the persistent sidebar pane.
+
 Overlay (`NAVIGATE` mode):
 
 | key       | verb                                                                            |

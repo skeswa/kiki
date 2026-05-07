@@ -12,6 +12,8 @@ Audit logs are separate. They answer what happened and who invoked it; notificat
 
 The default notification vocabulary is:
 
+Notification defaults:
+
 | Event                                        | Default                                                                                                |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Agent hit a permission prompt                | Loud notification; mark the thread blocked until acknowledged in the TUI                               |

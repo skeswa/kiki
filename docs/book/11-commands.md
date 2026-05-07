@@ -71,6 +71,13 @@ Repo scope and lifecycle scope are independent:
 - `--wide` enriches collapsed summaries.
 - `-r <revset>` passes through to jj revset selection, disables collapse logic, and errors if combined with `--no-stack`, `--all`, or `--wide`.
 
+Collapsed line format:
+
+- Default: `<status-glyph> <bookmark> [#<pr>] <agent-glyph> "<last-revision-description>"`.
+- `--wide`: adds literal PR state (`draft`, `ready`, `merged`, `closed`), CI roll-up, agent state with age, and relative last activity.
+
+No other jj-log flags: `-r <revset>` is the only jj-shaped flag adopted by `kk log` in v1. Other jj log affordances, such as patches, templates, reverse order, and custom color, remain direct `jj log` usage. This avoids a near-mirror CLI that drifts as jj evolves.
+
 Outside a registered repo, `kk log` errors and points to `kk ls`.
 
 The escape hatch for arbitrary revision selection is `jj`. kiki decorates the model it owns; it does not clone every flag of the tools beneath it.

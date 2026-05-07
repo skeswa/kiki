@@ -33,6 +33,17 @@ MCP uses a separate unix socket. URL paths route requests; credentials supply id
 
 A thread-scoped credential may read its own transcript. A URL such as `/threads/<uuid>` does not authorize the caller to act as that thread. Authorization is always bound to the credential presented on the request.
 
+When the same-thread transcript MCP surface ships, each call is checked in this order:
+
+MCP-specific status-code contract:
+
+1. Missing, malformed, revoked, or signature-invalid credentials are `Unauthenticated`.
+2. Well-formed credentials that are not `ThreadScoped<T>` are `PermissionDenied`; Admin belongs on the gRPC and CLI surface, not the narrow MCP surface.
+3. If the request names a thread both in the URL path and in an explicit argument, and they differ, the request is `InvalidArgument`.
+4. If the credential authorizes thread T and the request asks for thread U, where U is not T, the request is `PermissionDenied`.
+
+The daemon must not silently re-dispatch a request to the thread authorized by the credential. That would hide client bugs and make audit rows harder to interpret.
+
 ## Tool tiers
 
 The v2 substrate divides tools by authority:

@@ -55,6 +55,8 @@ Build upward in this order:
 
 ## Acceptance slice
 
+v1 acceptance slice:
+
 v1 is real when these work together against a real jj+git repo, tmux, Claude Code, and `gh`:
 
 1. Thread lifecycle: `kk init`, contextual `kk new`, `kk switch`, `kk close`, and `kk reopen`.

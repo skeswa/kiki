@@ -47,6 +47,30 @@ This ordering is required. It prevents false acknowledgement and phantom transcr
 
 Delivery and visibility are separate states. A transcript row that says kiki told the agent something must be written only after the hook has actually emitted that content and called `MarkDelivered`.
 
+## Worked scenarios
+
+These scenarios are illustrative, but they are part of the implementer's checklist. They name the cases that shaped the delivery protocol above.
+
+### Scenario 1: ancestor amend with active descendant
+
+Thread A and child thread B both have active agents. A amends revision X, which is in B's ancestry. kiki detects the jj op, bumps B's `pending_cascade_seq`, and enqueues a `ContextMessage`; it does not rebase B immediately. On B's next PreToolUse call, the hook claims the cascade lock, finds no covering `cascade_outbox` row, applies the rebase, advances `applied_cascade_seq`, reads the queue without draining it, composes the payload, pins that payload and the post-rebase anchor in `cascade_outbox`, and returns the payload to `kk-hook`. The hook writes to stdout, then calls `MarkDelivered`. The handler writes the visible transcript row, marks the outbox delivered, and sets `delivered_in_flight_seq`. B's following PreToolUse call acknowledges and drains the queue.
+
+### Scenario 2: parent advances by adding a revision
+
+Thread `foo` follows parent `bar`. `bar` advances from X to X+b1; `foo` is at X+f1. kiki detects the parent bookmark advance and follows the same hook-boundary path: `foo` rebases to X+b1+f1, receives a synthetic context message, and acknowledges it on the next tool call. The agent sees the new base before its tool runs.
+
+### Scenario 3: textual conflict
+
+If the protected rebase conflicts, kiki marks the child `Conflicted`, sends a loud notification, interrupts the agent, and resumes it with conflict framing such as "Cascade rebase produced a conflict on c. Resolve before continuing." The thread does not continue cascade work until the conflict is resolved.
+
+### Scenario 4: external jj operation
+
+If the human runs `jj describe`, `jj squash`, or another jj operation directly, kiki treats the resulting op like any other external op after op-attribution dedupe. If the op affects descendant ancestry, cascade fires for those descendants. The thread where the op originated is not disturbed unless its own ancestry actually changed.
+
+### Scenario 5: agent crash after delivery
+
+If an agent receives cascade payload N and crashes before acknowledging it, `acknowledged_cascade_seq` remains behind `applied_cascade_seq`. A resumed session starts with its own `delivered_in_flight_seq=0`. The next PreToolUse finds the existing outbox row because lookup is keyed by `applied_cascade_seq > acknowledged_cascade_seq`, regardless of `delivered_at`; it re-emits the same payload byte-for-byte, and `MarkDelivered` idempotently reuses the `cascade:N` transcript row. The agent may see the same cascade twice across sessions; the log records it once.
+
 ## Conflicts and escalation
 
 If rebase produces textual conflicts, the thread becomes `Conflicted`, a notification fires, and the agent is restarted with conflict framing.
