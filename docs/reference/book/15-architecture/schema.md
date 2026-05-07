@@ -26,7 +26,7 @@ The list below is table-level. Column-level definitions are derived from the beh
 - `thread_links` — directed follows edges. DAG-validated at insert time.
 - `agent_sessions` — per-session row carrying `delivered_in_flight_seq` and harness `session_id`.
 - `context_queue` — cascade messages with monotonic seq numbers per thread; drained at the next PreToolUse after delivery.
-- `cascade_outbox` — per-(thread, applied_cascade_seq) row carrying `(payload, anchor_change_id, anchor_commit_id, anchor_op_id, prepared_at, delivered_at NULL, transcript_row_id NULL)` with `UNIQUE (thread_id, applied_cascade_seq)`. Pins synthetic payload + anchor at compose time. See [cascade outbox](../../appendix/decisions/cascade-outbox.md).
+- `cascade_outbox` — per-(thread, applied_cascade_seq) row carrying `(payload, anchor_change_id, anchor_commit_id, anchor_op_id, prepared_at, delivered_at NULL, transcript_row_id NULL)` with `UNIQUE (thread_id, applied_cascade_seq)`. Pins synthetic payload + anchor at compose time. See [cascade outbox](../20-decisions/cascade-outbox.md).
 - `metadata_writes` — kk-ownership content-hash ledger for descriptions and bookmark names.
 - `cascades` — in-flight rebase coordination including the per-thread cascade lock.
 - `op_attribution` — kk-initiated op-id dedupe so the watcher does not react to its own ops.

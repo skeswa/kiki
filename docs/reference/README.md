@@ -26,15 +26,11 @@ Read it as a small spec book: first the reason for the tool, then the model, the
 18. [Build Sequencing](book/17-build-sequencing.md)
 19. [Roadmap](book/18-roadmap.md)
 20. [Naming](book/19-naming.md)
-
-Appendices contain design notes and historical PRD stubs:
-
-- [Decisions](appendix/decisions/)
-- [PRDs](appendix/prds/)
+21. [Decisions](book/20-decisions/)
 
 ## Authority
 
-The numbered chapters are the live contract. Appendices explain why the contract looks the way it does. The numbered chapters remain authoritative.
+The numbered chapters are the live contract. The Decisions chapter explains why parts of the contract look the way they do, but the behavioral chapters remain authoritative.
 
 When two live chapters appear to conflict, use this order:
 
@@ -42,10 +38,9 @@ When two live chapters appear to conflict, use this order:
 2. Behavioral chapters: [Threads](book/05-threads.md), [Authority](book/06-authority.md), [Cascade](book/07-cascade.md), [Transcript](book/08-transcript.md), [Publishing](book/09-publishing.md), [Metadata Evolution](book/10-metadata.md), [Commands](book/11-commands.md), [Interface](book/12-interface.md), [Configuration](book/13-configuration.md), and [Observability](book/14-observability.md)
 3. [User Stories](book/03-user-stories.md), as product intent that the stricter chapters must satisfy
 4. [Architecture](book/15-architecture/)
-5. [Testing](book/16-testing.md), [Build Sequencing](book/17-build-sequencing.md), [Roadmap](book/18-roadmap.md), and [Naming](book/19-naming.md)
-6. Appendices
+5. [Testing](book/16-testing.md), [Build Sequencing](book/17-build-sequencing.md), [Roadmap](book/18-roadmap.md), [Naming](book/19-naming.md), and [Decisions](book/20-decisions/)
 
-The original PRD path remains as a historical stub. The numbered chapters carry the contract.
+The numbered chapters carry the contract.
 
 ## Language
 
