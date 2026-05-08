@@ -149,23 +149,9 @@ They run `jj` directly. kiki does not refuse direct `jj`/`gh`/`tmux` operations;
 
 A few seconds later, the auth agent finishes the function it was writing and prepares its next tool call. `kk-hook` intercepts the PreToolUse, calls `PreToolUseDecision`, and the cascade orchestrator applies the rebase, advances `applied_cascade_seq`, composes a synthetic `ContextMessage`, persists it to `cascade_outbox`, and emits it to the agent. The agent receives it as its next turn and acknowledges on its following tool call (see [Cascade · delivery protocol](../07-cascade.md#delivery-protocol)).
 
-In the auth thread's overlay, a notification toast surfaces the cascade event. The Stack row's cascade glyph briefly flips through `●●○` (pending) and back to `──` (in sync) once the agent acknowledges.
+In the auth thread's overlay, the Stack row's cascade glyph briefly flips through `●●○` (pending) and back to `──` (in sync) once the agent acknowledges. No toast fires for this cascade — the toast trigger for "cascade applied to a child thread" only fires when ≥ 2 children rebased in coalescence (see [Interface · toasts](spec.md#toasts)), and `auth` is the only descendant.
 
-```text
- kiki · NAVIGATE · kestrel-mobile/auth                ┌─────────────────────────────┐
-                                                      │ ── auth   cascade applied   │
- STACK                              │  …              │   from android-skel  6s     │
-                                                      └─────────────────────────────┘
- ● main             ──    in        │
- │                                  │
- ●─android-skel     ──    wrk       │
- │                                  │
- ●─auth          ▸  ──    ←●        │
-                                    │
-
-```
-
-The agent's view of the change is a single synthetic turn explaining what was rebased; the developer's view is a six-second toast and a Stack row that briefly went amber. Neither has to coordinate further. The act is intentionally undramatic — that is what an ambient coordinator looks like when it's working.
+The agent's view of the change is a single synthetic turn explaining what was rebased; the developer's view is a momentary glyph flip on the Stack row. Neither has to coordinate further. The act is intentionally undramatic — that is what an ambient coordinator looks like when it's working.
 
 ## Act 5 — Cross-repo interlude: the copyright bump
 
@@ -194,7 +180,7 @@ $ kk close
 
 `kk close` stops the agent and tmux session, forgets the jj workspace, deletes the materialized workspace directory, and marks the thread `Closed` (see [Threads · close](../05-threads.md#close)). Tracked jj revisions survive on the merged commit; the bookmark is left in place. The PR is left untouched, which is the correct default — `--discard-pr` is the explicit close-the-PR path, and there is nothing to discard here because the PR has already merged.
 
-Total wall time on the copyright bump: about twelve minutes. Nothing in `kestrel-mobile` was perturbed. Across two repos, three threads are still active.
+Total wall time on the copyright bump: about twelve minutes. Nothing in `kestrel-mobile` was perturbed. The two `kestrel-mobile` threads remain active; `kestrel-www` now has one closed thread.
 
 ## Act 6 — The docs thread, started in parallel
 
@@ -210,17 +196,7 @@ $ kk new android-docs -m "Document the Android app's first-run flow:
   Library tab. Match the structure of the iOS first-run page."
 ```
 
-`kestrel-docs` has no other kiki threads either, so `android-docs` is parentless and follows nothing. From any registered repo, `kk ls --all-repos` now lists every active thread across both repos:
-
-```console
-$ kk ls --all-repos
-REPO            THREAD          CASCADE  AGENT
-kestrel-mobile  android-skel    ──       ●  working
-kestrel-mobile  auth            ──  ←●   ●  working
-kestrel-docs    android-docs    ──       ●  working
-```
-
-Three threads, two repos, one daemon, one keyboard. The follows arrow `←●` marks `auth` as a follower of `android-skel`; `android-docs` carries no arrow because it follows nothing. `--all` (which would include closed threads, like `copyright-2026`) is independent of `--all-repos` and is not passed here (see [Commands · `kk ls`](../11-commands.md#kk-ls)).
+`kestrel-docs` has no other kiki threads either, so `android-docs` is parentless and follows nothing. From any registered repo, `kk ls --all-repos` now lists every active thread across both repos. The exact column shape is up to the renderer; the spec commits to a `repo` column when the listing crosses repo scope and to active-thread coverage. The listing the developer sees contains `kestrel-mobile/android-skel`, `kestrel-mobile/auth` (with its follows arrow back to `android-skel`), and `kestrel-docs/android-docs` (see [Commands · `kk ls`](../11-commands.md#kk-ls)). `--all` (which would include closed threads, like `copyright-2026`) is independent of `--all-repos` and is not passed here.
 
 The developer keeps moving between threads with `kk switch`, which is a pure tmux client operation that does not mutate daemon focus state (see [Commands · `kk switch`](../11-commands.md#kk-switch)). The daemon is not "in" any thread; it is watching all of them.
 
@@ -277,29 +253,28 @@ Thursday morning, the `android-skel` thread's agent commits a navigation refacto
 
 > Cascade rebase produced a conflict on auth-biometric. Resolve before continuing.
 
-A loud notification fires. In the overlay, the `auth-biometric` row's cascade glyph flips to `◐` (red). A toast surfaces with the same indicator (see [Interface · toast triggers](spec.md#toasts)).
+A loud notification fires. The developer happens to have the overlay focused on `android-skel`; from that vantage, `auth-biometric` is a non-current thread, so the conflict surfaces as a toast — toasts for cascade conflicts only fire on non-current threads (see [Interface · toasts](spec.md#toasts)). The conflicted thread's row also turns red:
 
 ```text
- kiki · NAVIGATE · kestrel-mobile/auth-biometric    ┌────────────────────────────────┐
+ kiki · NAVIGATE · kestrel-mobile/android-skel      ┌────────────────────────────────┐
                                                     │ ◐ auth-biometric conflicted    │
  STACK                              │               │   tap T to read transcript     │
                                                     └────────────────────────────────┘
  ● main             ──    in        │
  │                                  │
- ●─android-skel     ──    wrk       │
+ ●─android-skel  ▸  ──    wrk       │
  │                                  │
- ●─auth-biometric ▸ ◐    ←●         │
+ ●─auth-biometric   ◐    ←●         │
                                     │
 ```
 
-The developer presses `enter` on `auth-biometric` to switch to its tmux session, opens a shell pane next to the agent (which is paused), and resolves the conflict by hand. jj's conflict markup makes the merge tractable; the resolution touches three lines.
+The developer cursors to `auth-biometric` and presses `enter` to switch to its tmux session, opens a shell pane next to the agent (which is paused), and resolves the conflict by hand. jj's conflict markup makes the merge tractable; the resolution touches three lines.
 
 ```console
 $ cd ~/code/kestrel-mobile-kiki-auth-biometric
 $ jj resolve
-$ jj log -r @ --no-graph -T 'change_id ++ "\n"'
 ```
 
-> kkd: the op-log watcher sees the resolve op like any other external op. The cascade orchestrator clears the `Conflicted` state once the working copy has no remaining conflict markers. The agent is resumed, sees a synthetic context message describing what was rebased and what the human resolved, and continues.
+> kkd: the op-log watcher sees the resolve op like any other external op. Once the rebase no longer conflicts, the thread leaves the `Conflicted` state and cascade work resumes (see [Cascade · conflicts and escalation](../07-cascade.md#conflicts-and-escalation)). The agent is resumed with a synthetic context message describing what was rebased and what the human resolved, and continues.
 
 The cascade glyph on `auth-biometric` returns to `──`. The conflict cost the developer about eight minutes of focused attention and zero corrupted state.
