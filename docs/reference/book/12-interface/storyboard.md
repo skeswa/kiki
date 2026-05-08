@@ -18,15 +18,9 @@ Acts are time-stamped (`Day · HH:MM — <repo>`) so the temporal arc is legible
 
 ### Mon 09:14 — kestrel-mobile, kestrel-docs, kestrel-www
 
-None of the three repos are kiki-registered. The developer runs `kk init` in each, in the order they will be touched. `kk init` is idempotent and never creates a starter thread (see [Commands · `kk init`](../11-commands.md#kk-init)).
+`kestrel-mobile` is already kiki-registered — the developer brought it under management on a prior project, and there are no threads in flight from that work. The two new-to-kiki repos for this week are `kestrel-docs` and `kestrel-www`. The developer runs `kk init` in each. `kk init` is idempotent and never creates a starter thread (see [Commands · `kk init`](../11-commands.md#kk-init)).
 
 ```console
-$ cd ~/code/kestrel-mobile
-$ kk init
-registered  ~/code/kestrel-mobile  (mon 2026-05-04 09:14:32)
-threads     0 active, 0 closed
-state       ~/code/kestrel-mobile/.kiki/state.db
-
 $ cd ~/code/kestrel-docs && kk init
 registered  ~/code/kestrel-docs  (mon 2026-05-04 09:15:10)
 threads     0 active, 0 closed
