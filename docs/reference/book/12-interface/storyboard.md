@@ -131,3 +131,175 @@ A bare `kk` in either thread now opens the overlay with both threads in the Stac
 Both threads are working concurrently. The Stack section orders them by `kk log` (parent above child); the Activity section orders the same threads flat by most-recent agent event. `tab` jumps the cursor between the two sections; `enter` switches the tmux client to whichever thread the cursor is on (see [Interface · keymap](spec.md#keymap)).
 
 The follows DAG is, for now, two hops deep: `main → android-skel → auth`. Cascades will travel one hop at a time when ancestors evolve — that is the next act.
+
+## Act 4 — Product changes their mind (small)
+
+### Tue 11:00 — kestrel-mobile
+
+Overnight, the navigation skeleton settled into a clean shape, and product responded with a small correction: the bottom-bar tab order should put `Library` left of `Discover`, not right. The change is small enough that the developer makes it directly, without spawning a thread for it. They drop into the `android-skel` workspace's tmux session, open a shell pane next to the agent pane, and amend the relevant revision by hand:
+
+```console
+$ cd ~/code/kestrel-mobile-kiki-android-skel
+$ jj describe -r @- -m "Scaffold Android navigation: NavHost + Material 3 + bottom NavigationBar (Library, Discover, Profile)"
+```
+
+They run `jj` directly. kiki does not refuse direct `jj`/`gh`/`tmux` operations; it watches the op log and reacts to whatever it sees (see [Invariants](../04-invariants.md)). What kkd sees is an external op — no `kk:` prefix, `op_id` not in `op_attribution` — and an ancestry change that affects the auth thread, which directly follows `android-skel`.
+
+> kkd: the op-log watcher dedupes against `op_attribution`, decides the op is external, walks the follows DAG to find direct descendants of the changed revision, and bumps `pending_cascade_seq` on `auth`. No rebase happens yet. The cascade waits for the auth agent's next PreToolUse boundary, so the agent never operates on stale disk state mid-edit (see [Cascade · invariant](../07-cascade.md#invariant)).
+
+A few seconds later, the auth agent finishes the function it was writing and prepares its next tool call. `kk-hook` intercepts the PreToolUse, calls `PreToolUseDecision`, and the cascade orchestrator applies the rebase, advances `applied_cascade_seq`, composes a synthetic `ContextMessage`, persists it to `cascade_outbox`, and emits it to the agent. The agent receives it as its next turn and acknowledges on its following tool call (see [Cascade · delivery protocol](../07-cascade.md#delivery-protocol)).
+
+In the auth thread's overlay, a notification toast surfaces the cascade event. The Stack row's cascade glyph briefly flips through `●●○` (pending) and back to `──` (in sync) once the agent acknowledges.
+
+```text
+ kiki · NAVIGATE · kestrel-mobile/auth                ┌─────────────────────────────┐
+                                                      │ ── auth   cascade applied   │
+ STACK                              │  …              │   from android-skel  6s     │
+                                                      └─────────────────────────────┘
+ ● main             ──    in        │
+ │                                  │
+ ●─android-skel     ──    wrk       │
+ │                                  │
+ ●─auth          ▸  ──    ←●        │
+                                    │
+
+```
+
+The agent's view of the change is a single synthetic turn explaining what was rebased; the developer's view is a six-second toast and a Stack row that briefly went amber. Neither has to coordinate further. The act is intentionally undramatic — that is what an ambient coordinator looks like when it's working.
+
+## Act 5 — Cross-repo interlude: the copyright bump
+
+### Tue 16:45 — kestrel-www
+
+In the middle of the auth work, the developer remembers that the marketing site's footer still says "© 2025". They do not interrupt either of the kestrel-mobile threads. They open a shell, change directory, and spawn a third thread in a different repo:
+
+```console
+$ cd ~/code/kestrel-www
+$ kk new copyright-2026 -m "Bump copyright year in the footer to 2026.
+  The string lives in components/Footer.tsx — replace the literal year
+  only, do not touch any other footer copy."
+```
+
+The new thread has no follows link; `kestrel-www` has no other kiki threads, and no parent makes sense. The agent edits one line. A minute later, the developer reviews the diff in the overlay's preview pane (`d`), is satisfied, and publishes:
+
+```console
+$ kk publish --ready -m "Bump copyright year to 2026"
+```
+
+`--ready` opens the PR ready for review rather than as a draft (see [Publishing · defaults](../09-publishing.md#defaults)). The base branch resolves to `main` because the thread has no follows ancestor (see [Publishing · PR base](../09-publishing.md#defaults)). CI is green within a minute. Marketing's reviewer approves. The developer merges via `gh pr merge` directly — kiki does not gate that — and closes the thread:
+
+```console
+$ kk close
+```
+
+`kk close` stops the agent and tmux session, forgets the jj workspace, deletes the materialized workspace directory, and marks the thread `Closed` (see [Threads · close](../05-threads.md#close)). Tracked jj revisions survive on the merged commit; the bookmark is left in place. The PR is left untouched, which is the correct default — `--discard-pr` is the explicit close-the-PR path, and there is nothing to discard here because the PR has already merged.
+
+Total wall time on the copyright bump: about twelve minutes. Nothing in `kestrel-mobile` was perturbed. Across two repos, three threads are still active.
+
+## Act 6 — The docs thread, started in parallel
+
+### Wed 09:14 — kestrel-docs
+
+Wednesday morning, product asks for first-pass documentation of the Android setup story so that beta testers have something to read alongside the build they are about to receive. The docs live in their own repo. The developer spawns a thread there:
+
+```console
+$ cd ~/code/kestrel-docs
+$ kk new android-docs -m "Document the Android app's first-run flow:
+  install from Firebase App Distribution, log in (password for now,
+  biometric coming soon), grant notification permission, land on the
+  Library tab. Match the structure of the iOS first-run page."
+```
+
+`kestrel-docs` has no other kiki threads either, so `android-docs` is parentless and follows nothing. From any registered repo, `kk ls --all-repos` now lists every active thread across both repos:
+
+```console
+$ kk ls --all-repos
+REPO            THREAD          CASCADE  AGENT
+kestrel-mobile  android-skel    ──       ●  working
+kestrel-mobile  auth            ──  ←●   ●  working
+kestrel-docs    android-docs    ──       ●  working
+```
+
+Three threads, two repos, one daemon, one keyboard. The follows arrow `←●` marks `auth` as a follower of `android-skel`; `android-docs` carries no arrow because it follows nothing. `--all` (which would include closed threads, like `copyright-2026`) is independent of `--all-repos` and is not passed here (see [Commands · `kk ls`](../11-commands.md#kk-ls)).
+
+The developer keeps moving between threads with `kk switch`, which is a pure tmux client operation that does not mutate daemon focus state (see [Commands · `kk switch`](../11-commands.md#kk-switch)). The daemon is not "in" any thread; it is watching all of them.
+
+## Act 7 — Product changes their mind (big)
+
+### Wed 15:30 — kestrel-mobile
+
+Mid-afternoon, product Slacks: scrap the password-first auth flow. Sales has been hearing repeated requests for biometric-first login from enterprise pilots, and the team wants to ship the Android beta with that posture from day one. Password is now a fallback, not the front door.
+
+The auth thread's direction is wrong. Not in detail — fully. Closing it and starting a new one is cleaner than re-prompting the agent and watching it patch its way to a different posture. The developer opens the overlay, cursors to `auth` in the Stack, and presses `x`. The confirmation card appears (see [Interface · forms](spec.md#forms)):
+
+```text
+ kiki · NAVIGATE · kestrel-mobile/auth                                         ?  esc
+
+ STACK                              │  kestrel-mobile/auth
+                                    │
+ ● main             ──    in        │   ╭─ Close kestrel-mobile/auth? ───────────────╮
+ │                                  │   │                                            │
+ ●─android-skel     ──    wrk       │   │  Stops the agent and tmux session.         │
+ │                                  │   │  Forgets the jj workspace and removes      │
+ ●─auth          ▸  ──    ←●        │   │  ~/code/kestrel-mobile-kiki-auth.          │
+                                    │   │  Tracked jj revisions are kept.            │
+                                    │   │  No PR is open.                            │
+                                    │   │                                            │
+                                    │   │   ⏎  Close      esc  Cancel                │
+                                    │   ╰────────────────────────────────────────────╯
+                                    │
+ ACTIVITY                           │
+ ─────────────────────────────────────────────────────────────────────────────────────
+ kestrel-mobile  auth  ── in sync  claude-opus-4-7  ctx ●●●○○ 41%  last op 12s
+```
+
+The developer presses `enter`. `kk close` stops the agent, kills the tmux session, forgets the workspace, and marks the thread `Closed` — but it retains the transcript. The developer specifically did not run `kk thread destroy`: that is the irreversible path, which abandons the bookmark, revokes credentials, and deletes the transcript by default (see [Threads · destroy](../05-threads.md#destroy)). `Closed` is recoverable (`kk reopen <thread>`) and the transcript is searchable later if anything from the password-first attempt turns out to be worth keeping.
+
+Then the developer spawns the replacement:
+
+```console
+$ kk new auth-biometric --follows android-skel -m "Biometric-first login,
+  with password as a fallback for devices without enrolled biometrics.
+  Use AndroidX Biometric. The login NavHost destination is in
+  android-skel; pop to the home tab on success, fall through to the
+  password form on biometric failure."
+```
+
+The Stack tree's shape is unchanged — there is still one thread following `android-skel` — but the slot now holds `auth-biometric`. The `auth` thread is gone from the active list; `kk ls --all` would still show it, marked closed (see [Commands · `kk ls`](../11-commands.md#kk-ls)).
+
+## Act 8 — A cascade conflict
+
+### Thu 10:08 — kestrel-mobile
+
+Thursday morning, the `android-skel` thread's agent commits a navigation refactor: it moves the auth-related destinations out of the root `NavHost` into a nested `loginGraph`. This changes the same files the `auth-biometric` thread is mid-edit on. The cascade fires; the protected rebase on `auth-biometric` produces a textual conflict.
+
+`auth-biometric` transitions to `Conflicted`. The cascade orchestrator interrupts the agent and resumes it with conflict framing (see [Cascade · scenario 3](../07-cascade.md#scenario-3-textual-conflict)):
+
+> Cascade rebase produced a conflict on auth-biometric. Resolve before continuing.
+
+A loud notification fires. In the overlay, the `auth-biometric` row's cascade glyph flips to `◐` (red). A toast surfaces with the same indicator (see [Interface · toast triggers](spec.md#toasts)).
+
+```text
+ kiki · NAVIGATE · kestrel-mobile/auth-biometric    ┌────────────────────────────────┐
+                                                    │ ◐ auth-biometric conflicted    │
+ STACK                              │               │   tap T to read transcript     │
+                                                    └────────────────────────────────┘
+ ● main             ──    in        │
+ │                                  │
+ ●─android-skel     ──    wrk       │
+ │                                  │
+ ●─auth-biometric ▸ ◐    ←●         │
+                                    │
+```
+
+The developer presses `enter` on `auth-biometric` to switch to its tmux session, opens a shell pane next to the agent (which is paused), and resolves the conflict by hand. jj's conflict markup makes the merge tractable; the resolution touches three lines.
+
+```console
+$ cd ~/code/kestrel-mobile-kiki-auth-biometric
+$ jj resolve
+$ jj log -r @ --no-graph -T 'change_id ++ "\n"'
+```
+
+> kkd: the op-log watcher sees the resolve op like any other external op. The cascade orchestrator clears the `Conflicted` state once the working copy has no remaining conflict markers. The agent is resumed, sees a synthetic context message describing what was rebased and what the human resolved, and continues.
+
+The cascade glyph on `auth-biometric` returns to `──`. The conflict cost the developer about eight minutes of focused attention and zero corrupted state.
