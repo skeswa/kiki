@@ -8,7 +8,9 @@ The protagonist is unnamed. The work is to port the iOS Kestrel app to Android, 
 - `kestrel-docs` — the user-facing product documentation.
 - `kestrel-www` — the marketing site, where one copyright year is wrong.
 
-The storyboard introduces no new commands, flags, output strings, glyphs, or screen elements. Every beat in it grounds out in the normative chapters. Where a beat is load-bearing, it cites the chapter that authorizes it. Where it would require behavior the rest of the book does not authorize, that gap is a finding, not a license to extend the surface here.
+The storyboard introduces no new commands, flags, glyphs, or screen elements. Every beat in it grounds out in the normative chapters. Where a beat is load-bearing, it cites the chapter that authorizes it. Where it would require behavior the rest of the book does not authorize, that gap is a finding, not a license to extend the surface here.
+
+Transcripts and wireframes in this chapter render the fields the spec commits to in a plausible terminal shape. Exact spacing, column ordering, and any output text the spec does not pin are illustrative — they show what kiki *might* look like in motion, not what an implementation must emit byte-for-byte. Glyphs and committed output strings (the `in sync` / `pending` / `conflicted` cascade-state words; the empty-state placeholder; the conflict-framing message) are reproduced verbatim from the spec.
 
 Acts are time-stamped (`Day · HH:MM — <repo>`) so the temporal arc is legible: product changes its mind twice, work stacks up, a thread is abandoned in flight, a cascade conflicts and recovers, and the week closes with a stack of merged PRs and a quiet TUI.
 
@@ -302,9 +304,9 @@ $ kk log --wide
 
 Reviewers approve through the day; the skeleton PR merges first. kiki polls GitHub through `gh` and notices the merge. For `auth-biometric`, the parent-merged auto-cascade kicks in (see [Cascade · parent merged](../07-cascade.md#parent-merged)): kiki rebases the child onto the repo default branch, force-pushes with `--force-with-lease`, updates the child PR's base from `android-skel` to `main`, and only then drops the follows link. All three remote operations succeed before the link is dropped; until they do, the link stays so a retry knows what to reconcile.
 
-> kkd: the parent-merge transition lives in 07-cascade.md's state machine as `FollowingParent → ParentMergePending → DetachedMovedToDefault`. Local rebase, force-push, and PR-base update each have their own failure-and-retry surface; the link is dropped only after all three confirm. The auth-biometric thread is now an independent thread targeting `main`, not a child of `android-skel`.
+> kkd: the parent-merge transition lives in 07-cascade.md's state machine as `FollowingParent → ParentMergePending → DetachedMovedToDefault`. The follows link is dropped only after local and remote updates succeed. The auth-biometric thread is now an independent thread targeting `main`, not a child of `android-skel`.
 
-A toast surfaces in whichever overlay is open at the moment of the rebase, summarizing the auto-cascade. Shortly after, reviewers approve `auth-biometric` and that PR merges too. The week's port has landed on `main` as two clean commits.
+The `auth-biometric` row in the Stack updates after the parent-merge transition: the follows arrow `←●` disappears, since auth-biometric no longer follows anything. Shortly after, reviewers approve `auth-biometric` and that PR merges too. The week's port has landed on `main` as two clean commits.
 
 ## Act 10 — Closing out
 
@@ -326,7 +328,7 @@ A final `kk ls --all-repos --all` (the `--all` flag includes closed threads, the
 - `kestrel-docs/android-docs` — closed
 - `kestrel-www/copyright-2026` — closed
 
-Bare `kk` from `kestrel-mobile` opens the overlay back at the empty-state placeholder it started the week with: `no threads — press \`n\` to create one`. Five threads were spawned, one was abandoned, four merged. The follows DAG is empty; the cascade outbox is empty; the daemon is idle.
+Bare `kk` from `kestrel-mobile` opens the overlay with no active work remaining; the closed threads are reachable through `kk ls --all` and `kk reopen <thread>` if anything from the week needs revisiting. Five threads were spawned, one was abandoned, four merged. The follows DAG is empty; the cascade outbox is empty; the daemon is idle.
 
 ## Epilogue
 
@@ -337,6 +339,6 @@ The patterns this storyboard demonstrates and the chapters that authorize them:
 - **Abandoning** — act 7's `kk close` of the wrong-direction `auth` thread, retaining the transcript and revisions for possible reuse, in contrast to the irreversible `kk thread destroy` (see [Threads · close](../05-threads.md#close), [Threads · destroy](../05-threads.md#destroy)).
 - **Cross-repo** — acts 1 (registration), 5 (`kestrel-www` copyright bump), 6 (`kestrel-docs` parallel work). One daemon, per-repo registration, `kk ls --all-repos` for the global view (see [Commands · `kk ls`](../11-commands.md#kk-ls)).
 - **Cascade in motion** — act 4 (small ancestor change, hop-by-hop propagation), act 8 (textual conflict and human resolution). Both demonstrate that direct `jj` operations are first-class inputs to the coordinator, not gated by it (see [Cascade](../07-cascade.md), [Invariants](../04-invariants.md)).
-- **Stacked publish** — act 9. `kk publish --downstack` publishes ancestors first; the parent merge then auto-migrates descendants onto the repo default branch (see [Publishing · defaults](../09-publishing.md#defaults)).
+- **Stacked publish** — act 9. `kk publish --downstack` publishes ancestors first; the parent merge then auto-migrates descendants onto the repo default branch (see [Publishing · flags](../09-publishing.md#flags), [Cascade · parent merged](../07-cascade.md#parent-merged)).
 
 If the storyboard appears to require any behavior the rest of the book does not authorize, that is a finding. The storyboard is illustrative; the specification is normative.
