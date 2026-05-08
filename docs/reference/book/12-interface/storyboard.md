@@ -278,3 +278,65 @@ $ jj resolve
 > kkd: the op-log watcher sees the resolve op like any other external op. Once the rebase no longer conflicts, the thread leaves the `Conflicted` state and cascade work resumes (see [Cascade · conflicts and escalation](../07-cascade.md#conflicts-and-escalation)). The agent is resumed with a synthetic context message describing what was rebased and what the human resolved, and continues.
 
 The cascade glyph on `auth-biometric` returns to `──`. The conflict cost the developer about eight minutes of focused attention and zero corrupted state.
+
+## Act 9 — Publishing the stack
+
+### Thu 16:00 — kestrel-mobile
+
+By late Thursday, the navigation skeleton is complete and the biometric-first auth flow works end-to-end against staging. The developer wants both threads in front of reviewers as a stack: skeleton at the bottom, auth-biometric on top. From the skeleton thread, they invoke a downstack publish:
+
+```console
+$ kk publish --downstack --ready
+```
+
+`--downstack` publishes the current thread plus unpublished descendants, top-down (see [Publishing · flags](../09-publishing.md#flags)). `--ready` opens both PRs ready for review rather than as drafts (see [Publishing · defaults](../09-publishing.md#defaults)). kiki publishes ancestors first, then descendants: skeleton's PR is created with base `main`; auth-biometric's PR is then created with base `android-skel`. Each PR opens a separate editor session so the developer can shape its title and body — the AI-drafted text is a starting point, not the finished version. The transcript is not input to PR drafting (see [Publishing · PR text](../09-publishing.md#pr-text)).
+
+Once both editors close and `gh` returns success, `kk log --wide` shows the stack annotated with PR state, CI roll-up, agent state, and last-activity age (see [Commands · `kk log`](../11-commands.md#kk-log)):
+
+```console
+$ kk log --wide
+●─auth-biometric  [#143] ●  "Biometric-first auth flow"  ready  ●●●●● ci green  working    34s
+●─android-skel    [#142] ●  "Scaffold Android navigation"  ready  ●●●●● ci green  working   12m
+●─main
+```
+
+Reviewers approve through the day; the skeleton PR merges first. kiki polls GitHub through `gh` and notices the merge. For `auth-biometric`, the parent-merged auto-cascade kicks in (see [Cascade · parent merged](../07-cascade.md#parent-merged)): kiki rebases the child onto the repo default branch, force-pushes with `--force-with-lease`, updates the child PR's base from `android-skel` to `main`, and only then drops the follows link. All three remote operations succeed before the link is dropped; until they do, the link stays so a retry knows what to reconcile.
+
+> kkd: the parent-merge transition lives in 07-cascade.md's state machine as `FollowingParent → ParentMergePending → DetachedMovedToDefault`. Local rebase, force-push, and PR-base update each have their own failure-and-retry surface; the link is dropped only after all three confirm. The auth-biometric thread is now an independent thread targeting `main`, not a child of `android-skel`.
+
+A toast surfaces in whichever overlay is open at the moment of the rebase, summarizing the auto-cascade. Shortly after, reviewers approve `auth-biometric` and that PR merges too. The week's port has landed on `main` as two clean commits.
+
+## Act 10 — Closing out
+
+### Fri 09:00 — across repos
+
+Friday morning, the developer cleans up. `auth-biometric` and `android-skel` each have a merged PR; their threads have done their job. `kk close` archives them. The agent stops, the tmux session is killed, the jj workspace is forgotten, the materialized workspace directory is removed, and the threads transition to `Closed` (see [Threads · close](../05-threads.md#close)). Tracked jj revisions live on `main`; bookmarks are kept; PRs are left untouched (already merged). The developer does the same in `kestrel-docs` after a smaller PR cycle on the `android-docs` thread.
+
+```console
+$ kk close                                  # in auth-biometric
+$ kk switch android-skel && kk close
+$ cd ~/code/kestrel-docs && kk close        # android-docs
+```
+
+A final `kk ls --all-repos --all` (the `--all` flag includes closed threads, the `--all-repos` flag widens repo scope — they are independent, see [Commands · `kk ls`](../11-commands.md#kk-ls)) shows the week as a flat list across the three repos:
+
+- `kestrel-mobile/android-skel` — closed
+- `kestrel-mobile/auth` — closed (the password-first version, abandoned mid-week)
+- `kestrel-mobile/auth-biometric` — closed (the biometric-first replacement, merged)
+- `kestrel-docs/android-docs` — closed
+- `kestrel-www/copyright-2026` — closed
+
+Bare `kk` from `kestrel-mobile` opens the overlay back at the empty-state placeholder it started the week with: `no threads — press \`n\` to create one`. Five threads were spawned, one was abandoned, four merged. The follows DAG is empty; the cascade outbox is empty; the daemon is idle.
+
+## Epilogue
+
+The patterns this storyboard demonstrates and the chapters that authorize them:
+
+- **Branching** — acts 3 and 7. `kk new --follows <parent>` records a live cascade edge in the follows DAG (see [Threads · creation](../05-threads.md#creation), [Cascade · trigger](../07-cascade.md#trigger)).
+- **Merging back** — acts 5 (a single thread merging direct to `main`) and 9 (a stacked publish where the parent merge auto-rebases the child onto `main`) (see [Publishing](../09-publishing.md), [Cascade · parent merged](../07-cascade.md#parent-merged)).
+- **Abandoning** — act 7's `kk close` of the wrong-direction `auth` thread, retaining the transcript and revisions for possible reuse, in contrast to the irreversible `kk thread destroy` (see [Threads · close](../05-threads.md#close), [Threads · destroy](../05-threads.md#destroy)).
+- **Cross-repo** — acts 1 (registration), 5 (`kestrel-www` copyright bump), 6 (`kestrel-docs` parallel work). One daemon, per-repo registration, `kk ls --all-repos` for the global view (see [Commands · `kk ls`](../11-commands.md#kk-ls)).
+- **Cascade in motion** — act 4 (small ancestor change, hop-by-hop propagation), act 8 (textual conflict and human resolution). Both demonstrate that direct `jj` operations are first-class inputs to the coordinator, not gated by it (see [Cascade](../07-cascade.md), [Invariants](../04-invariants.md)).
+- **Stacked publish** — act 9. `kk publish --downstack` publishes ancestors first; the parent merge then auto-migrates descendants onto the repo default branch (see [Publishing · defaults](../09-publishing.md#defaults)).
+
+If the storyboard appears to require any behavior the rest of the book does not authorize, that is a finding. The storyboard is illustrative; the specification is normative.
