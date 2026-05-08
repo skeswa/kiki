@@ -4,12 +4,12 @@ kiki state lives in two SQLite databases. All tables are versioned via migration
 
 ## Database split
 
-| Path                    | Scope                 | Contents                                              |
-| ----------------------- | --------------------- | ----------------------------------------------------- |
-| `~/.kiki/state.db`      | per-user              | repo registry, daemon meta                            |
-| `<repo>/.kiki/state.db` | per-repo (gitignored) | threads, agent sessions, transcripts, cascades, audit |
+| Path                                | Scope         | Contents                                              |
+| ----------------------------------- | ------------- | ----------------------------------------------------- |
+| `~/.kiki/state.db`                  | per-user      | repo registry, daemon meta                            |
+| `~/.kiki/repos/<repo_id>/state.db`  | per-repo      | threads, agent sessions, transcripts, cascades, audit |
 
-`<repo>/.kiki/` is gitignored. The user-level database knows which repos kkd watches; the per-repo database holds everything that lives or dies with the repo.
+Both databases live under `~/.kiki/` — kiki's centralized state directory. The source repo's own filesystem holds no kiki state; the per-repo `state.db` is keyed by `<repo_id>` (a UUID assigned at `kk init` and recorded in the per-user `repos` table) so the kiki dir survives the source repo being moved, renamed, or symlinked. The user-level database knows which repos kkd watches; the per-repo database holds everything that lives or dies with the repo.
 
 ## Tables
 
@@ -17,10 +17,10 @@ The list below is table-level. Column-level definitions are derived from the beh
 
 ### Per-user (`~/.kiki/state.db`)
 
-- `repos` — registered repo paths, registration time, opt-in metadata.
+- `repos` — `(repo_id, canonical_path, registered_at, opt_in_metadata)`. `repo_id` is a UUID assigned at `kk init` and is the durable identity that keys the per-repo state directory at `~/.kiki/repos/<repo_id>/`. `canonical_path` is the realpath of the registered repo and is updated if `kk repo unregister` + `kk init` is the explicit re-registration path; the `repo_id` and the per-repo database it owns survive across renames.
 - `daemon_meta` — daemon startup info, last-known socket path, schema version.
 
-### Per-repo (`<repo>/.kiki/state.db`)
+### Per-repo (`~/.kiki/repos/<repo_id>/state.db`)
 
 - `threads` — per-thread row carrying `pending_cascade_seq`, `applied_cascade_seq`, `acknowledged_cascade_seq`, and a `lifecycle` column with values `Active | ClosePreflight | CloseCommit | Closed | Orphaned | Destroyed` (see [Threads](../05-threads.md)).
 - `thread_links` — directed follows edges. DAG-validated at insert time.

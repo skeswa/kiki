@@ -21,7 +21,7 @@ It verifies prerequisites:
 
 - jj is initialized — hard error if not, with a message naming `jj init --colocate` as the typical fix.
 - `gh` is authenticated enough for publish operations — hard error if not.
-- the repo can store gitignored local state under `<repo>/.kiki/` — hard error if not writable.
+- `kkd` can write the per-repo state directory at `~/.kiki/repos/<repo_id>/` — hard error if not writable. The source repo's filesystem itself receives no writes; the only kiki file that may live there is the optional committed `<repo>/.kiki.toml` (the repo-shared config layer), which `kk init` does not create.
 
 `kk init` does **not** verify that any specific harness binary is installed. The harness contract is pluggable (see [Harness adapter](15-architecture/harness-adapter.md)); v1 ships only the `claude-code` adapter, but kiki does not refuse registration on a host that has not installed a harness yet. The check happens at `kk new` time instead: spawning a thread with the configured default harness errors if that harness's binary is missing.
 

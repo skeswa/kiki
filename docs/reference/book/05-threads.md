@@ -47,7 +47,7 @@ This default is overridable via `[paths] workspaces_root` (see [Configuration](1
 
 Sibling-of-repo is the default for two reasons: it matches jj's natural `jj workspace add ../<name>` ergonomics, and it leaves the workspace discoverable next to the repo without nesting another working copy inside the parent's working copy.
 
-Kiki creates `<workspace>/.kiki/` (mode `0700`) for the per-thread hook credential and harness config. Kiki also creates `<workspace>/kiki-errors.log` lazily when a client process (notably `kk-hook`) cannot reach `kkd` and needs to record a failure locally. Kiki does **not** auto-mutate `.gitignore` to exclude that log; whether to ignore it is the user's call.
+The per-thread hook credential lives at `~/.kiki/repos/<repo_id>/credentials/<thread_id>` (mode `0600`); kiki creates the parent directory at thread spawn (mode `0700`). The only file kiki places inside the workspace tree is the harness's own config (e.g., `<workspace>/.claude/settings.json` for Claude Code, which Claude Code requires in the workspace because that is where it looks for hook configuration); that file references the credential by absolute path. Per-thread error logs live at `~/.kiki/repos/<repo_id>/errors/<thread_id>.log`, written lazily when a client process (notably `kk-hook`) cannot reach `kkd` and needs to record a failure locally. Nothing kiki-managed is written into the source repo's own filesystem.
 
 ## Workspace isolation
 
@@ -62,7 +62,7 @@ Close is two-phase:
 1. Preflight performs no destructive mutation.
 2. Commit stops the agent and tmux session, reruns loss-prevention checks, forgets the jj workspace, deletes the materialized workspace directory, and marks the thread closed.
 
-Close must allowlist kiki-owned ephemeral workspace files such as `<workspace>/.kiki/hook-cred` and generated per-thread harness config. These files must not self-block close. User-created untracked or ignored files that would be deleted still require explicit handling.
+Close must allowlist kiki-owned ephemeral workspace files — for v1 that means the harness's per-thread config (e.g., `<workspace>/.claude/settings.json`). These files must not self-block close. The hook credential and per-thread error log live under `~/.kiki/repos/<repo_id>/` and are revoked / removed independently of the workspace deletion. User-created untracked or ignored files that would be deleted still require explicit handling.
 
 Plain `kk close` leaves any open PR untouched. `kk close --discard-pr` is the explicit PR-closing path.
 

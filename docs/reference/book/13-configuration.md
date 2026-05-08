@@ -11,7 +11,7 @@ From lowest to highest:
 1. hardcoded defaults
 2. repo-shared committed config: `<repo>/.kiki.toml`
 3. user config: `~/.config/kiki/config.toml`
-4. repo-local gitignored config: `<repo>/.kiki/config.toml`
+4. repo-local gitignored config: `~/.kiki/repos/<repo_id>/config.toml`
 5. per-thread sqlite config
 6. `KIKI_*` environment
 7. CLI flags
@@ -65,11 +65,13 @@ The top-level config sections expected in v1:
 | `user_state_db`   | string | `<user_state_dir>/state.db`     | structural — daemon restart |
 | `kkd_socket`      | string | `<user_state_dir>/kkd.sock`     | structural — daemon restart |
 | `kkd_mcp_socket`  | string | `<user_state_dir>/kkd-mcp.sock` | structural — daemon restart |
-| `repo_state_dir`  | string | `<repo>/.kiki/`                 | structural — daemon restart |
+| `repo_state_dir`  | string | `<user_state_dir>/repos/<repo_id>/` | structural — daemon restart |
 | `workspaces_root` | string | `<parent-of-repo>/`             | structural — next `kk new`  |
 | `audit_log`       | string | `<repo_state_dir>/audit.log`    | structural — daemon restart |
 
 `workspaces_root` does not embed `<repo>` or `<slug>`; kiki always materializes the workspace as `<workspaces_root>/<repo>-kiki-<slug>/`. Setting `workspaces_root = ~/work/kk-workspaces/` puts every thread's workspace under that directory rather than next to its source repo.
+
+`repo_state_dir` defaults to a centralized location under `<user_state_dir>` keyed by the repo's `<repo_id>` (a UUID assigned at `kk init` and recorded in the per-user `repos` table). Per-repo state — the per-repo `state.db`, gitignored `config.toml`, `audit.log`, `errors/<thread_id>.log`, and `credentials/<thread_id>` — lives under that directory. The source repo's own filesystem carries no kiki state; only an optional `<repo>/.kiki.toml` (the committed repo-shared config layer) lives there, and only when the team commits one.
 
 ## UI keys
 

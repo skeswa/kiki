@@ -14,7 +14,7 @@ This distinction matters. Credentials contain ordinary bugs and misbehaving tool
 `ThreadScoped<thread_id>`:
 
 - bound to one thread
-- written to `<workspace>/.kiki/hook-cred`
+- written to `~/.kiki/repos/<repo_id>/credentials/<thread_id>` (mode `0600`); the workspace tree carries only the harness's own config file (e.g., `<workspace>/.claude/settings.json` for Claude Code), which references that absolute path
 - read by `kk-hook`, sidebar, and the same-thread MCP client when MCP ships
 - rotated on close and reopen
 

@@ -29,7 +29,7 @@ flowchart LR
     GrpcSock["~/.kiki/kkd.sock\ngRPC over unix socket"]
     McpSock["~/.kiki/kkd-mcp.sock\nStreamable HTTP MCP over unix socket\n(stretch/post-v1)"]
     AdminCred["~/.kiki/admin-cred\nread by kk CLI / TUI"]
-    HookCred["<workspace>/.kiki/hook-cred\nread by kk-hook / sidebar / MCP client"]
+    HookCred["~/.kiki/repos/<repo_id>/credentials/<thread_id>\nread by kk-hook / sidebar / MCP client"]
 
     AdminCred -. read .-> CLI
     AdminCred -. read .-> TUI
@@ -72,7 +72,7 @@ flowchart LR
 
     subgraph State["Persistent state"]
         UserDb["~/.kiki/state.db\nrepo registry + daemon meta"]
-        RepoDb["<repo>/.kiki/state.db\nthreads, credentials, audit, transcripts"]
+        RepoDb["~/.kiki/repos/<repo_id>/state.db\nthreads, credentials, audit, transcripts\n(centralized; no state inside the source repo)"]
     end
 
     Auth --> UserDb

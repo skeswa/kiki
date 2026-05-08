@@ -10,8 +10,8 @@ The tool is named **kiki**. The command is `kk`.
 - Hook sidecar: `kk-hook`
 - User state directory: `~/.kiki/`
 - User config: `~/.config/kiki/config.toml`
-- Repo-local state/config: `<repo>/.kiki/`
-- Repo-shared config: `<repo>/.kiki.toml`
+- Per-repo state and gitignored config: `~/.kiki/repos/<repo_id>/` (centralized; the source repo's filesystem holds no kiki state)
+- Repo-shared committed config: `<repo>/.kiki.toml` (the only kiki file that lives inside the source repo, and only when the team commits one)
 
 ## Command style
 

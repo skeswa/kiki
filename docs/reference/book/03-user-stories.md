@@ -146,7 +146,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 ## Thread transcript
 
 98. As a developer, I want kkd to capture each human-authored, agent-authored, and kk-authored conversational text event in a thread to a durable on-disk log bound to the jj change-id that was `@` at capture time, so that I have a recall surface separate from what was committed.
-99. As a developer, I want the thread transcript to live in `<repo>/.kiki/state.db` (gitignored, never pushed), so that prose containing dead ends, tool errors, or quoted file contents stays local.
+99. As a developer, I want the thread transcript to live in `~/.kiki/repos/<repo_id>/state.db` (centralized under `~/.kiki/`, never pushed, and never inside the source repo's filesystem), so that prose containing dead ends, tool errors, or quoted file contents stays local.
 100.  As a developer, I want `kk thread transcript [<change>]` to print messages for a change, with `--search <query>` for full-text, `--range <from>..<to>` for spans, and `--recent <n>` for tail-of-thread, so that I can recall context as a human reader.
 101.  As a developer, I want my agent to be able to retrieve from its own thread's log mid-task via a kiki-hosted MCP server, so that the agent can recall what the user asked or what happened earlier without me bridging it manually. (Stretch / post-v1; human `kk thread transcript` is the v1 acceptance surface.)
 102.  As a developer, I do NOT want my agent to read another thread's log via MCP in v1, so that cross-thread context-sharing waits for the v2 substrate design and its safety mechanisms (causal-chain detection, depth caps, audit trail).

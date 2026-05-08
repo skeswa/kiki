@@ -65,9 +65,9 @@ The hook's exact behavior — outbox lookup, decision step, post-stdout `MarkDel
 
 ## Hook degradation
 
-When `kkd` is unreachable (socket missing, connection refused, daemon mid-restart), the hook degrades to pass-through. The connect timeout is 200ms and the overall hook budget is 1s; on expiry the hook returns Claude Code's `continue` decision so the agent's tool call is not blocked, then appends one structured record to `<workspace>/kiki-errors.log`.
+When `kkd` is unreachable (socket missing, connection refused, daemon mid-restart), the hook degrades to pass-through. The connect timeout is 200ms and the overall hook budget is 1s; on expiry the hook returns Claude Code's `continue` decision so the agent's tool call is not blocked, then appends one structured record to `~/.kiki/repos/<repo_id>/errors/<thread_id>.log`.
 
-`<workspace>/kiki-errors.log` is the catch-all for client-side errors that cannot reach `kkd`. It is created lazily at first failure. Kiki does not auto-mutate `.gitignore` to exclude the log; whether to ignore it is the user's call.
+`~/.kiki/repos/<repo_id>/errors/<thread_id>.log` is the catch-all for client-side errors that cannot reach `kkd`. It is created lazily at first failure. The hook learns its absolute path at thread-spawn time, where `kkd` writes it into the per-thread harness config alongside the credential path; the source repo's filesystem is never touched.
 
 Pass-through is not a violation of the cascade safety invariant; it is the explicit precondition's failure mode. The cascade invariant in [Invariants](../04-invariants.md) requires `kkd` to be reachable in order to apply a rebase at a safe boundary. When the daemon is unreachable, no rebase is applied — the working copy is left untouched — and the pending cascade state is durable elsewhere. Two cases:
 
@@ -76,7 +76,7 @@ Pass-through is not a violation of the cascade safety invariant; it is the expli
 
 Either way, the next successful PreToolUse round-trip after `kkd` returns sees `pending_cascade_seq > applied_cascade_seq`, applies the rebase, composes the synthetic payload, persists it to `cascade_outbox`, and emits it. `cascade_outbox` only ever holds applied-but-not-yet-acknowledged cascades; pending-but-not-yet-applied cascades are not stored there. Cascade delivery is deferred, not dropped.
 
-In the deferred window, the agent's tool call may run against a working copy that has not yet picked up an ancestor change. That is the trade-off: the hook prefers an agent that keeps moving over an agent that wedges on a daemon hiccup, and it relies on the queue to make sure the cascade is still delivered the moment `kkd` returns. When `kkd` returns and observes a non-empty `kiki-errors.log` for a thread, it surfaces a single notification per thread summarizing the gap.
+In the deferred window, the agent's tool call may run against a working copy that has not yet picked up an ancestor change. That is the trade-off: the hook prefers an agent that keeps moving over an agent that wedges on a daemon hiccup, and it relies on the queue to make sure the cascade is still delivered the moment `kkd` returns. When `kkd` returns and observes a non-empty `~/.kiki/repos/<repo_id>/errors/<thread_id>.log` for a thread, it surfaces a single notification per thread summarizing the gap.
 
 ## Hook chaining
 
@@ -117,4 +117,4 @@ Cascade-injection row writes are NOT part of this trait — they are performed b
 5. `jj new` on the bookmark.
 6. `tmux new-session -d` cd'd into the workspace path.
 7. Harness spawn through `Harness::spawn(SpawnOpts { thread_id, session_id, initial_prompt: Option<String>, harness_args })`. The harness adapter routes the optional initial prompt to the harness's first user-turn input; for Claude Code, this is the harness's startup-message contract.
-8. `ThreadScoped<thread_id>` credential written to `<workspace>/.kiki/hook-cred` (mode `0600`) and per-thread harness hook config installed (e.g., `<workspace>/.claude/settings.json` for Claude Code).
+8. `ThreadScoped<thread_id>` credential written to `~/.kiki/repos/<repo_id>/credentials/<thread_id>` (mode `0600`) and per-thread harness hook config installed inside the workspace at the path the harness expects (e.g., `<workspace>/.claude/settings.json` for Claude Code). The harness config references the credential and the per-thread error-log path by absolute path under `~/.kiki/`. The workspace tree itself receives only the harness config file; nothing kiki-internal goes inside the source repo's filesystem.

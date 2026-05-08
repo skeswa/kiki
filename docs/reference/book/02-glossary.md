@@ -25,7 +25,7 @@ Definitions of the load-bearing terms in kiki's reference. When a term is used i
 
 ## Transcript
 
-- **Thread transcript** — kiki's local on-disk record of human-authored, agent-authored, and kiki-authored conversational text events per thread, bound to jj change-ids. Local-only (`<repo>/.kiki/state.db`, gitignored, never pushed). Rows distinguish `author` (`human|agent|kk`) from `direction` (`inbound_to_agent|outbound_from_agent|local_record`) so kiki-authored context is not misattributed to the agent.
+- **Thread transcript** — kiki's local on-disk record of human-authored, agent-authored, and kiki-authored conversational text events per thread, bound to jj change-ids. Local-only (`~/.kiki/repos/<repo_id>/state.db`, never pushed; the source repo's filesystem holds no kiki state). Rows distinguish `author` (`human|agent|kk`) from `direction` (`inbound_to_agent|outbound_from_agent|local_record`) so kiki-authored context is not misattributed to the agent.
 - **Local-only-features rule** — the constraint that the thread transcript feeds back into AI-driven kiki features only at local boundaries (`kk reopen` catch-up in v1, agent self-query when same-thread transcript MCP ships). It does NOT feed into features producing externally-published artifacts (`kk publish` PR-drafter, auto-describe, auto-rename).
 - **`synthesized=TRUE`** — flag on a transcript row indicating it is kiki-composed content the agent received (cascade injections, reopen catch-up, hard-escalation framing). The flag is what lets `kk reopen` catch-up exclude prior catch-ups from its source query, breaking the recursion that would otherwise compound on every reopen.
 - **`anchor_unknown=TRUE`** — flag on a backfilled transcript row whose timestamp predates the available `op_history` and cannot be reliably anchored to a `(change_id, commit_id, op_id)`. Anchor-aware queries skip these rows by default; `--recent` and FTS5 search include them. See [transcript anchoring](20-decisions/transcript-anchoring.md).
@@ -41,7 +41,7 @@ Definitions of the load-bearing terms in kiki's reference. When a term is used i
 ## Auth
 
 - **`Admin` credential** — required for global, cross-thread, or destructive daemon mutations. Stored at `~/.kiki/admin-cred` (mode `0600`). Read by the human CLI / TUI on each invocation.
-- **`ThreadScoped<T>` credential** — bound to one thread. Stored at `<workspace>/.kiki/hook-cred` (mode `0600`). Read by `kk-hook`, the persistent sidebar, and the same-thread MCP client when MCP ships. Rotated on close and reopen.
+- **`ThreadScoped<T>` credential** — bound to one thread. Stored at `~/.kiki/repos/<repo_id>/credentials/<thread_id>` (mode `0600`). Read by `kk-hook`, the persistent sidebar, and the same-thread MCP client when MCP ships. The hook's harness config (e.g., the `<workspace>/.claude/settings.json` Claude Code requires in the workspace tree) references that absolute path. Rotated on close and reopen.
 - **Repo-summary read scope** — the small expansion of `ThreadScoped<T>` allowing a sidebar process to subscribe to read-only one-line summaries of sibling threads in the same repo. Same-repo only, read-only, summaries only (no diffs, no transcripts). The single cross-thread read a `ThreadScoped<T>` credential can perform.
 
 ## State

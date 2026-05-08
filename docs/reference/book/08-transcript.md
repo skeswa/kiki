@@ -6,7 +6,7 @@ It is a memory aid for the human and, at local boundaries, for the same thread's
 
 ## Storage
 
-Transcript rows live in `<repo>/.kiki/state.db`, which is gitignored.
+Transcript rows live in `~/.kiki/repos/<repo_id>/state.db`. The source repo's filesystem holds no transcript state — kiki centralizes all per-repo runtime under `~/.kiki/`.
 
 The transcript is local-only in v1. It must not feed:
 
