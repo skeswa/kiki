@@ -9,7 +9,9 @@ kiki state lives in two SQLite databases. All tables are versioned via migration
 | `~/.kiki/state.db`                  | per-user      | repo registry, daemon meta                            |
 | `~/.kiki/repos/<repo_id>/state.db`  | per-repo      | threads, agent sessions, transcripts, cascades, audit |
 
-Both databases live under `~/.kiki/` — kiki's centralized state directory. The source repo's own filesystem holds no kiki state; the per-repo `state.db` is keyed by `<repo_id>` (a UUID assigned at `kk init` and recorded in the per-user `repos` table) so the kiki dir survives the source repo being moved, renamed, or symlinked. The user-level database knows which repos kkd watches; the per-repo database holds everything that lives or dies with the repo.
+Both databases live under `~/.kiki/` — kiki's centralized state directory. The source repo's own filesystem holds no kiki state; the per-repo `state.db` lives at `~/.kiki/repos/<repo_id>/state.db`, where `<repo_id>` is a UUID assigned at `kk init` and recorded in the per-user `repos` table. The user-level database knows which repos kkd watches; the per-repo database holds everything that lives or dies with the repo.
+
+The `<repo_id>` UUID gives the centralized directory a stable, opaque name during one registration; it is **not** an identity that survives the source repo being moved out of band. With no breadcrumb inside the source repo, kiki's only handle on a registered repo is its `canonical_path`. If the user `mv`s the tree, `kk` invoked from the new location reports the repo as unregistered (because no `canonical_path` matches), while the prior centralized state stays on disk at `~/.kiki/repos/<old_repo_id>/`. The v1 recoveries are: move the source tree back so the registered `canonical_path` matches; or `kk repo unregister <old-path>` followed by `kk init` at the new location, which mints a fresh `repo_id` and starts over. By default, `kk repo unregister` only removes the registry row and leaves the centralized state directory alone so it can be recovered by re-registering at the same path; `kk repo unregister --purge` removes the centralized state directory as well. See [Commands · Repo registry](../11-commands.md#repo-registry). A move-aware `kk repo relocate` command is not in v1.
 
 ## Tables
 
@@ -17,7 +19,7 @@ The list below is table-level. Column-level definitions are derived from the beh
 
 ### Per-user (`~/.kiki/state.db`)
 
-- `repos` — `(repo_id, canonical_path, registered_at, opt_in_metadata)`. `repo_id` is a UUID assigned at `kk init` and is the durable identity that keys the per-repo state directory at `~/.kiki/repos/<repo_id>/`. `canonical_path` is the realpath of the registered repo and is updated if `kk repo unregister` + `kk init` is the explicit re-registration path; the `repo_id` and the per-repo database it owns survive across renames.
+- `repos` — `(repo_id, canonical_path, registered_at, opt_in_metadata)`. `repo_id` is a UUID assigned at `kk init` and keys the per-repo state directory at `~/.kiki/repos/<repo_id>/`. `canonical_path` is the realpath of the registered source repo at registration time and is the only handle kiki has for matching a future invocation back to this row. `repo_id` is stable for the life of the registration (so the centralized directory's name does not churn while kkd is running); it is **not** preserved across `kk repo unregister` + `kk init`, which is a fresh registration with a new UUID. An out-of-band `mv` of the source tree cannot be auto-detected — see the move semantics in the section above.
 - `daemon_meta` — daemon startup info, last-known socket path, schema version.
 
 ### Per-repo (`~/.kiki/repos/<repo_id>/state.db`)

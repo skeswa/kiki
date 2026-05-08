@@ -113,3 +113,11 @@ Expected thread-management commands include:
 - `kk thread detach` if the v1 detach escape hatch ships
 
 `attach`, `reparent`, and `restore --to <path>` (used to re-point an `Orphaned` thread at a moved workspace) are deferred graph-surgery and lifecycle commands.
+
+## Repo registry
+
+`kk repo unregister <path>` removes a repo from the per-user registry. It requires `Admin` authority (see [Authority](06-authority.md)) and is the explicit counterpart to `kk init`.
+
+By default, `kk repo unregister` does **not** delete the centralized per-repo state directory at `~/.kiki/repos/<repo_id>/`. The row is removed from `~/.kiki/state.db`'s `repos` table, but threads, transcript, audit log, and credentials remain on disk under the now-orphaned `<repo_id>` so the user can recover them by re-registering at the same canonical path. `--purge` removes the centralized state directory along with the registry row; this is destructive and irreversible (the state directory's threads, transcripts, and credentials are gone).
+
+Source-repo moves are not auto-detected. With no breadcrumb inside the source tree, a moved repo appears unregistered to `kk` from the new path. The v1 recoveries are: move the source tree back so its path matches the registered `canonical_path`; or `kk repo unregister --purge <old-path>` followed by `kk init` at the new location, which mints a fresh `repo_id` and starts over. A move-aware `kk repo relocate` command is not in v1.
