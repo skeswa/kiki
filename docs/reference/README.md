@@ -18,7 +18,7 @@ Read it as a small spec book: first the reason for the tool, then the model, the
 10. [Publishing](book/09-publishing.md)
 11. [Metadata Evolution](book/10-metadata.md)
 12. [Commands](book/11-commands.md)
-13. [Interface](book/12-interface.md)
+13. [Interface](book/12-interface/)
 14. [Configuration](book/13-configuration.md)
 15. [Observability](book/14-observability.md)
 16. [Architecture](book/15-architecture/)
@@ -35,7 +35,7 @@ The numbered chapters are the live contract. The Decisions chapter explains why 
 When two live chapters appear to conflict, use this order:
 
 1. [Invariants](book/04-invariants.md)
-2. Behavioral chapters: [Threads](book/05-threads.md), [Authority](book/06-authority.md), [Cascade](book/07-cascade.md), [Transcript](book/08-transcript.md), [Publishing](book/09-publishing.md), [Metadata Evolution](book/10-metadata.md), [Commands](book/11-commands.md), [Interface](book/12-interface.md), [Configuration](book/13-configuration.md), and [Observability](book/14-observability.md)
+2. Behavioral chapters: [Threads](book/05-threads.md), [Authority](book/06-authority.md), [Cascade](book/07-cascade.md), [Transcript](book/08-transcript.md), [Publishing](book/09-publishing.md), [Metadata Evolution](book/10-metadata.md), [Commands](book/11-commands.md), [Interface](book/12-interface/), [Configuration](book/13-configuration.md), and [Observability](book/14-observability.md)
 3. [User Stories](book/03-user-stories.md), as product intent that the stricter chapters must satisfy
 4. [Architecture](book/15-architecture/)
 5. [Testing](book/16-testing.md), [Build Sequencing](book/17-build-sequencing.md), [Roadmap](book/18-roadmap.md), [Naming](book/19-naming.md), and [Decisions](book/20-decisions/)

@@ -31,7 +31,7 @@ It verifies prerequisites:
 
 ## `kk`
 
-Bare `kk` opens the overlay TUI in `NAVIGATE` mode (see [Interface](12-interface.md)) when the TUI ships. Before the TUI ships, it prints a concise command summary and points to `kk ls`. Outside a registered repo, even after the TUI ships, `kk` falls back to the command summary plus `kk ls`.
+Bare `kk` opens the overlay TUI in `NAVIGATE` mode (see [Interface](12-interface/spec.md)) when the TUI ships. Before the TUI ships, it prints a concise command summary and points to `kk ls`. Outside a registered repo, even after the TUI ships, `kk` falls back to the command summary plus `kk ls`.
 
 ## `kk new`
 

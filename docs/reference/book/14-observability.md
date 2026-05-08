@@ -30,7 +30,7 @@ These defaults are configurable under `[notifications]`.
 
 ## Notification transport
 
-The in-UI surface is the primary channel: while a kk overlay or persistent sidebar is focused, attention events render as toasts (see [Interface](12-interface.md)). OS-native notifications are the fallback for users who are away from the UI.
+The in-UI surface is the primary channel: while a kk overlay or persistent sidebar is focused, attention events render as toasts (see [Interface](12-interface/spec.md)). OS-native notifications are the fallback for users who are away from the UI.
 
 The cross-platform default is the `notify-rust` crate. On macOS, where `notify-rust` requires a signed application bundle, kiki falls back to shelling out to `osascript -e 'display notification ...'`. The transport is configurable under `[notifications]`:
 

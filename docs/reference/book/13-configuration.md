@@ -87,4 +87,4 @@ All `[ui]` keys are personal preference. They are valid in user and per-thread c
 
 `theme` selects the palette; the canonical alternates documented for v1 are `soft-dark` (default), `soft-light`, and `high-contrast`. Unknown theme values warn and fall back to `soft-dark`.
 
-The semantics, wireframes, and degradation rules for these keys live in [Interface](12-interface.md).
+The semantics, wireframes, and degradation rules for these keys live in [Interface](12-interface/spec.md).
