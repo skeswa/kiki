@@ -195,6 +195,12 @@ Read these before the invariants. If a story and a normative chapter appear to p
 136. As a developer, I want kk to skip spawning the sidebar pane when my terminal is narrower than `[ui] sidebar_min_terminal_cols` (default 100) and log a warning at `kk new` time, so that the sidebar never renders broken on a narrow terminal.
 137. As a developer, I want toggling `[ui] persistent_sidebar` after threads exist to take effect at next `kk new`/`kk reopen` (not retroactively reshape live sessions), with a config-set warning making the lag visible, so that I'm not surprised when an existing thread stays unchanged.
 
+## Shell pane (opt-out)
+
+137a. As a developer, I want every thread's tmux session to come up with a shell pane below the agent pane by default, with cwd set to the workspace and the shell process taken from my `$SHELL`, so that direct `jj` / `gh` / test invocations live alongside the agent without me having to spawn a separate terminal and `cd` into the workspace each time.
+
+137b. As a developer, I want the shell pane to die with the tmux session at `kk close` along with the agent (and any other panes I split in), so that the close blast radius is unambiguous and I learn not to leave long-running jobs in the shell pane expecting them to survive.
+
 ## Stated non-goals
 
 138. As a developer, I do NOT want kk to manage or cap my agent's resource consumption (CPU, RAM, tokens), so that those decisions stay in my hands.

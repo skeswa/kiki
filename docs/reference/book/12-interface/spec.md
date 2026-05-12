@@ -6,6 +6,7 @@ The TUI is not required for the first core implementation slice. This is the v1 
 
 - **Overlay** — the full-screen TUI invoked by bare `kk` (inside a registered repo) or tmux `prefix+k`. Transient. Dismissed on switch, on `q` or `esc`, or on completing a verb. Outside a registered repo, bare `kk` falls back to the command summary plus `kk ls` (see [Commands](../11-commands.md)).
 - **Persistent sidebar** — an opt-in tmux pane spawned at thread birth. Always-on, navigation-only. Lives next to the agent pane until the user kills it.
+- **Shell pane** — an opt-out tmux pane spawned at thread birth, running the user's `$SHELL` at the workspace cwd, laid out below the agent pane in the same tmux window. The pane kiki manages — singular — so direct `jj` / `gh` / test invocations live alongside the agent without leaving the thread. Detailed semantics in [Shell pane](#shell-pane).
 - **Stack section** — the threads in the current repo, rendered as a follows-aware tree in `kk log` order. Cursor moves here for navigation.
 - **Activity section** — the same threads, flat-listed by most-recent agent event (descending). Cursor moves here for triage.
 - **Preview pane** — the right two-thirds of the overlay. Renders one of: transcript tail, working-copy diff, PR comments. Toggled by `t` / `d` / `c`.
@@ -263,6 +264,77 @@ If the terminal is narrower than `[ui] sidebar_min_terminal_cols` (default 100),
 ```
 
 The sidebar's context strip is shorter than the overlay's: just bookmark + dirty + cascade glyph + agent dot. Model and ctx-% are omitted because they are agent-pane state and the agent pane already shows them. The per-row inlined status under the current thread's bookmark line is unchanged from the overlay — same `StatusRenderer --no-jj` projection.
+
+## Shell pane
+
+The shell pane is a kiki-spawned tmux pane running the user's shell at the thread's workspace cwd. It exists so the user can interact directly with the same jj workspace the agent is operating in — running `jj`, `gh`, tests, or any other command — without leaving the thread's tmux session. The agent pane and the shell pane share a working copy; what one writes the other sees.
+
+The shell pane is on by default (`[ui] shell_pane = true`). It is opt-out, not opt-in, because direct shell access alongside the agent is an expected component of the kiki experience, not an extra. When opted out, the thread's session contains only the agent pane (and the persistent sidebar pane, if that is also enabled).
+
+In kiki's vocabulary, **the** shell pane is the singular pane kiki creates at thread birth. If the user runs `tmux split-window` to add additional panes, those are just tmux panes — kiki neither manages them nor refers to them as shell panes. Re-ensure logic on `kk switch` / `kk reopen` only ever looks for and creates the one kiki-managed shell pane.
+
+### Layout
+
+The shell pane lives in the same tmux window as the agent pane, in a horizontal split below it. Default split: 75% agent on top, 25% shell on the bottom. Configurable via `[ui] shell_pane_position` (`below` | `right` | `window`, default `below`) and `[ui] shell_pane_size_pct` (int, default `25`).
+
+The four layout combinations of `[ui] persistent_sidebar` × `[ui] shell_pane`:
+
+| `persistent_sidebar` | `shell_pane` | layout                                                                    |
+| -------------------- | ------------ | ------------------------------------------------------------------------- |
+| `true`               | `true`       | sidebar left (32 cols) · agent top-right (~75%) · shell bottom-right (~25%) |
+| `false`              | `true`       | agent top (~75%) · shell bottom (~25%) — full width                       |
+| `true`               | `false`      | sidebar left (32 cols) · agent right (full height)                        |
+| `false`              | `false`      | agent only — full window                                                  |
+
+Initial focus at thread birth lands on the agent pane so the developer can interact with the harness's first turn. Pane focus across `kk switch` follows tmux's default behavior (last-focused pane on the session before detach), so kiki does not override user muscle memory.
+
+### Wireframe — default thread tmux layout (sidebar + agent + shell)
+
+```
+ ╭─ kiki ──────────────────────╮ ╭─ codex-conv-tui ─────────────────────────────────╮
+ │                             │ │                                                  │
+ │ STACK                       │ │ > human                                          │
+ │                             │ │   could you check whether the cascade outbox    │
+ │ ● main          ──    in    │ │   row is dropped on a hook crash before          │
+ │ │                           │ │   MarkDelivered?                                 │
+ │ ●─pi/refactor   ●●○  wrk    │ │                                                  │
+ │ │                           │ │ ● working   2m 18s   esc to interrupt            │
+ │ ●─pi/codex ▸    ●●●  ←●     │ │                                                  │
+ │ │                           │ │   reading kiki-core/cascade/outbox.rs ...        │
+ │ ●─pi/agent     ○     idle   │ ╰──────────────────────────────────────────────────╯
+ │                             │ ╭─ shell ──────────────────────────────────────────╮
+ │ ACTIVITY                    │ │ ~/code/pi-extensions.kiki/codex-conv $ jj st     │
+ │                             │ │ M  kiki-core/src/cascade/outbox.rs               │
+ │ ● codex     wrk    2m18s    │ │ Working copy : qxnopkyl 8a3c2d1e                 │
+ │ ● refactor  wrk     34s     │ │ ~/code/pi-extensions.kiki/codex-conv $ _         │
+ │ ◐ session   conflict        │ │                                                  │
+ │ ○ agent     idle  1h12m     │ │                                                  │
+ │ ✓ minimal   ✓        8m     │ │                                                  │
+ │ ─────────────────────────── │ │                                                  │
+ │ ↑↓ ⇄ ⏎ switch · q · ?       │ │                                                  │
+ │ master ✻  ── in sync  ●     │ │                                                  │
+ ╰─────────────────────────────╯ ╰──────────────────────────────────────────────────╯
+```
+
+The sidebar pane (left) is the persistent navigation surface; the agent pane (top-right) hosts the harness's PTY; the shell pane (bottom-right) hosts the user's shell at the workspace cwd. When `[ui] persistent_sidebar = false`, the sidebar region drops and the agent + shell expand to fill the window. When `[ui] shell_pane = false`, the shell region drops and the agent fills its column.
+
+### Lifecycle
+
+- **`kk new`**: spawns the shell pane if `[ui] shell_pane = true` and the terminal is at least `[ui] shell_pane_min_rows` tall, with cwd set to the workspace path and the shell process taken from `$SHELL` (fallback `/bin/sh`). No environment variables are injected; the shell inherits the parent env unchanged.
+- **`kk switch <thread>`**: re-ensures the shell pane idempotently. If the pane is present, no-op. If absent (the session was just attached, or the pane was killed before the previous detach), kiki recreates it fresh at the workspace cwd.
+- **`kk reopen <thread>`**: as `kk new` — the pane is spawned fresh. Shell history, scrollback, and any processes that were running before close are not preserved; the user's shell starts cold.
+- **`kk close`**: the tmux session is killed, and the shell pane goes with it. Any process running in the shell pane is killed alongside the agent. See [Threads · close](../05-threads.md#close).
+- **User kills the pane mid-session**: kiki does not auto-respawn it within the same continuous attach. The next `kk switch` or `kk reopen` re-ensures it.
+
+The pane is transparent to kkd after spawn in v1. The daemon does not track which process is running in it, does not surface its state in the TUI or sidebar, and does not log audit rows for activity in it. Anything kiki cares about that the user does in the shell pane — direct jj operations, gh interactions — routes through the existing op-log watcher and GitHub polling paths as if the user had run it anywhere else. This is the ambient-coordinator stance applied to the shell pane: kiki sets it up, then gets out of the way. Future versions may promote the shell pane to a tracked surface; v1 commits only to spawn, re-ensure, and degrade.
+
+### Degradation
+
+If the terminal has fewer rows than `[ui] shell_pane_min_rows` (default `24`) at thread birth, kiki skips spawning the shell pane and logs a warning, mirroring the persistent sidebar's `sidebar_min_terminal_cols` skip-and-warn rule. The same threshold check runs idempotently at `kk switch` / `kk reopen`, so resizing the terminal larger and switching back picks up the shell pane on the next event. Resizing smaller after birth does not retroactively kill the pane.
+
+### Authority
+
+The shell pane runs the user's shell process at the user's UID; kiki passes no thread-scoped credential into it. When the user invokes `kk` from inside the shell pane, the `kk` binary reads `~/.kiki/admin-cred` exactly as it does from any other terminal — the same context-resolution chain (env → tmux session name → cwd) auto-discovers the thread. See [Authority](../06-authority.md).
 
 ## Toasts
 

@@ -76,8 +76,9 @@ $ kk new --sidebar android-skel -m "Scaffold Android navigation: gradle module,
  │ ACTIVITY                    │ │ ● working   4s   esc to interrupt                │
  │                             │ │                                                  │
  │ ● android-skel  wrk    4s   │ │   reading app/src/main/AndroidManifest.xml ...   │
- │                             │ │                                                  │
- │ ─────────────────────────── │ │                                                  │
+ │                             │ ╰──────────────────────────────────────────────────╯
+ │                             │ ╭─ shell ──────────────────────────────────────────╮
+ │ ─────────────────────────── │ │ ~/code/kestrel-mobile-kiki-android-skel $ _      │
  │ ↑↓ ⇄ ⏎ switch · q · ?       │ │                                                  │
  │ android-skel  ── in sync  ● │ │                                                  │
  ╰─────────────────────────────╯ ╰──────────────────────────────────────────────────╯
@@ -132,7 +133,7 @@ The follows DAG is, for now, two hops deep: `main → android-skel → auth`. Ca
 
 ### Tue 11:00 — kestrel-mobile
 
-Overnight, the navigation skeleton settled into a clean shape, and product responded with a small correction: the bottom-bar tab order should put `Library` left of `Discover`, not right. The change is small enough that the developer makes it directly, without spawning a thread for it. They drop into the `android-skel` workspace's tmux session, open a shell pane next to the agent pane, and amend the relevant revision by hand:
+Overnight, the navigation skeleton settled into a clean shape, and product responded with a small correction: the bottom-bar tab order should put `Library` left of `Discover`, not right. The change is small enough that the developer makes it directly, without spawning a thread for it. They drop into the `android-skel` workspace's tmux session and shift focus to the shell pane below the agent — already cd'd into the workspace, already running their `$SHELL` — and amend the relevant revision by hand:
 
 ```console
 $ cd ~/code/kestrel-mobile-kiki-android-skel
@@ -264,7 +265,7 @@ A loud notification fires. The developer happens to have the overlay focused on 
                                     │
 ```
 
-The developer cursors to `auth-biometric` and presses `enter` to switch to its tmux session, opens a shell pane next to the agent (which is paused), and resolves the conflict by hand. jj's conflict markup makes the merge tractable; the resolution touches three lines.
+The developer cursors to `auth-biometric` and presses `enter` to switch to its tmux session, focuses the shell pane below the agent (which is paused), and resolves the conflict by hand. jj's conflict markup makes the merge tractable; the resolution touches three lines.
 
 ```console
 $ cd ~/code/kestrel-mobile-kiki-auth-biometric

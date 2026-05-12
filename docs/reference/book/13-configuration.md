@@ -82,11 +82,17 @@ All `[ui]` keys are personal preference. They are valid in user and per-thread c
 | `persistent_sidebar`        | bool   | `false`       | no — next `kk new` / `kk reopen` |
 | `sidebar_width`             | int    | `32`          | no — next `kk new` / `kk reopen` |
 | `sidebar_min_terminal_cols` | int    | `100`         | no — next `kk new` / `kk reopen` |
+| `shell_pane`                | bool   | `true`        | no — next `kk new` / `kk reopen` / `kk switch` |
+| `shell_pane_position`       | string | `"below"`     | no — next `kk new` / `kk reopen` / `kk switch` |
+| `shell_pane_size_pct`       | int    | `25`          | no — next `kk new` / `kk reopen` / `kk switch` |
+| `shell_pane_min_rows`       | int    | `24`          | no — next `kk new` / `kk reopen` / `kk switch` |
 | `mouse_enabled`             | bool   | `true`        | yes                              |
 | `overlay_min_cols`          | int    | `80`          | no — next overlay open           |
 | `toast_ttl_ms`              | int    | `4000`        | yes                              |
 | `theme`                     | string | `"soft-dark"` | yes                              |
 
 `theme` selects the palette; the canonical alternates documented for v1 are `soft-dark` (default), `soft-light`, and `high-contrast`. Unknown theme values warn and fall back to `soft-dark`.
+
+`shell_pane_position` accepts `below` (horizontal split below the agent pane, default), `right` (vertical split to the right of the agent pane), or `window` (separate tmux window). Unknown values warn and fall back to `below`. The full lifecycle, degradation, and authority semantics for the shell pane live in [Interface · Shell pane](12-interface/spec.md#shell-pane).
 
 The semantics, wireframes, and degradation rules for these keys live in [Interface](12-interface/spec.md).

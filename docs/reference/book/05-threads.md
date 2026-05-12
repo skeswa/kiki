@@ -22,7 +22,9 @@ Mutable projections include:
 - bookmark
 - initial jj change on that bookmark
 - tmux session rooted in the workspace
-- harness process
+- agent pane hosting the harness process
+- shell pane in the same tmux window at the workspace cwd, running the user's `$SHELL` (fallback `/bin/sh`), opt-out via `[ui] shell_pane = false`
+- optional persistent sidebar pane (when `[ui] persistent_sidebar = true`)
 - per-thread hook credential and hook configuration
 
 If any step fails, kiki unwinds prior steps to avoid orphaned state.
@@ -69,6 +71,8 @@ Plain `kk close` leaves any open PR untouched. `kk close --discard-pr` is the ex
 Children of a closed thread auto-detach with notification.
 
 Close is intentionally boring. It should be possible to close a thread with confidence that tracked work survives and that local junk is not silently swept away.
+
+Close kills the entire tmux session, which means every pane in it goes with the session — the agent pane, the shell pane, the optional persistent sidebar pane, and any additional panes the user split into the session. Any process running in the shell pane (a long test, a `tail -f`, a debugger) is killed alongside the agent. Long-running work that needs to outlive `kk close` belongs outside the thread's tmux session.
 
 After close, the tmux client switches to the parent thread if that session exists. Otherwise it returns to the previously focused thread if possible, or detaches.
 
