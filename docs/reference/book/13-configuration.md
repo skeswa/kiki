@@ -93,6 +93,6 @@ All `[ui]` keys are personal preference. They are valid in user and per-thread c
 
 `theme` selects the palette; the canonical alternates documented for v1 are `soft-dark` (default), `soft-light`, and `high-contrast`. Unknown theme values warn and fall back to `soft-dark`.
 
-`shell_pane_position` accepts `below` (horizontal split below the agent pane, default), `right` (vertical split to the right of the agent pane), or `window` (separate tmux window). Unknown values warn and fall back to `below`. The full lifecycle, degradation, and authority semantics for the shell pane live in [Interface · Shell pane](12-interface/spec.md#shell-pane).
+`shell_pane_position` accepts `below` (horizontal split below the agent pane, default) or `right` (vertical split to the right of the agent pane). Unknown values warn and fall back to `below`. The shell pane is always co-resident with the agent pane in the same tmux window; routing it to a separate window is intentionally not a v1 option. The full lifecycle, degradation, and authority semantics for the shell pane live in [Interface · Shell pane](12-interface/spec.md#shell-pane).
 
 The semantics, wireframes, and degradation rules for these keys live in [Interface](12-interface/spec.md).

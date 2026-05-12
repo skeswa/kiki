@@ -6,7 +6,7 @@ The TUI is not required for the first core implementation slice. This is the v1 
 
 - **Overlay** — the full-screen TUI invoked by bare `kk` (inside a registered repo) or tmux `prefix+k`. Transient. Dismissed on switch, on `q` or `esc`, or on completing a verb. Outside a registered repo, bare `kk` falls back to the command summary plus `kk ls` (see [Commands](../11-commands.md)).
 - **Persistent sidebar** — an opt-in tmux pane spawned at thread birth. Always-on, navigation-only. Lives next to the agent pane until the user kills it.
-- **Shell pane** — an opt-out tmux pane spawned at thread birth, running the user's `$SHELL` at the workspace cwd, laid out below the agent pane in the same tmux window. The pane kiki manages — singular — so direct `jj` / `gh` / test invocations live alongside the agent without leaving the thread. Detailed semantics in [Shell pane](#shell-pane).
+- **Shell pane** — an opt-out tmux pane spawned at thread birth, running the user's `$SHELL` at the workspace cwd, laid out alongside the agent pane in the same tmux window (default position: below; configurable to the right). The pane kiki manages — singular — so direct `jj` / `gh` / test invocations live alongside the agent without leaving the thread. Detailed semantics in [Shell pane](#shell-pane).
 - **Stack section** — the threads in the current repo, rendered as a follows-aware tree in `kk log` order. Cursor moves here for navigation.
 - **Activity section** — the same threads, flat-listed by most-recent agent event (descending). Cursor moves here for triage.
 - **Preview pane** — the right two-thirds of the overlay. Renders one of: transcript tail, working-copy diff, PR comments. Toggled by `t` / `d` / `c`.
@@ -275,16 +275,20 @@ In kiki's vocabulary, **the** shell pane is the singular pane kiki creates at th
 
 ### Layout
 
-The shell pane lives in the same tmux window as the agent pane, in a horizontal split below it. Default split: 75% agent on top, 25% shell on the bottom. Configurable via `[ui] shell_pane_position` (`below` | `right` | `window`, default `below`) and `[ui] shell_pane_size_pct` (int, default `25`).
+The shell pane lives in the same tmux window as the agent pane. By default it sits in a horizontal split below the agent (the agent on top, the shell on the bottom). Configurable via `[ui] shell_pane_position` (`below` | `right`, default `below`) and `[ui] shell_pane_size_pct` (int, default `25`).
 
-The four layout combinations of `[ui] persistent_sidebar` × `[ui] shell_pane`:
+`shell_pane_size_pct` is read as "the percentage of the dimension the split divides" — height when `position = below`, width when `position = right` — so the same key produces the analogous proportion under either orientation. Under the default `below` + `25`, the agent occupies the top 75% of height and the shell the bottom 25%; under `right` + `25`, the agent occupies 75% of width on the left and the shell 25% on the right. The shell pane never escapes the agent's tmux window — the agent and shell are co-resident in one window by design, so the user can see one while interacting with the other.
 
-| `persistent_sidebar` | `shell_pane` | layout                                                                    |
-| -------------------- | ------------ | ------------------------------------------------------------------------- |
+The four layout combinations of `[ui] persistent_sidebar` × `[ui] shell_pane`, shown with the default `shell_pane_position = below`:
+
+| `persistent_sidebar` | `shell_pane` | layout                                                                      |
+| -------------------- | ------------ | --------------------------------------------------------------------------- |
 | `true`               | `true`       | sidebar left (32 cols) · agent top-right (~75%) · shell bottom-right (~25%) |
-| `false`              | `true`       | agent top (~75%) · shell bottom (~25%) — full width                       |
-| `true`               | `false`      | sidebar left (32 cols) · agent right (full height)                        |
-| `false`              | `false`      | agent only — full window                                                  |
+| `false`              | `true`       | agent top (~75%) · shell bottom (~25%) — full width                         |
+| `true`               | `false`      | sidebar left (32 cols) · agent right (full height)                          |
+| `false`              | `false`      | agent only — full window                                                    |
+
+Under `shell_pane_position = right`, the agent / shell rows flip orientation: the shell sits to the right of the agent (taking `shell_pane_size_pct` of width), and the sidebar — when present — still occupies the leftmost 32 cols. The sidebar's position is fixed; only the shell pane's position is configurable.
 
 Initial focus at thread birth lands on the agent pane so the developer can interact with the harness's first turn. Pane focus across `kk switch` follows tmux's default behavior (last-focused pane on the session before detach), so kiki does not override user muscle memory.
 
@@ -316,7 +320,7 @@ Initial focus at thread birth lands on the agent pane so the developer can inter
  ╰─────────────────────────────╯ ╰──────────────────────────────────────────────────╯
 ```
 
-The sidebar pane (left) is the persistent navigation surface; the agent pane (top-right) hosts the harness's PTY; the shell pane (bottom-right) hosts the user's shell at the workspace cwd. When `[ui] persistent_sidebar = false`, the sidebar region drops and the agent + shell expand to fill the window. When `[ui] shell_pane = false`, the shell region drops and the agent fills its column.
+The sidebar pane (left) is the persistent navigation surface; the agent pane (top-right) hosts the harness's PTY; the shell pane (bottom-right) hosts the user's shell at the workspace cwd. The wireframe shows the default `shell_pane_position = below`; under `right`, the shell pane swaps to a vertical band to the right of the agent. When `[ui] persistent_sidebar = false`, the sidebar region drops and the agent + shell expand to fill the window. When `[ui] shell_pane = false`, the shell region drops and the agent fills its column.
 
 ### Lifecycle
 

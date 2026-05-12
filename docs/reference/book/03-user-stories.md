@@ -197,7 +197,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 
 ## Shell pane (opt-out)
 
-137a. As a developer, I want every thread's tmux session to come up with a shell pane below the agent pane by default, with cwd set to the workspace and the shell process taken from my `$SHELL`, so that direct `jj` / `gh` / test invocations live alongside the agent without me having to spawn a separate terminal and `cd` into the workspace each time.
+137a. As a developer, I want every thread's tmux session to come up with a shell pane alongside the agent pane in the same window by default (positioned below the agent in the default layout, or to the right via `[ui] shell_pane_position`), with cwd set to the workspace and the shell process taken from my `$SHELL`, so that direct `jj` / `gh` / test invocations live alongside the agent without me having to spawn a separate terminal and `cd` into the workspace each time.
 
 137b. As a developer, I want the shell pane to die with the tmux session at `kk close` along with the agent (and any other panes I split in), so that the close blast radius is unambiguous and I learn not to leave long-running jobs in the shell pane expecting them to survive.
 
