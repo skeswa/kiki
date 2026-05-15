@@ -49,9 +49,13 @@ Build upward in this order:
 4. `kk publish` stack flow with editor integration.
 5. `LogRenderer`, `StatusRenderer`, `kk log`, and `kk status`.
 6. Transcript capture, read API, and reopen catch-up.
-7. Overlay TUI using gRPC plus shared renderers.
-8. Persistent sidebar pane.
-9. PR merge polling and auto-archive.
+7. `kk thread detach` as the graph-surgery escape hatch.
+
+Post-acceptance polish can then add:
+
+1. Overlay TUI using gRPC plus shared renderers.
+2. Persistent sidebar pane.
+3. PR merge polling and auto-archive.
 
 ## Acceptance slice
 
@@ -63,9 +67,10 @@ v1 is real when these work together against a real jj+git repo, tmux, Claude Cod
 2. Safe cascade: parent changes rebase following children at a Claude Code PreToolUse boundary, deliver kiki-authored context, and handle retry and conflict paths.
 3. Publish: `kk publish` publishes stacks top-down and keeps PR text human-owned after creation.
 4. Recall and orientation: transcript capture, `kk thread transcript`, `kk log`, and `kk status`.
-5. Local-only transcript rule: transcripts feed local recall and reopen catch-up, and do not feed publishing or metadata generation.
+5. Escape hatch: `kk thread detach` breaks a follows edge without broader graph surgery.
+6. Local-only transcript rule: transcripts feed local recall and reopen catch-up, and do not feed publishing or metadata generation.
 
-The overlay TUI, persistent sidebar, AI auto-rename polish, and full notification vocabulary deepen the demo. They do not replace the acceptance slice.
+The overlay TUI, persistent sidebar, AI auto-rename polish, PR merge auto-archive, and full notification vocabulary deepen the demo. They do not replace the acceptance slice.
 
 ## Budget
 

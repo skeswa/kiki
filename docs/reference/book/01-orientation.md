@@ -20,10 +20,11 @@ kiki exists to make parallel, recursive work patterns cheap enough that a develo
 
 v1 is successful when kiki can create, switch, coordinate, publish, archive, reopen, and inspect agentic work threads without relying on the original PRD as the implementation contract.
 
-The v1 acceptance surface includes:
+The first v1 acceptance surface includes:
 
 - `kk init`, `kk new`, `kk switch`, `kk ls`, `kk close`, `kk reopen`
-- `kk publish`, `kk log`, `kk status`, `kk thread transcript`
+- `kk publish`, `kk log`, `kk status`, `kk thread transcript`, `kk thread detach`
+- `kk config get|set|unset|edit|show`
 - per-user daemon with per-repo opt-in
 - jj workspace + bookmark backed thread identity
 - tmux session lifecycle
@@ -36,7 +37,7 @@ The v1 acceptance surface includes:
 
 ## Deferred or stretch
 
-These can deepen v1 but must not block the core acceptance slice unless explicitly promoted:
+These can deepen v1 but must not block the first acceptance slice unless explicitly promoted:
 
 - overlay TUI
 - persistent sidebar pane

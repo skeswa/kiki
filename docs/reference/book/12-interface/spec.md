@@ -13,7 +13,7 @@ The TUI is not required for the first core implementation slice. This is the v1 
 - **Chord ribbon** — a one-line keybinding hint at the bottom edge of the overlay. Toggled by `?`. Adapts to current selection (e.g. hides `c` for a thread without a PR).
 - **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](../11-commands.md)). Single source of truth.
 - **Context strip** — the bottom-most line of the overlay or the persistent sidebar pane. One compressed sentence with TUI-specific content. Two forms by context: the overlay form carries repo + bookmark + cascade glyph + agent model + ctx % + last op age; the persistent-sidebar form is shorter (bookmark + cascade glyph + agent glyph) because the agent pane next to it already surfaces model and ctx. This is a TUI footer, separate from the `StatusRenderer`-backed inlined status.
-- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms, overriding the default — see [Publishing](../09-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens a confirmation card.
+- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, optional auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., if auto-archive polish ships, the undo grace is 5000ms, overriding the default — see [Publishing](../09-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens a confirmation card.
 - **Card** — a centered modal panel with title, body, and one or two action buttons. Used for spawn and destructive confirmation.
 
 ## Glyph language
@@ -32,7 +32,7 @@ Two glyphs per row, max. PR appears inline as `#NNNN` only if set.
 | follows arrow       | `←●`  | dim    |
 | current thread mark | `▸`   | accent |
 
-The cascade indicator and the agent-state indicator share the same three-valued state model as `kk status` (`in sync`, `pending`, `conflicted`). The CLI prints the textual state per `cli.md`; the TUI projects each state to a glyph from the table above. The state model is the source of truth — the textual and glyph forms are two presentations.
+The cascade indicator uses the same three-valued state model as `kk status` (`in sync`, `pending`, `conflicted`). The agent-state indicator uses the harness state model (`idle`, `working`, `finished`, `blocked`). The CLI prints the textual cascade state described in [Commands](../11-commands.md); the TUI projects cascade and agent states to glyphs from the table above.
 
 Every state in this table must be distinguishable by glyph alone, not by color. Color is an accelerator: it makes scanning faster, but `NO_COLOR=1` and color-blind palettes must still convey the state. The `LogRenderer` and `StatusRenderer` projections strip color when `NO_COLOR=1` is set in the environment and rely on glyph + label to carry the signal. See [Invariants](../04-invariants.md).
 
@@ -58,7 +58,7 @@ The overlay is one screen, three regions stacked vertically:
  ●─pi/refactor      ●●○   wrk       │  agent       ● working   2m 18s
  │                                  │  pr          #482 draft  ●●●●● ci green
  ●─pi/codex-conv ▸  ●●●   ←●        │  follows     pi/refactor → main
- │                                  │  workspace   ~/code/pi-extensions.kiki/codex-conv
+ │                                  │  workspace   ~/code/pi-extensions-kiki-codex-conv
  ●─pi/agent-tui     ○     idle      │
                                     │  ─ preview ────────────────────────────────────
  ACTIVITY                           │
@@ -194,7 +194,7 @@ The ribbon adapts to selection. For a closed thread, `i`, `p`, and `x` drop out 
  │                                  │   │                                          │
  ●─pi/codex-conv ▸  ●●●   ←●        │   │  Stops the agent and tmux session.       │
  │                                  │   │  Forgets the jj workspace and removes    │
- ●─pi/agent-tui     ○     idle      │   │  ~/code/pi-extensions.kiki/codex-conv.   │
+ ●─pi/agent-tui     ○     idle      │   │  ~/code/pi-extensions-kiki-codex-conv.   │
                                     │   │  Tracked jj revisions are kept.          │
  ACTIVITY                           │   │  PR #482 is left open (use --discard-pr).│
                                     │   │                                          │
@@ -307,10 +307,10 @@ Initial focus at thread birth lands on the agent pane so the developer can inter
  │ │                           │ │   reading kiki-core/cascade/outbox.rs ...        │
  │ ●─pi/agent     ○     idle   │ ╰──────────────────────────────────────────────────╯
  │                             │ ╭─ shell ──────────────────────────────────────────╮
- │ ACTIVITY                    │ │ ~/code/pi-extensions.kiki/codex-conv $ jj st     │
+ │ ACTIVITY                    │ │ ~/code/pi-extensions-kiki-codex-conv $ jj st     │
  │                             │ │ M  kiki-core/src/cascade/outbox.rs               │
  │ ● codex     wrk    2m18s    │ │ Working copy : qxnopkyl 8a3c2d1e                 │
- │ ● refactor  wrk     34s     │ │ ~/code/pi-extensions.kiki/codex-conv $ _         │
+ │ ● refactor  wrk     34s     │ │ ~/code/pi-extensions-kiki-codex-conv $ _         │
  │ ◐ session   conflict        │ │                                                  │
  │ ○ agent     idle  1h12m     │ │                                                  │
  │ ✓ minimal   ✓        8m     │ │                                                  │
@@ -347,11 +347,11 @@ Toasts are non-modal pills in the overlay's top-right corner, stacking downward.
 Two subtypes share the surface:
 
 - **Notification toast** — no interactive action. The body may include hint text naming an overlay verb (e.g., "tap T to read transcript"); the verb is fielded by the overlay's normal keymap, the toast does not intercept it.
-- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge — see [Publishing](../09-publishing.md)). Toasts never open a confirmation card.
+- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge if that polish ships — see [Publishing](../09-publishing.md)). Toasts never open a confirmation card.
 
 Dismissal rules (apply to both subtypes):
 
-- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms; specific triggers may override, e.g., auto-archive undo grace = 5000ms — see [Publishing](../09-publishing.md))
+- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms; specific triggers may override, e.g., auto-archive undo grace = 5000ms if that polish ships — see [Publishing](../09-publishing.md))
 - click anywhere on the toast pill (excluding the action label, which runs the action) dismisses it
 - moving the keyboard cursor onto the row that issued the toast, or clicking that row, dismisses the toast (treated as "user acknowledged")
 - invoking the toast's action (actionable toasts only) dismisses the toast on completion
@@ -363,7 +363,7 @@ Toast triggers (v1):
 - cascade conflict on a non-current thread (`◐`) — notification
 - cascade applied to a child thread (`──`, only when ≥ 2 children rebased to coalesce noise) — notification
 - config-set warning that won't take effect until next `kk new` / `kk reopen` — notification
-- auto-archive on PR-merge (`✓`) with `undo` action (5s grace — see [Publishing](../09-publishing.md)) — actionable
+- auto-archive on PR-merge (`✓`) with `undo` action, if that polish ships (5s grace — see [Publishing](../09-publishing.md)) — actionable
 
 Toasts are overlay-only. The persistent sidebar is navigation-only, and stacking toast UI beside the live agent pane would be ambiguous. When the overlay is closed, OS-native notifications (configured via `[notifications]` — see [Configuration](../13-configuration.md)) carry the same events.
 
@@ -494,6 +494,10 @@ If `[ui] mouse_enabled = false`, kiki does not request mouse capture from the te
 - `persistent_sidebar` (bool, default `false`) — covered in [Configuration](../13-configuration.md)
 - `sidebar_width` (int, default `32`)
 - `sidebar_min_terminal_cols` (int, default `100`)
+- `shell_pane` (bool, default `true`)
+- `shell_pane_position` (string, default `"below"`)
+- `shell_pane_size_pct` (int, default `25`)
+- `shell_pane_min_rows` (int, default `24`)
 - `mouse_enabled` (bool, default `true`)
 - `overlay_min_cols` (int, default `80`)
 - `toast_ttl_ms` (int, default `4000`)
@@ -502,4 +506,4 @@ If `[ui] mouse_enabled = false`, kiki does not request mouse capture from the te
 All `[ui]` keys are personal preference: valid in user and per-thread config, invalid in repo-shared config (warned-and-ignored). Hot-reload semantics (matching [Configuration](../13-configuration.md)):
 
 - `mouse_enabled`, `toast_ttl_ms`, and `theme` are cosmetic and hot-reload.
-- `persistent_sidebar`, `sidebar_width`, `sidebar_min_terminal_cols`, and `overlay_min_cols` take effect on the next lifecycle event (`kk new`, `kk reopen`, or next overlay open) — they do not retroactively reshape live sessions.
+- `persistent_sidebar`, `sidebar_width`, `sidebar_min_terminal_cols`, `shell_pane`, `shell_pane_position`, `shell_pane_size_pct`, `shell_pane_min_rows`, and `overlay_min_cols` take effect on the next lifecycle event (`kk new`, `kk reopen`, `kk switch`, or next overlay open, depending on the key) — they do not retroactively reshape live sessions.

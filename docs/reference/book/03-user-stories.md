@@ -42,7 +42,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 25. As a developer, I want my thread's working copy to be rebased ONLY at agent tool boundaries or quiescence, never with the agent mid-edit, so that the agent's mental model never diverges from what is on disk.
 26. As a developer, I want the cascade to handle textual conflicts by marking the thread "conflicted" and surfacing a notification, so that I resolve them deliberately instead of corrupting agent state.
 27. As a developer in a child thread B that follows parent A, I want B to pick up A's new commits automatically (auto-rebased onto A's new tip), so that stacked work stays coordinated without manual rebasing.
-28. As a developer, I want `kk thread detach` to break the live-follow link, so that I can pin a child thread at its current base while the parent advances independently. (v1 escape hatch if specified in `cli.md`; otherwise deferred.)
+28. As a developer, I want `kk thread detach` to break the live-follow link, so that I can pin a child thread at its current base while the parent advances independently. This is the v1 graph-surgery escape hatch; attach and reparent remain deferred.
 29. As a developer, I want `kk thread attach <child> --to <parent>` to re-establish a follows link, so that I can resume live coupling after a turbulent moment. (Deferred beyond v1.)
 30. As a developer, I want `kk thread reparent <child> --onto <new-parent>` to move a thread under a different parent, so that I can correct stack relationships when I realize the topology was wrong. (Deferred beyond v1.)
 31. As a developer, I want kk to refuse cyclic follows links, so that the coupling graph stays a DAG.
@@ -93,7 +93,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 64. As a developer, I want `kk close` to take me back to the parent thread's session if it exists, so that I keep working without manual session-switching.
 65. As a developer, I want `kk reopen <thread>` to restore an archived thread (re-create workspace, re-spawn tmux session, re-resume agent), so that I can pick up old work seamlessly.
 66. As a developer, I want children of a closed thread to auto-detach with a notification, so that I am aware of the lifecycle change.
-67. As a developer, I want a merged PR to auto-archive its thread with a 5-second undo grace period, so that completion cleans itself up.
+67. As a developer, I want a merged PR to auto-archive its thread with a 5-second undo grace period, so that completion cleans itself up. (v1.x / demo polish; the core behavior is notifying and updating PR/thread state.)
 68. As a developer, I want a PR closed-without-merge to surface a notification but NOT auto-archive its thread, so that I can decide whether to keep iterating.
 69. As a developer, I want `kk thread destroy` as a separate, irreversible command (one-way `jj abandon`), so that I have a clear ladder from soft-close to permanent removal.
 70. As a developer, I want plain `kk close` to leave any open PR untouched, with `kk close --discard-pr` as the explicit "also close the PR" option, so that GitHub-visible state is preserved unless I deliberately change it.

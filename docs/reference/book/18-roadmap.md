@@ -11,7 +11,7 @@ Likely post-acceptance work:
 - additional `kk thread` management commands;
 - status-line and TUI polish;
 - AI auto-describe and auto-rename execution loop once the ownership ledger is proven;
-- PR merge polling and auto-archive if it misses the first acceptance slice;
+- PR merge polling and auto-archive;
 - narrow same-thread transcript MCP reads if the human CLI surface is stable.
 
 ## v2 MCP substrate

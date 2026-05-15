@@ -134,4 +134,4 @@ stateDiagram-v2
 
 ## Detach and graph surgery
 
-`kk thread detach` is the v1 escape hatch for breaking a live follows link if it ships with the CLI surface. Broader graph surgery, including attach and reparent, is deferred beyond v1 unless promoted by a later spec change.
+`kk thread detach` is the v1 escape hatch for breaking a live follows link. It removes the follows edge and leaves the child pinned at its current base; it does not rebase, publish, close, or otherwise rewrite the child. Broader graph surgery, including attach and reparent, is deferred beyond v1 unless promoted by a later spec change.

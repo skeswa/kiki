@@ -10,7 +10,7 @@ Tests should target observable behavior and persisted state, not private impleme
 - `CascadeOrchestrator`
 - `ConfigLoader`
 - `ContextDiscovery`
-- `AICompose`
+- `AICompose` if auto-describe / auto-rename execution ships
 - `AuthEnforcer`
 - `ThreadTranscriptStore`
 - `LogRenderer`

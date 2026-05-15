@@ -100,17 +100,85 @@ The escape hatch for arbitrary revision selection is `jj`. kiki decorates the mo
 
 The cascade state indicator is exactly one of `in sync`, `pending`, or `conflicted`; it does not include counts.
 
-## Thread management commands
+## `kk publish`
 
-Expected thread-management commands include:
+`kk publish` publishes the resolved thread to GitHub through `gh`; see [Publishing](09-publishing.md).
 
-- `kk close`
-- `kk reopen <thread>`
-- `kk thread transcript`
-- `kk thread comments`
-- `kk thread interrupt`
-- `kk thread destroy`
-- `kk thread detach` if the v1 detach escape hatch ships
+Important flags:
+
+- `--no-edit` uses the AI draft as-is.
+- `--no-ai` opens an empty editor draft.
+- `-m "<title>"` sets the PR title inline.
+- `--ready` opens the PR ready for review instead of draft.
+- `--downstack` publishes the current thread plus unpublished descendants, top-down.
+- `--refresh` regenerates title/body for an existing PR only when explicitly requested.
+
+Publishing requires `Admin` authority. The transcript is not input to PR drafting.
+
+## `kk close`
+
+`kk close [<thread>]` archives a thread without deleting tracked jj work; see [Threads](05-threads.md#close).
+
+Important flags:
+
+- `--discard-pr` also closes the open PR. Plain `kk close` leaves PR state untouched.
+
+Close requires `Admin` authority. It runs the two-phase close protocol, kills the thread tmux session, forgets the jj workspace, removes the materialized workspace directory after loss-prevention checks, preserves bookmark/revisions/transcript, and auto-detaches following children with notification.
+
+## `kk reopen`
+
+`kk reopen <thread>` restores a closed thread by recreating its workspace, tmux session, hook credentials, and harness process.
+
+Reopen requires `Admin` authority. It prepends a local-only catch-up message composed from non-synthesized transcript rows and records that catch-up as synthesized kiki-authored transcript content.
+
+## `kk thread transcript`
+
+`kk thread transcript [<thread>] [<change>]` reads the local transcript for a thread.
+
+Important flags:
+
+- `--search <query>` runs full-text search.
+- `--range <from>..<to>` reads a change span.
+- `--recent <n>` reads the tail of the thread.
+- `--include-unanchored` includes rows with unknown change anchors.
+- `--include-tombstoned` includes rows for tombstoned or redirected changes.
+- `--no-synthesized` hides kiki-authored synthesized rows.
+
+Human transcript reads require `Admin` authority. Agent MCP transcript reads are a later same-thread-only surface, not the v1 command path.
+
+## `kk thread comments`
+
+`kk thread comments [<thread>]` lists GitHub PR review comments for the thread's PR.
+
+The v1 surface is read-only and requires `Admin` authority. Feeding review comments into agent context is future work.
+
+## `kk thread interrupt`
+
+`kk thread interrupt <thread>` hard-stops and reframes the thread's agent through the harness resume path.
+
+Interrupt requires `Admin` authority. It is the explicit human escape hatch for a stuck or off-track agent and uses the same hard-escalation shape as cascade conflict handling.
+
+## `kk thread detach`
+
+`kk thread detach <thread>` removes the thread's live follows edge.
+
+Detach requires `Admin` authority. It leaves the child pinned at its current base and does not rebase, publish, close, or destroy the thread. `attach` and `reparent` are deferred beyond v1.
+
+## `kk thread destroy`
+
+`kk thread destroy <thread>` permanently destroys a thread except for jj operation recovery.
+
+Destroy requires `Admin` authority and explicit confirmation. It abandons the bookmark, revokes credentials, tombstones the thread row, and deletes transcript rows by default. `--keep-log` retains transcript rows for explicit destroyed-thread views.
+
+## `kk config`
+
+`kk config get|set|unset|edit|show` manages layered TOML configuration; see [Configuration](13-configuration.md).
+
+`kk config get <key>` reports the effective value and the source layer. Unknown keys warn rather than error. Structural key changes must tell the user whether they hot-reload, take effect at the next lifecycle event, or require daemon restart.
+
+`kk config` requires `Admin` authority.
+
+## Deferred thread management commands
 
 `attach`, `reparent`, and `restore --to <path>` (used to re-point an `Orphaned` thread at a moved workspace) are deferred graph-surgery and lifecycle commands.
 
