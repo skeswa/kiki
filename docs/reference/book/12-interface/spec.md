@@ -12,27 +12,33 @@ The TUI is v1.x polish, not acceptance slice (see [Orientation](../01-orientatio
 - **Preview pane** — the right two-thirds of the overlay. Renders one of: transcript tail, working-copy diff, PR comments. Toggled by `t` / `d` / `c`.
 - **Chord ribbon** — a one-line keybinding hint at the bottom edge of the overlay. Toggled by `?`. Adapts to current selection (e.g. hides `c` for a thread without a PR).
 - **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](../11-commands.md)). Single source of truth.
+- **Checkpoint lag** — a normal active-thread condition in which the bookmark checkpoint trails the workspace's persisted live head. Detailed status labels it `checkpoint behind head`; compact TUI surfaces append `↑` to the bookmark. This is not dirty state or cascade conflict.
 - **Context strip** — the bottom-most line of the overlay or the persistent sidebar pane. One compressed sentence with TUI-specific content. Two forms by context: the overlay form carries repo + bookmark + cascade glyph + agent model + ctx % + last op age; the persistent-sidebar form is shorter (bookmark + cascade glyph + agent glyph) because the agent pane next to it already surfaces model and ctx. This is a TUI footer, separate from the `StatusRenderer`-backed inlined status.
-- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms, overriding the default — see [Publishing](../09-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens a confirmation card.
-- **Card** — a centered modal panel with title, body, and one or two action buttons. Used for spawn and destructive confirmation.
+- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms, overriding the default — see [Publishing](../09-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens an approval card.
+- **Card** — a centered modal panel with title, body, and one or two action buttons. Used for spawn input and foreground approval.
+
+The overlay authenticates ordinary current-thread reads with the contextual thread credential and consumes the repo-summary stream for every other row. It never treats cursor position as authority. Opening transcript, diff, PR-comment, or detailed-audit content for a non-current thread enters the foreground approval flow before fetching content. The approved response is one immutable snapshot bound to the method, target, query, and repository observation; refreshing it, changing tabs, expanding its range, or opening the full reader requires a new challenge. No sensitive bytes are fetched speculatively behind an approval card.
 
 ## Glyph language
 
 Two glyphs per row, max. PR appears inline as `#NNNN` only if set.
 
-| state               | glyph | color  |
-| ------------------- | ----- | ------ |
-| cascade in sync     | `──`  | dim    |
-| cascade pending     | `●●○` | amber  |
-| cascade conflicted  | `◐`   | red    |
-| agent idle          | `○`   | dim    |
-| agent working       | `●`   | amber  |
-| agent finished      | `✓`   | green  |
-| agent blocked       | `◐`   | red    |
-| follows arrow       | `←●`  | dim    |
-| current thread mark | `▸`   | accent |
+| state                   | glyph | color  |
+| ----------------------- | ----- | ------ |
+| cascade in sync         | `──`  | dim    |
+| cascade pending         | `↻`   | amber  |
+| cascade conflicted      | `◐`   | red    |
+| agent idle              | `○`   | dim    |
+| agent working           | `●`   | amber  |
+| agent finished          | `✓`   | green  |
+| agent blocked           | `◐`   | red    |
+| lifecycle in progress   | `…`   | amber  |
+| lifecycle repair needed | `!`   | red    |
+| lifecycle closed        | `□`   | dim    |
+| follows arrow           | `←●`  | dim    |
+| current thread mark     | `▸`   | accent |
 
-The cascade indicator uses the same three-valued state model as `kk status` (`in sync`, `pending`, `conflicted`). The agent-state indicator uses the agent display states (`idle`, `working`, `finished`, `blocked`) defined in [Harness adapter](../15-architecture/harness-adapter.md#agent-display-states). The CLI prints the textual cascade state described in [Commands](../11-commands.md); the TUI projects cascade and agent states to glyphs from the table above.
+The cascade indicator uses the same three-valued state model as `kk status` (`in sync`, `pending`, `conflicted`). For `Creating | ClosePreflight | CloseCommit | DestroyCommit`, lifecycle `…` replaces the agent glyph; for `CreateFailed | CloseFailed | ProjectionDiverged | DestroyFailed`, `!` replaces it and the literal lifecycle label appears in detail; `□` identifies a closed row when closed rows are requested. `Destroyed` rows are hidden unless an explicit future destroyed-thread view requests them. Active rows use the normal agent display states. This replacement rule preserves the two-state-glyph limit.
 
 Every state in this table must be distinguishable by glyph alone, not by color. Color is an accelerator: it makes scanning faster, but `NO_COLOR=1` and color-blind palettes must still convey the state. The `LogRenderer` and `StatusRenderer` projections strip color when `NO_COLOR=1` is set in the environment and rely on glyph + label to carry the signal. See [Invariants](../04-invariants.md).
 
@@ -55,9 +61,9 @@ The overlay is one screen, three regions stacked vertically:
                                     │
  ● main             ──    in        │  bookmark    pi-extensions/codex-conv-tui
  │                                  │  cascade     ── in sync
- ●─pi/refactor      ●●○   wrk       │  agent       ● working   2m 18s
+ ●─pi/refactor      ↻   wrk       │  agent       ● working   2m 18s
  │                                  │  pr          #482 draft  ●●●●● ci green
- ●─pi/codex-conv ▸  ●●●   ←●        │  follows     pi/refactor → main
+ ●─pi/codex-conv ▸  ↻   ←●        │  follows     pi/refactor → main
  │                                  │  workspace   ~/code/pi-extensions-kiki-codex-conv
  ●─pi/agent-tui     ○     idle      │
                                     │  ─ preview ────────────────────────────────────
@@ -81,9 +87,9 @@ The overlay is one screen, three regions stacked vertically:
                                     │
  ● main             ──    in        │  human  2m 18s ago
  │                                  │   could you check whether a materialized intent
- ●─pi/refactor      ●●○   wrk       │   is dropped on a hook crash before MarkDelivered?
+ ●─pi/refactor      ↻   wrk       │   is dropped on a hook crash before MarkDelivered?
  │                                  │
- ●─pi/codex-conv ▸  ●●●   ←●        │  agent  2m 04s ago
+ ●─pi/codex-conv ▸  ↻   ←●        │  agent  2m 04s ago
  │                                  │   reading kiki-core/cascade/intent_store.rs ...
  ●─pi/agent-tui     ○     idle      │   its saved payload stays deliverable until ack,
                                     │   so a crash before MarkDelivered re-enters the
@@ -109,9 +115,9 @@ The overlay is one screen, three regions stacked vertically:
                                     │
  ● main             ──    in        │  M  kiki-core/src/cascade/intent_store.rs +14 -2
  │                                  │  M  kkd/src/services/cascade.rs       +6  -0
- ●─pi/refactor      ●●○   wrk       │  ?  tests/cascade/crash_before_md.rs  +88
+ ●─pi/refactor      ↻   wrk       │  ?  tests/cascade/crash_before_md.rs  +88
  │                                  │  ─────────────────────────────────────────────
- ●─pi/codex-conv ▸  ●●●   ←●        │  diff --git a/kiki-core/src/cascade/intent_store.rs
+ ●─pi/codex-conv ▸  ↻   ←●        │  diff --git a/kiki-core/src/cascade/intent_store.rs
  │                                  │  +pub fn lookup_pending(&self) -> Option<Row> {
  ●─pi/agent-tui     ○     idle      │  +    self.rows
                                     │  +        .iter()
@@ -134,9 +140,9 @@ The overlay is one screen, three regions stacked vertically:
                                     │
  ● main             ──    in        │  base  main
  │                                  │  ci    ●●●●● green   ci.yaml passed 1m ago
- ●─pi/refactor      ●●○   wrk       │
+ ●─pi/refactor      ↻   wrk       │
  │                                  │  ─ comments ─────────────────────────────────
- ●─pi/codex-conv ▸  ●●●   ←●        │
+ ●─pi/codex-conv ▸  ↻   ←●        │
  │                                  │  @ogul  18m ago  on cascade/intent_store.rs:42
  ●─pi/agent-tui     ○     idle      │   nit: drop the lookup_pending wrapper, use
                                     │   the closure inline?
@@ -160,9 +166,9 @@ The overlay is one screen, three regions stacked vertically:
                                     │  …
  ● main             ──    in        │
  │                                  │
- ●─pi/refactor      ●●○   wrk       │
+ ●─pi/refactor      ↻   wrk       │
  │                                  │
- ●─pi/codex-conv ▸  ●●●   ←●        │
+ ●─pi/codex-conv ▸  ↻   ←●        │
  │                                  │
  ●─pi/agent-tui     ○     idle      │
                                     │
@@ -180,7 +186,7 @@ The overlay is one screen, three regions stacked vertically:
 
 The ribbon adapts to selection. For a closed thread, `i`, `p`, and `x` drop out and `r` (reopen — see keymap below) appears. For a thread without a PR, `c` (preview comments) drops out independently.
 
-### Wireframe — destructive confirmation card (`x` close on cursored thread)
+### Wireframe — foreground approval card (`x` close on cursored thread)
 
 ```
  kiki · NAVIGATE · pi-extensions/codex-conv-tui                              ?  esc
@@ -189,13 +195,14 @@ The ribbon adapts to selection. For a closed thread, `i`, `p`, and `x` drop out 
                                     │
  ● main             ──    in        │  …
  │                                  │
- ●─pi/refactor      ●●○   wrk       │   ╭─ Close pi-extensions/codex-conv-tui? ───╮
+ ●─pi/refactor      ↻   wrk       │   ╭─ Close pi-extensions/codex-conv-tui? ───╮
  │                                  │   │                                          │
- ●─pi/codex-conv ▸  ●●●   ←●        │   │  Stops the agent and tmux session.       │
+ ●─pi/codex-conv ▸  ↻   ←●        │   │  Stops the agent and tmux session.       │
  │                                  │   │  Forgets the jj workspace and removes    │
  ●─pi/agent-tui     ○     idle      │   │  ~/code/pi-extensions-kiki-codex-conv.   │
                                     │   │  Tracked jj revisions are kept.          │
  ACTIVITY                           │   │  PR #482 is left open (use --discard-pr).│
+                                    │   │  plan 7f3a91c2 · one use · expires 30s   │
                                     │   │                                          │
  ● codex-conv     working   2m18s   │   │   ⏎  Close      esc  Cancel              │
  ● refactor       working    34s    │   ╰──────────────────────────────────────────╯
@@ -206,7 +213,7 @@ The ribbon adapts to selection. For a closed thread, `i`, `p`, and `x` drop out 
  pi-extensions  master ✻  ── in sync  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
-`i` (interrupt) shows the same shape; the body changes. Both require an explicit `enter` — there is no chord that fires destructive verbs in one keystroke.
+`i` (interrupt) shows the same shape; the body changes. `enter` confirms the daemon-issued challenge through the enrolled presenter, then the exact operation retries with its one-use approval. There is no chord that fires destructive verbs in one keystroke.
 
 ### Wireframe — spawn card (`n` for new thread, `N` for new-as-child-of-cursored)
 
@@ -226,6 +233,8 @@ The ribbon adapts to selection. For a closed thread, `i`, `p`, and `x` drop out 
 
 `n` opens this with `follows` set to "── no follow" by default. `N` opens it with `follows` set to the cursored thread.
 
+Submitting the spawn form begins, but does not itself satisfy, the one-shot approval flow required by `kk new`. The daemon returns a canonical plan naming the base/head, follows choice, workspace, harness, and initial-input digest; the overlay displays that plan in an approval card and confirms it through its enrolled foreground presenter. The same two-phase shape applies to publish, close, interrupt, reopen, and any cross-thread or consequential repair action.
+
 ## Persistent sidebar pane
 
 The persistent sidebar is opt-in via `[ui] persistent_sidebar = true` in user config, or per-thread via `kk new --sidebar` / `--no-sidebar`. It is spawned at thread birth and re-ensured idempotently at `kk switch` / `kk reopen`. If the user kills the pane within a live session, kiki does not auto-respawn.
@@ -243,9 +252,9 @@ If the terminal is narrower than `[ui] sidebar_min_terminal_cols` (default 100),
  │                             │ │   could you check whether a materialized intent │
  │ ● main          ──    in    │ │   is dropped on a hook crash before              │
  │ │                           │ │   MarkDelivered?                                 │
- │ ●─pi/refactor   ●●○  wrk    │ │                                                  │
+ │ ●─pi/refactor   ↻  wrk    │ │                                                  │
  │ │                           │ │ ● working   2m 18s   esc to interrupt            │
- │ ●─pi/codex ▸    ●●●  ←●     │ │                                                  │
+ │ ●─pi/codex ▸    ↻  ←●     │ │                                                  │
  │ │                           │ │   reading kiki-core/cascade/intent_store.rs ...  │
  │ ●─pi/agent     ○     idle   │ │                                                  │
  │                             │ │                                                  │
@@ -300,9 +309,9 @@ Initial focus at thread birth lands on the agent pane so the developer can inter
  │                             │ │   could you check whether a materialized intent │
  │ ● main          ──    in    │ │   is dropped on a hook crash before              │
  │ │                           │ │   MarkDelivered?                                 │
- │ ●─pi/refactor   ●●○  wrk    │ │                                                  │
+ │ ●─pi/refactor   ↻  wrk    │ │                                                  │
  │ │                           │ │ ● working   2m 18s   esc to interrupt            │
- │ ●─pi/codex ▸    ●●●  ←●     │ │                                                  │
+ │ ●─pi/codex ▸    ↻  ←●     │ │                                                  │
  │ │                           │ │   reading kiki-core/cascade/intent_store.rs ...  │
  │ ●─pi/agent     ○     idle   │ ╰──────────────────────────────────────────────────╯
  │                             │ ╭─ shell ──────────────────────────────────────────╮
@@ -337,7 +346,7 @@ If the terminal has fewer rows than `[ui] shell_pane_min_rows` (default `24`) at
 
 ### Authority
 
-The shell pane runs the user's shell process at the user's UID; kiki passes no thread-scoped credential into it. When the user invokes `kk` from inside the shell pane, the `kk` binary reads `~/.kiki/admin-cred` exactly as it does from any other terminal — the same context-resolution chain (env → tmux session name → cwd) auto-discovers the thread. See [Authority](../06-authority.md).
+The shell pane runs the user's shell process at the user's UID; kiki injects no credential into it. When the user invokes `kk`, context discovery resolves the thread and the CLI loads only that thread's credential. Consequential operations enter the foreground one-shot approval flow; the CLI never auto-loads reusable Admin authority. See [Authority](../06-authority.md).
 
 ## Toasts
 
@@ -346,7 +355,7 @@ Toasts are non-modal pills in the overlay's top-right corner, stacking downward.
 Two subtypes share the surface:
 
 - **Notification toast** — no interactive action. The body may include hint text naming an overlay verb (e.g., "tap T to read transcript"); the verb is fielded by the overlay's normal keymap, the toast does not intercept it.
-- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge — see [Publishing](../09-publishing.md)). Toasts never open a confirmation card.
+- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge — see [Publishing](../09-publishing.md)). Toasts never open an approval card.
 
 Dismissal rules (apply to both subtypes):
 
@@ -375,9 +384,9 @@ Toasts are overlay-only. The persistent sidebar is navigation-only, and stacking
                                                     └─────────────────────────────┘
  ● main             ──    in
  │
- ●─pi/refactor      ●●○   wrk
+ ●─pi/refactor      ↻   wrk
  │
- ●─pi/codex-conv ▸  ●●●   ←●
+ ●─pi/codex-conv ▸  ↻   ←●
  │
  ●─pi/agent-tui     ○     idle
  │
@@ -388,14 +397,14 @@ Toasts are overlay-only. The persistent sidebar is navigation-only, and stacking
 
 ## Forms
 
-Spawn and confirmation cards are the only v1 forms. Both:
+Spawn and approval cards are the only initial UI forms. Both:
 
 - center on screen
 - have a single labeled title row, a body, and one or two action buttons
 - accept `enter` for the primary action and `esc` for cancel
 - accept `tab` and `shift+tab` to move between fields, when there is more than one field
 
-Forms are pure ratatui widgets; they call `kkd` only after `enter`. The card surface stays inside the overlay process.
+Forms are pure ratatui widgets. Submitting a form calls `BeginApproval`; it does not perform the operation. The approval card must display the daemon-returned canonical plan and digest byte-for-byte. Only an enrolled foreground presenter may call `ConfirmApproval`, after which the overlay retries the exact operation with the resulting approval id. A changed plan dismisses the stale card and starts again. The card surface stays inside the overlay process, but authority remains in the daemon challenge and one-use capability.
 
 ## Keymap
 
@@ -405,11 +414,13 @@ The overlay is a small state machine:
 
 - `NAVIGATE`: default state. Sidebar cursor moves through Stack and Activity rows.
 - `PREVIEW`: right pane is pinned to transcript tail, diff, or PR comments for the cursored thread.
-- `CONFIRM`: destructive verbs such as close or interrupt wait for explicit confirmation.
+- `APPROVE`: a sensitive read, spawn, or consequential verb waits on a daemon-issued foreground approval challenge.
 - `SPAWN`: spawn form collects thread name, follows target, and harness fields.
 - `VIEWER`: full-screen transcript reader opened by `T`.
 
 `q` and `esc` leave the overlay from `NAVIGATE` and return to the prior overlay state from sub-states. `enter` only switches threads from `NAVIGATE` on a bookmark row. Destructive actions are unavailable from the persistent sidebar pane.
+
+For the current thread, `space`, `t`, `d`, and `T` may enter `PREVIEW` or `VIEWER` directly under `ThreadScoped<T>`. For another thread, those keys enter `APPROVE`; success installs only the approved immutable snapshot and then enters the requested view. `c` follows the same rule because PR comments exceed the repo-summary scope. Cancellation returns to `NAVIGATE` without issuing the read.
 
 Overlay (`NAVIGATE` mode):
 
@@ -427,8 +438,8 @@ Overlay (`NAVIGATE` mode):
 | `n`       | spawn modal (new thread, no follow)                                             |
 | `N`       | spawn modal (new thread, follows cursored)                                      |
 | `p`       | publish cursored thread (`kk publish`)                                          |
-| `x`       | close cursored thread (opens confirmation card)                                 |
-| `i`       | interrupt cursored thread's agent (opens confirmation card)                     |
+| `x`       | close cursored thread (opens approval card)                                     |
+| `i`       | interrupt cursored thread's agent (opens approval card)                         |
 | `r`       | reopen cursored thread (only meaningful when thread is closed; otherwise no-op) |
 | `?`       | toggle chord ribbon                                                             |
 | `q`       | dismiss overlay                                                                 |
@@ -456,11 +467,11 @@ The sidebar binds **no** verb that mutates state. Spawn, publish, close, destroy
 
 One line at the bottom of the overlay. Order, left to right:
 
-`<repo>  <bookmark>[*]  <cascade-glyph cascade-state>  <agent-model>  ctx ●●●●○ <pct>%  last op <duration>`
+`<repo>  <bookmark>[*][↑]  <cascade-glyph cascade-state>  <agent-model>  ctx ●●●●○ <pct>%  last op <duration>`
 
-`*` is the dirty marker for the current thread's working copy. `<cascade-glyph cascade-state>` is the kiki-CLI-shared three-valued indicator. `<agent-model>` is the harness-reported model name. `ctx` is the harness-reported context-window utilization. `last op` is the duration since the last jj op on the current thread.
+`*` is the dirty marker for the current working copy; `↑` means its bookmark checkpoint trails the persisted live head. `<cascade-glyph cascade-state>` is the kiki-CLI-shared three-valued indicator. `<agent-model>` is the harness-reported model name. `ctx` is the harness-reported context-window utilization. `last op` is the duration since the last jj op on the current thread.
 
-The persistent sidebar's context strip is a shortened form: `<bookmark>[*]  <cascade-glyph cascade-state>  <agent-glyph>`. Model and ctx are omitted because the agent pane next to it already surfaces them.
+The persistent sidebar's context strip is a shortened form: `<bookmark>[*][↑]  <cascade-glyph cascade-state>  <agent-glyph>`. Model and ctx are omitted because the agent pane next to it already surfaces them.
 
 The context strip is a TUI-specific footer and is **not** a `StatusRenderer` projection. The `StatusRenderer`-fed artifact is the _inlined status_ under the current thread's bookmark line in the Stack section; that artifact is byte-identical with `kk status --no-jj` per `testing.md` (`StatusRenderer` shared-renderer test).
 
@@ -476,7 +487,7 @@ If a row is too narrow to render the full glyph + name + status, the name is tru
 
 Mouse capture is on by default (`[ui] mouse_enabled = true`). The following events are honored in v1:
 
-- click on a sidebar row → moves cursor to that row, equivalent to navigating with arrows; if the row issued a still-active toast, that toast also dismisses
+- click on an overlay sidebar row → moves the cursor and dismisses any overlay toast issued by that row; the persistent sidebar has no toast surface
 - click on a preview-tab letter (`t` / `d` / `c`) in the preview pane header → switches preview mode, equivalent to pressing the corresponding key
 - click on a toast pill, anywhere except the action label → dismisses that toast (notification toasts have no action label and dismiss on any click; actionable toasts dismiss everywhere except the labeled action)
 - click on a toast's named action label (actionable toasts only) → invokes the action and dismisses the toast on completion

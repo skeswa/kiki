@@ -1,6 +1,6 @@
 # Metadata Evolution
 
-kiki may eventually help keep thread names, bookmark names, and revision descriptions current as work changes. The foundation ships in the acceptance slice even though the execution loop is v1.x polish: kiki must know which prose it owns and which prose belongs to the human.
+kiki may eventually help keep thread names, checkpoint bookmark names, and revision descriptions current as work changes. Both the ownership foundation and execution loop are v1.x work: the acceptance slice does not write AI-authored metadata, so it does not need to carry a ledger before that behavior exists. When the feature ships, kiki must know which prose it owns and which belongs to the human.
 
 ## Ownership ledger
 

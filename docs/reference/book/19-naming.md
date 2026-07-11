@@ -7,7 +7,7 @@ The tool is named **kiki**. The command is `kk`.
 - Tool name: `kiki`
 - CLI binary: `kk`
 - Daemon binary: `kkd`
-- Hook sidecar: `kk-hook`
+- Hook sidecar: `kk-hook` (exclusive `PreToolUse` admission plus `PostToolBatch` completion reporting for the Claude adapter)
 - User state directory: `~/.kiki/`
 - User config: `~/.config/kiki/config.toml`
 - Per-repo state and gitignored config: `~/.kiki/repos/<repo_id>/` (centralized; the source repo's filesystem holds no kiki state)

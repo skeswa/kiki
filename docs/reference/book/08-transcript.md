@@ -2,13 +2,15 @@
 
 The thread transcript is a local recall surface for human-authored, agent-authored, and kiki-authored conversational text.
 
-It is a memory aid for the human and, at local boundaries, for the same thread's resumed agent. Code truth remains in jj and the filesystem.
+It is a memory aid for the human and, after explicit provider-egress consent, for the same thread's resumed agent. Code truth remains in jj and the filesystem.
+
+Transcript capture, transcript reads, and transcript-backed reopen catch-up are v1.x work, not part of the acceptance slice. The acceptance-slice cascade protocol does not depend on a transcript row being written. This chapter fixes the privacy and data-model boundary for when the feature ships.
 
 ## Storage
 
 Transcript rows live in `~/.kiki/repos/<repo_id>/state.db`. The source repo's filesystem holds no transcript state — kiki centralizes all per-repo runtime under `~/.kiki/`.
 
-The transcript is local-only in v1. It must not feed:
+Transcript rows are stored locally. They must not feed:
 
 - `kk publish` PR drafting
 - auto-describe
@@ -16,6 +18,8 @@ The transcript is local-only in v1. It must not feed:
 - any externally visible artifact
 
 This prohibition applies even when using the transcript would make the generated artifact better. The transcript contains dead ends, local reasoning, tool failures, and quoted material the user did not choose to publish.
+
+“Stored locally” does not mean “never leaves the machine.” If the user explicitly requests reopen catch-up, kiki sends the selected catch-up text to the configured harness/model provider as agent input. [Reopen catch-up](#reopen-catch-up) defines the required consent boundary.
 
 ## Row model
 
@@ -43,14 +47,14 @@ Kiki-authored cascade, reopen catch-up, and hard-escalation messages are `author
 
 ## Capture
 
-The v1 capture adapter is Claude Code JSONL projection.
+The first capture adapter is Claude Code JSONL projection.
 
 Captured:
 
 - user text rows
 - assistant text rows
 
-Not captured in v1:
+Not captured initially:
 
 - token-streaming deltas
 - structured tool calls
@@ -69,15 +73,21 @@ For each `(thread_id, session_id)`, kiki stores a `transcript_offsets` row conta
 
 `kk reopen` may reuse a harness session id or create a new one, depending on harness behavior. A reused session resumes from its stored offset. A fresh session starts with a new offset row; the thread transcript is the union of all session ids ordered by thread-local `seq`.
 
-Cascade-injection rows are not projected from harness JSONL. They are written by the `MarkDelivered(intent_id)` handler after stdout delivery, using `dedup_key=cascade:<intent_id>` and the payload and anchor embedded in that `sync_intent`. A retry must re-emit the saved payload byte-identically. If `@` advances between intent materialization and `MarkDelivered`, the transcript row still binds to the saved anchor.
+Cascade-injection rows are not projected from harness JSONL. When transcript capture is enabled, the transcript projector records the durable `MarkDelivered` event using `dedup_key=cascade:<intent_id>` and the payload and anchor embedded in that `sync_intent`. A retry must re-emit the saved payload byte-identically. If `@` advances between materialization and delivery, the row still binds to the saved anchor. Failure to project this optional row cannot fail or roll back cascade acknowledgement.
 
 ## Reopen catch-up
 
-`kk reopen` composes catch-up from recent rows where `synthesized=false`. This prevents recursive catch-up quoting.
+Plain `kk reopen` does not send transcript text to the agent. `kk reopen --catch-up` explicitly requests a catch-up composed from recent rows where `synthesized=false`; this prevents recursive catch-up quoting.
+
+A closed thread has no live thread credential. `BeginApproval` therefore discloses that catch-up was requested but returns no transcript text. After the exact reopen approval is claimed into its durable journal, and before the harness starts, the daemon releases the preview only to the same enrolled foreground presenter as an authorized reversible step. Declining provider egress drops the catch-up and continues as a plain reopen unless the human cancels the whole operation; no transcript text reaches the harness first.
+
+Before the first provider-bound catch-up, kiki shows that selected local transcript text will be sent to the configured model provider and asks for foreground consent. The user may approve once, remember approval for that provider and repo, or cancel. A remembered preference is revocable and changing provider identity invalidates it. Remembering privacy consent suppresses that prompt; it does not bypass the separate authority required to reopen a thread. Under the v1 authority contract, non-interactive reopen remains unavailable.
+
+Kiki should offer a preview before consent. It does not claim to scrub secrets or reliably redact the catch-up. Consent covers model-provider egress for reopen context only; it does not permit transcript use in publication, metadata generation, telemetry, or unrelated agent prompts.
 
 The catch-up itself is captured as `synthesized=true`.
 
-Before invoking the harness with a kiki-prepended catch-up or hard-escalation message, `kkd` inserts a `pending_kkd_prepends` sidecar row keyed by `(thread_id, sha256(text))` with a short TTL. The JSONL projector uses that sidecar to mark the eventual harness-emitted user row as `author=kk`, `direction=inbound_to_agent`, and `synthesized=true`.
+Before invoking the harness with a kiki-prepended catch-up or hard-escalation message, `kkd` inserts a `pending_kkd_prepends` sidecar row keyed by `(thread_id, sha256(text))` with a short TTL. The JSONL projector, when installed, uses that sidecar to mark the eventual harness-emitted user row as `author=kk`, `direction=inbound_to_agent`, and `synthesized=true`.
 
 The sidecar match intentionally omits `session_id`, because a fresh-session reopen may not have a session id until after the harness starts. Duplicate `(thread_id, text_sha256)` rows are allowed and consumed FIFO so two byte-identical prepends in the TTL window produce two synthesized rows.
 
@@ -85,14 +95,30 @@ Catch-up source queries must exclude `synthesized=true` rows. This prevents reop
 
 ## Read API
 
-Human CLI can read repo transcripts through `kk thread transcript`. Query modes cover by-change reads, full-text search, change ranges, tail reads, and anchored/tombstoned/synthesized row filtering; the flag surface lives in [Commands](11-commands.md#kk-thread-transcript).
+The v1.x human CLI reads transcripts through `kk thread transcript`. Query modes cover by-change reads, full-text search, change ranges, tail reads, and anchored/tombstoned/synthesized row filtering; the flag surface lives in [Commands](11-commands.md#kk-thread-transcript).
 
 Agent MCP transcript reads are v1.x polish. When they ship, they are same-thread only.
 
+An MCP transcript result is local IPC on its first hop but normally becomes model-provider input when the harness returns tool output to a hosted model. Same-thread authority therefore is necessary but not sufficient. Before enabling transcript MCP for a managed harness, kiki requires remembered provider-egress consent for purpose `transcript_mcp` and that harness's current provider identity. MCP itself cannot open the foreground prompt or grant consent: without a matching record it returns `ConsentRequired` and no transcript content. The human grants or revokes that purpose through the foreground privacy-consent CLI/TUI surface.
+
+## Provider-egress consent
+
+Provider-egress consent is a privacy policy record, not a `HumanApproval` and not configuration. Each durable record binds:
+
+- `repo_id`;
+- `thread_id`;
+- normalized provider identity: harness, provider/service, endpoint origin, and a non-secret account or tenant fingerprint when available;
+- purpose: `catch_up` or `transcript_mcp`;
+- disclosure-policy version, grant time, and optional revocation time.
+
+The foreground presenter shows the provider identity, purpose, thread scope, and absence of secret scrubbing before granting. A remembered grant applies only to that tuple. Thread, provider, endpoint, account/tenant, purpose, or disclosure-version change fails closed and asks again. A one-time catch-up approval is attached only to that invocation and is not inserted as a remembered grant.
+
+Consent records live in the registered repo's SQLite database and are inspectable and revocable. Revocation takes effect before the next provider-bound read; it does not recall content already sent. Committed config, environment variables, CLI flags, MCP calls, and an operational `HumanApproval` cannot create a remembered grant.
+
 ## Privacy and retention
 
-v1 performs no secret scrubbing. Local-only storage is the privacy posture. Redaction that is "usually right" is not enough for text that may contain prompts, quoted source, command output, or tool failures.
+Kiki performs no secret scrubbing. Locally stored, never used for publication, and explicit provider-egress consent are separate promises. Redaction that is "usually right" is not enough for text that may contain prompts, quoted source, command output, or tool failures.
 
-v1 has no transcript retention cap. SQLite is expected to handle the volume because token deltas and tool payloads are not captured.
+The initial transcript release has no retention cap. SQLite is expected to handle the volume because token deltas and tool payloads are not captured.
 
 `kk close` preserves transcript rows. `kk thread destroy` deletes them by default; `--keep-log` is the explicit retention opt-out.

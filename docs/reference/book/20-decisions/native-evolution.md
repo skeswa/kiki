@@ -6,7 +6,7 @@ Kiki distinguishes jj repository evolution from on-disk workspace materializatio
 
 When an ancestor revision is rewritten, jj may immediately evolve descendant commits and the working-copy commit recorded for another workspace. The other workspace's files can remain stale. Kiki compares before/after operation views and the follows edge's last synchronized base, then records a `NativeRewrite` containing the exact `from_base_commit → to_base_commit` transition. It waits for the managed agent's safe boundary, verifies that the current child still descends from `to_base_commit`, and materializes the child's current jj state. It does not rebase history jj already evolved or pin a child working-copy commit that may evolve again before the boundary.
 
-When a parent bookmark gains a new tip that is not already an ancestor of the following child, jj has no knowledge of kiki's follows edge. Kiki records a `ParentAdvance` intent and explicitly rebases the child's owned stack onto the exact parent commit at the child's safe boundary.
+When a parent's persisted workspace head gains a new commit that is not already an ancestor of the following child, jj has no knowledge of kiki's follows edge. Kiki records a `ParentAdvance` intent and explicitly rebases the child's provably single-parent owned stack onto that exact commit at the child's safe boundary. The thread bookmark is checkpointed separately and is not treated as the live head because jj does not move it merely when `jj new` creates a child.
 
 ## Why
 

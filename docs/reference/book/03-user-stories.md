@@ -8,7 +8,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 
 1. As a developer, I want to install `kk` from a single binary distribution, so that getting started is one command.
 2. As a developer, I want to run `kk init` in a git+jj repository to opt that repo into kiki management, so that I am explicit about which repos kkd watches.
-3. As a developer, I want kk to verify prerequisites at `kk init` — jj initialized and gh authenticated — so that I get clear errors instead of cryptic failures later. Harness binaries (e.g., Claude Code) are not pre-validated at init time; the architecture is BYO-harness, and the check happens at `kk new` time when a thread actually needs the configured harness.
+3. As a developer, I want kk to verify only local coordination prerequisites at `kk init` — notably that jj is initialized — so that a missing GitHub login does not block local work. Harness binaries are checked at `kk new`; `gh` and GitHub authentication are checked lazily at `kk publish` or explicitly via `kk doctor --github`.
 4. As a developer, I want kkd to start automatically the first time I invoke `kk`, so that I never have to think about daemon lifecycle.
 5. As a developer, I want kkd to recover from crashes by reading its sqlite state on restart, so that my threads survive daemon issues.
 6. As a developer, I want kkd to be resurrectable across system restarts via launchd/systemd-user, so that my threads survive reboots.
@@ -23,13 +23,15 @@ Read these before the invariants. If a story and a normative chapter appear to p
 12. As a developer, I want `kk new --harness <name>` to override the default agent harness for a single thread, so that once additional harnesses ship I can pick the right one per task. (v1: only `claude-code` is accepted; any other harness name errors with a clear "unsupported harness, see [agent.default_harness] config" message until further adapters are added.)
 13. As a developer, I want each thread to live in its own jj workspace so agents in different threads do not accidentally interfere with each other's files in the course of normal cooperative work, so that parallel agentic work stays in its own lane. (This is a cooperative isolation property, not filesystem access control; see Trust model: same-UID processes can still reach sibling workspaces.)
 14. As a developer, I want to spawn N sibling threads off the same starting point in parallel (e.g., one per caller of a function I'm refactoring), so that I can fan out migration work across agents simultaneously.
+    14a. As a developer, I want the active workspace's `@` to be the thread's live head while its bookmark remains an explicit checkpoint/publication projection, so that ordinary `jj new` behavior cannot silently leave kiki following or publishing the wrong commit.
+    14b. As a developer, I want thread creation to recover durably from a daemon crash at any external step and to start the harness only after credentials and isolated hook configuration are ready, so that “atomic spawn” does not depend on impossible cross-system rollback.
 
 ## Switching and orientation
 
 15. As a developer, I want `kk switch <thread>` to point my tmux client at that thread's session, so that switching is instant.
 16. As a developer, I want a tmux keybinding (e.g., `prefix+k`) that overlays the kk TUI for fast switching and spawning, so that I never have to leave my current session.
 17. As a developer, I want `kk` with no arguments to open the interactive TUI, so that I can browse and act on threads visually.
-18. As a developer, I want `kk ls` to list active threads with status icons, so that I can scan state at a glance from any terminal.
+18. As a developer, I want `kk ls` to list active and repair-relevant operational threads with lifecycle labels that remain distinct without color, so that creating, failed, closing, or projection-diverged work cannot disappear from the default view.
 19. As a developer, I want `kk ls --all` to include closed threads, so that I can find archived work.
 20. As a developer, I want a tmux status-line strip showing thread count and an "attention needed" indicator, so that I have ambient peripheral awareness while heads-down.
 21. As a developer, I want `kk` invocations inside a thread's tmux session to know which thread I am in via env, tmux session name, or cwd, so that thread-acting commands work without specifying a target.
@@ -41,27 +43,30 @@ Read these before the invariants. If a story and a normative chapter appear to p
 24. As a developer in thread B (a child of A), I want my agent to receive a clear "your base changed, here is the diff" signal at the next tool boundary when A's revisions are amended, so that the repository may evolve immediately while B's files and agent context move together.
 25. As a developer, I want kiki to materialize evolved state or perform an explicit follows rebase ONLY at agent tool boundaries or quiescence, never with the managed agent mid-edit, so that the agent's mental model never diverges from what is on disk. I understand that a direct human `jj` command in a stale child workspace is an explicit escape hatch that may materialize it earlier; at the next boundary kiki must probe actual files and recover unsnapshotted edits rather than assume the op log tells the whole story.
 26. As a developer, I want the cascade to handle textual conflicts by marking the thread "conflicted" and surfacing a notification, so that I resolve them deliberately instead of corrupting agent state.
-27. As a developer in a child thread B that follows parent A, I want B to pick up A's newly added commits automatically through an explicit boundary-safe `ParentAdvance` reconciliation, so that stacked work stays coordinated without manual rebasing.
-28. As a developer, I want `kk thread detach` to break the live-follow link, so that I can pin a child thread at its current base while the parent advances independently. This is the v1 graph-surgery escape hatch; attach and reparent remain deferred.
+27. As a developer in a child thread B that follows parent A, I want B to pick up A's newly added live-head commits automatically through an explicit boundary-safe `ParentAdvance` reconciliation, so that stacked work stays coordinated without pretending A's bookmark automatically followed `jj new`.
+28. As a developer, I want `kk thread detach` to synchronously catch up the operation DAG, surface any parent transition that watcher lag had not recorded yet, checkpoint my exact child head, and only then break the live-follow link, so that detach cannot silently discard a parent advance. This is the v1 graph-surgery escape hatch; attach and reparent remain deferred.
 29. As a developer, I want `kk thread attach <child> --to <parent>` to re-establish a follows link, so that I can resume live coupling after a turbulent moment. (Deferred beyond v1.)
 30. As a developer, I want `kk thread reparent <child> --onto <new-parent>` to move a thread under a different parent, so that I can correct stack relationships when I realize the topology was wrong. (Deferred beyond v1.)
 31. As a developer, I want kk to refuse cyclic follows links, so that the coupling graph stays a DAG.
-32. As a developer, I want a child thread to move onto the repo default branch and auto-detach (with notification) when its parent thread merges, so that stacked work survives the parent landing without silently following a moving target.
-33. As a developer, I want kk to escalate from soft-pause to SIGINT+resume only when (i) a textual conflict cannot auto-resolve, (ii) the agent is in long pure-thinking with no upcoming tool call to intercept, or (iii) I explicitly request `kk thread interrupt`, so that the disruptive escalation is rare and predictable.
+32. As a developer, I want the v1.x GitHub integration to move a child locally onto the exact merged default-branch commit, then present a one-shot-approved remote force-push/PR-base plan and detach only after local and remote state agree, so that stacked work survives the parent landing without silently reusing an older publish approval.
+33. As a developer, I want kk to escalate from soft-pause to SIGINT+resume only when the safety contract requires it—dirty or indeterminate files before mutation, textual conflicts or divergent successors, ambiguous topology, an unprovable delivery barrier, prolonged pure thinking with no boundary, or my explicit `kk thread interrupt`—so that disruption is rare but never preferred over edit or delivery safety.
 34. As a developer, I want `kk thread interrupt <thread>` as the explicit human escape hatch to hard-stop and re-frame an agent, so that I can rescue a stuck or off-track thread.
+    34a. As a developer, I want kiki to block every tool call in a parallel Claude tool batch when one call triggers reconciliation, and to acknowledge delivery only after that batch closes and a later model turn begins, so that a sibling call from the same batch cannot observe new files before the agent receives the explanation.
+    34b. As a developer, I want v1 managed Claude sessions to reserve `PreToolUse` exclusively for kiki, with a clear startup diagnostic when effective user hooks would race it, so that the safe boundary is real rather than configuration-order folklore.
 
 ## Ambient coordinator
 
 35. As a developer, I want to run `jj` directly inside or outside any thread's workspace and have kk react to my ops, so that kk feels additive to my normal jj workflow rather than invasive.
 36. As a developer, I want kk to detect when an agent invokes `jj` via Bash and react identically to a human invocation, so that the abstraction does not leak.
-37. As a developer, I want kk to surface a "your parent thread was abandoned" prompt when external `jj abandon` removes a parent's bookmark, so that I am asked how to respond instead of silently breaking.
+37. As a developer, I want kk to distinguish deletion/movement of a parent's checkpoint bookmark from external `jj abandon` of its live head or owned revisions, so that bookmark drift enters projection repair while ancestry destruction stops as topology divergence instead of either event silently changing my follows base.
 38. As a developer, I want kk to never re-react to its own jj ops (op-attribution dedupe), so that the system cannot fall into self-triggered loops.
-39. As a developer, I want kk to coalesce rapid-fire jj op storms into a single cascade per thread, so that ten quick ops do not cause ten cascades.
+39. As a developer, I want kk to traverse jj's complete operation-head frontier, preserve incomparable concurrent operations instead of ordering them by timestamp, and coalesce compatible rapid-fire triggers into one cascade per thread, so that op storms stay quiet without losing a branch of the operation DAG.
 40. As a developer, I want kk to detect when something other than kk force-pushes a thread's branch (manual `git push --force`, etc.) and surface a "remote diverged" warning requiring explicit reconciliation, so that I never have a silent mismatch between local and remote state.
+    40a. As a developer, I want kiki to detect missing or moved bookmarks, missing jj workspace records, path mismatches, and missing tmux sessions, repair only provably unambiguous cases automatically, and otherwise guide me through `kk repair`, while continuing safe live-head observation when the workspace itself is still uniquely identified, so that an unrelated bookmark or session problem does not silently freeze follows coordination.
 
 ## AI auto-evolution
 
-41. As a developer, I want kk to track ownership of revision descriptions and bookmark names, so that the v1 invariant "never overwrite human-authored prose" is enforceable even before background AI evolution ships.
+41. As a developer, I want kk to track ownership of revision descriptions and bookmark names before background AI evolution writes either surface, so that the invariant "never overwrite human-authored prose" is proven with the v1.x metadata feature rather than burdening the initial coordination slice.
 42. As a developer, I want kk to eventually auto-evolve bookmark names and revision descriptions as work takes shape, so that my history narrates itself. (Stretch / post-v1 execution.)
 43. As a developer, I want auto-rename and auto-describe to fire when the thread's agent has been quiescent for a configurable window OR after specific events (`jj split`, `jj squash`), so that the AI loop never races my agent. (Stretch / post-v1 execution.)
 44. As a developer, I want kk to NEVER silently overwrite a description I or my agent typed, so that my prose and intent stay intact and kk remains trustworthy.
@@ -74,9 +79,9 @@ Read these before the invariants. If a story and a normative chapter appear to p
 
 ## Publishing
 
-51. As a developer, I want `kk publish` to open `$EDITOR` with an AI-pre-filled PR title and description, so that I review and edit instead of writing from scratch.
-52. As a developer, I want `kk publish --no-edit` to skip the editor and use the AI draft as-is, so that low-stakes PRs are one command.
-53. As a developer, I want `kk publish --no-ai` to open the editor empty, so that I can write sensitive PRs without any model involvement.
+51. As a developer, I want the first v1.x `kk publish` flow to open `$EDITOR` with text derived only from explicit command input and non-transcript metadata, with opt-in AI prefill added later alongside the metadata execution loop, so that manual publishing does not wait for or silently invoke a model.
+52. As a developer, I want `kk publish --no-edit` to skip the editor and use the exact generated non-transcript draft shown in the approved plan, whether deterministic in the first release or AI-assisted after that feature ships, so that low-stakes PRs are one command without changing the egress boundary.
+53. As a developer, once AI publishing assistance ships, I want `kk publish --no-ai` to force the manual non-model drafting path, so that I can write sensitive PRs without model involvement. The flag is not part of the first manual publishing release.
 54. As a developer, I want `kk publish -m "<title>"` to set the title inline, so that I can fast-path simple cases.
 55. As a developer, I want `kk publish --ready` to open the PR as ready-for-review (default is draft), so that I do not unnecessarily block reviewers on WIP.
 56. As a developer, I want `kk publish` from a child thread whose parent is unpublished to automatically publish ancestors first (top-down), so that the PR stack is wired up correctly.
@@ -84,27 +89,27 @@ Read these before the invariants. If a story and a normative chapter appear to p
 58. As a developer, I want `kk publish --downstack` to publish the current thread plus all unpublished descendants, so that I can land a feature tree in one command.
 59. As a developer, I want a thread's PR base to default to the parent thread's branch when stacked, otherwise to the repo's default branch (resolved from `gh repo view`), so that stack relationships translate correctly to GitHub.
 60. As a developer, I want PR descriptions to be human-territory after creation (kk does not silently overwrite), with `kk publish --refresh` as an opt-in regenerator, so that my reviewer-facing prose is stable.
-61. As a developer, I want a child thread's branch to be automatically rebased onto the repo default branch and force-pushed with `--force-with-lease` when its parent merges, with the PR base updated to that default branch, so that stacked PRs survive the parent landing without manual cleanup.
-62. As a developer, I want `kk thread comments` to list a thread's PR review comments inside the thread context (read-only display in v1), so that I can respond with full context.
+61. As a developer, I want a child thread to be reconciled locally onto the exact merged default-branch commit when its parent merges, then receive an exact one-shot approval plan for `--force-with-lease` and PR-base update before those remote mutations occur, so that stacked PRs survive landing without granting unattended remote authority.
+62. As a developer, I want the v1.x `kk thread comments` surface to list a thread's PR review comments read-only inside the thread context, so that I can respond with full context.
 
 ## Closing and reopening
 
-63. As a developer, I want `kk close` to archive the current thread (kill tmux session, forget jj's workspace record, and remove the materialized workspace directory after a loss-prevention preflight plus post-stop recheck) while preserving the bookmark and revisions, so that I never lose tracked work to closure.
+63. As a developer, I want `kk close` to freeze and prove quiescent every process in the managed tmux session, rerun loss-prevention and operation-frontier checks against the exact approved plan, resume the original process states if safety or the approval fingerprint changed, and otherwise checkpoint the exact head and reconcile/detach children before killing the session, forgetting the workspace, and removing the directory, so that a failed or drifted close never leaves a dead thread labeled Active or reuses stale approval.
 64. As a developer, I want `kk close` to take me back to the parent thread's session if it exists, so that I keep working without manual session-switching.
-65. As a developer, I want `kk reopen <thread>` to restore an archived thread (re-create workspace, re-spawn tmux session, re-resume agent), so that I can pick up old work seamlessly.
-66. As a developer, I want children of a closed thread to auto-detach with a notification, so that I am aware of the lifecycle change.
-67. As a developer, I want a merged PR to auto-archive its thread with a 5-second undo grace period, so that completion cleans itself up. (v1.x polish; the acceptance-slice behavior is notifying and updating PR/thread state.)
+65. As a developer, I want `kk reopen <thread>` to restore an archived thread through a restart-recoverable journal whose launcher must report ready before the thread becomes Active, so that a crash during workspace, credential, tmux, or harness recreation leaves an honest repairable state.
+66. As a developer, I want parent close to synchronously refresh every child edge, require a choice for any newly discovered transition, and while the parent is frozen checkpoint and detach each child before killing the parent session, so that watcher lag or a failed detach cannot erase a parent advance or leave an unresumable parent.
+67. As a developer, I want a merged PR to auto-archive its thread with a 5-second undo grace period, so that completion cleans itself up. Merge polling, notification, state updates, and auto-archive all ship with the v1.x GitHub integration rather than the coordination acceptance slice.
 68. As a developer, I want a PR closed-without-merge to surface a notification but NOT auto-archive its thread, so that I can decide whether to keep iterating.
-69. As a developer, I want `kk thread destroy` as a separate, irreversible command (one-way `jj abandon`), so that I have a clear ladder from soft-close to permanent removal.
+69. As a developer, I want `kk thread destroy` to preserve jj revisions by default while deleting the local thread projections through a method-bound journal, and require a separate `--abandon-revisions` approval naming an exact validated chain with no registered or foreign descendants, so that ordinary cleanup never implies history loss or expands an inferred `jj abandon` revset.
 70. As a developer, I want plain `kk close` to leave any open PR untouched, with `kk close --discard-pr` as the explicit "also close the PR" option, so that GitHub-visible state is preserved unless I deliberately change it.
 
 ## Observability and notifications
 
-71. As a developer, I want OS-native notifications when an agent hits a permission prompt, when a cascade produces a conflict, when a parent thread merges or is abandoned, and when a PR check fails, so that I do not miss important moments.
+71. As a developer, I want acceptance-slice OS notifications for agent permission prompts, cascade conflicts, and local parent abandonment, with merge and PR-check notifications added by the v1.x GitHub integration, so that unavailable remote polling is not implied by the core coordinator.
 72. As a developer, I want notifications to be configurable per-event-type, so that I can tune signal vs. noise.
 73. As a developer, I want CI status changes on a PR to surface as notifications but NOT auto-trigger any fix action, so that kk does not make assumptions about what to do.
 74. As a developer, I want the TUI to show a tree of threads (parent-child via follows), so that I can visualize my work structure.
-75. As a developer, I want `kk status` on a thread to show its branch, recent activity, agent status, and PR (if any), so that I can quickly orient.
+75. As a developer, I want `kk status` to distinguish the live workspace head from its bookmark checkpoint and show whether that checkpoint is current, behind, or diverged; v1.x may add PR state, so that ordinary bookmark lag is never mistaken for lost work.
 
 ## Configuration
 
@@ -116,7 +121,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 
 ## Pluggable UI architecture
 
-81. As a future UI author, I want a stable gRPC contract over a unix socket exposing all daemon state and behavior, so that I can build alternative UIs (native macOS GUI, web, mobile) without modifying kkd.
+81. As a future local UI author, I want a stable gRPC contract over a unix socket exposing daemon state and behavior, so that I can build another same-host UI without modifying kkd. Remote and mobile clients may reuse service semantics, but require a future transport and authentication contract.
 82. As a future UI author, I want server-streaming events for thread state changes, so that my UI reacts in real-time without polling.
 83. As a developer, I want `kk` CLI, `kk` TUI, and `kk-hook` to be pure clients of the same gRPC API (no privileged internals), so that UIs and the daemon evolve independently.
 
@@ -129,32 +134,32 @@ Read these before the invariants. If a story and a normative chapter appear to p
 
 ## Hooks and harness integration
 
-88. As a developer, I want kk to install its Claude Code PreToolUse hook per-thread without polluting my global Claude Code config, so that my non-kk Claude Code work is unaffected. v1 does not install a Stop hook unless that hook has a separately specified job.
-89. As a developer, I want kk's hooks to chain non-destructively with my user-defined hooks (kk runs first, passes through if it has nothing to inject), so that I keep my custom hooks.
-90. As a developer, I want kk to revert hook config when a thread is closed, so that nothing lingers on disk.
+88. As a developer, I want kk to launch its managed Claude session with isolated, launch-scoped hook settings, so that my non-kk Claude Code work is unaffected and tracked `.claude/settings.json` is never overwritten.
+89. As a developer, I want kiki to refuse an unsafe managed session when it cannot prove exclusive control of `PreToolUse`, while preserving unrelated hook types only when the harness can isolate them, so that concurrent user hooks cannot race workspace reconciliation.
+90. As a developer, I want any fallback merge into `.claude/settings.local.json` to preserve prior bytes through a content-hash ownership record and restore only kiki's own fragment on close, so that nothing user-owned is overwritten or deleted.
 91. As a developer with a less-capable harness (Codex without rich hook support), I want kk to gracefully degrade to SIGINT+resume for context delivery, so that the tool still works just less smoothly.
 92. As a developer, I want the `kk-hook` sidecar to add imperceptible latency (target <5ms typical) to each agent tool call, so that the hook never feels in the way.
 
 ## Trust model and auditability
 
-93. As a developer, I want destructive and global operations (close other threads, destroy, reparent across threads, register/unregister a repo) to require an `Admin` credential, so that a buggy hook or a misbehaving agent acting on its own thread cannot accidentally take destructive action elsewhere.
+93. As a developer, I want destructive, cross-thread, sensitive-read, and externally visible operations to require a one-use approval bound to the exact method and target and issued through an interactive foreground flow, so that a buggy hook or agent invoking `kk` cannot inherit reusable human authority.
 94. As a developer, I want each thread's `kk-hook` to be issued a `ThreadScoped` credential bound to that thread's id, so that even if a hook's behavior is wrong it cannot mutate any other thread's state.
-95. As a developer, I want every parseable daemon transport attempt (accepted or rejected, gRPC or MCP) logged in an append-only audit log with caller credential when identifiable, declared scope, method, args summary, outcome, and timestamp, so that when something destructive or suspicious happens I can answer "who did it" definitively.
-96. As a developer, I want `kk audit log` (Admin) and per-thread audit slices via `kk thread audit` to surface the audit trail, so that auditing is discoverable rather than buried in the daemon. (Distinct from `kk thread transcript`, which is the conversational transcript per the Thread transcript section.)
-97. As a developer, I want the trust model documented honestly: kkd does not defend against an actively malicious same-UID agent that has the user's `Admin` credential, so that I do not over-rely on the capability scoping for properties it cannot deliver.
+95. As a developer, I want every parseable daemon transport attempt (accepted or rejected, gRPC or MCP) recorded exactly once in SQLite—with resolved-repo attempts in that repo's audit table and unscoped or unresolved attempts in the user-level table—so that operational history is queryable without inventing a repo for bootstrap or failed routing.
+96. As a developer, I want `kk audit log` and per-thread audit slices via `kk thread audit` to surface the audit trail, while understanding that append-only is enforced by daemon APIs and is not tamper-proof against my UID.
+97. As a developer, I want the trust model documented honestly: one-shot approvals reduce accidental agent authority but do not defend against an actively malicious same-UID process that can impersonate user interaction or modify local state.
 
 ## Thread transcript
 
 98. As a developer, I want kkd to capture each human-authored, agent-authored, and kk-authored conversational text event in a thread to a durable on-disk log bound to the jj change-id that was `@` at capture time, so that I have a recall surface separate from what was committed.
-99. As a developer, I want the thread transcript to live in `~/.kiki/repos/<repo_id>/state.db` (centralized under `~/.kiki/`, never pushed, and never inside the source repo's filesystem), so that prose containing dead ends, tool errors, or quoted file contents stays local.
+99. As a developer, I want the thread transcript to live in `~/.kiki/repos/<repo_id>/state.db` (centralized under `~/.kiki/`, never pushed, and never inside the source repo's filesystem), so that prose containing dead ends, tool errors, or quoted file contents does not enter the repo or publication paths; separately consented provider egress remains explicit.
 100.  As a developer, I want `kk thread transcript [<change>]` to print messages for a change, with `--search <query>` for full-text, `--range <from>..<to>` for spans, and `--recent <n>` for tail-of-thread, so that I can recall context as a human reader.
-101.  As a developer, I want my agent to be able to retrieve from its own thread's log mid-task via a kiki-hosted MCP server, so that the agent can recall what the user asked or what happened earlier without me bridging it manually. (Stretch / post-v1; human `kk thread transcript` is the v1 acceptance surface.)
+101.  As a developer, I want my agent to be able to retrieve from its own thread's log mid-task via a kiki-hosted MCP server, so that the agent can recall what happened earlier without me bridging it manually. This follows the v1.x human transcript surface and is not acceptance work.
 102.  As a developer, I do NOT want my agent to read another thread's log via MCP in v1, so that cross-thread context-sharing waits for the v2 substrate design and its safety mechanisms (causal-chain detection, depth caps, audit trail).
-103.  As a developer, I want `kk reopen` to seed the resumed agent with a brief catch-up message synthesized from the log, so that a reopened thread is not a cold start.
-104.  As a developer, I want auto-describe and the `kk publish` PR-drafter to NOT read from the thread transcript, so that local-only prose cannot silently leak into externally-published artifacts.
+103.  As a developer, I want the v1.x `kk reopen --catch-up` flow to preview and, after first-use consent, send a brief transcript-derived catch-up to the resumed agent, so that a reopened thread need not be a cold start and provider egress is never mislabeled as local-only.
+104.  As a developer, I want auto-describe and PR drafting to NOT read from the locally stored transcript, so that recall prose cannot silently leak into published artifacts.
 105.  As a developer, I want `kk thread destroy` to delete the thread transcript alongside the bookmark by default, with `--keep-log` as the explicit retention opt-out, so that destroy means destroy unless I say otherwise.
 106.  As a developer, I want the capture path abstracted behind a `TranscriptAdapter` trait, so that future harnesses (Codex, others) can be added without touching the log schema or the read API.
-107.  As a developer, I do NOT want token-streaming deltas, structured tool-call inputs and outputs, or extended-thinking blocks captured in v1, so that the log is a readable narrative rather than a verbose event stream.
+107.  As a developer, I do NOT want token-streaming deltas, structured tool-call inputs and outputs, or extended-thinking blocks captured in the initial transcript release, so that the log is a readable narrative rather than a verbose event stream.
 
 ## Revision and status view (`kk log`, `kk status`)
 
@@ -180,7 +185,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 124. As a developer, I want the navigation cursor to move on log lines (j/k or arrows) and `enter` to switch to the cursored thread (dismissing the overlay), so that the most common action is the cheapest keystroke.
 125. As a developer, I want `space` to preview the cursored thread in the right pane (transcript tail / diff / comments toggleable via `t`/`d`/`c`) without changing my active thread, so that I can peek before committing to a switch.
 126. As a developer, I want destructive and creative verbs (`n` spawn, `N` spawn-as-child-of-cursored, `p` publish, `x` close, `i` interrupt) to be available only in the overlay TUI, not in the persistent sidebar pane, so that a stray keypress in a passive sidebar can't take action. (`c` is reserved for the PR-comments preview in story 125; close binds to `x` to avoid the collision.)
-127. As a developer, I want destructive overlay verbs (`x`, `i`) to open a confirmation modal rather than firing immediately, so that fat-fingering doesn't cost me work.
+127. As a developer, I want consequential overlay verbs (`x`, `i`) to open a daemon-issued approval card rather than firing immediately, so that fat-fingering does not cost me work and the confirmation is bound to the exact plan.
 128. As a developer, I want lowercase `t` in the overlay to surface a transcript-tail preview in the right pane (alongside `d` diff and `c` PR comments) and shift-`T` to escalate to a full-screen `kk thread transcript` reader for the cursored thread, so that the cheap glance and the deep drill-down sit on the same letter at two different intensities.
 129. As a developer, I want `?` to surface a help overlay listing the active keymap, so that the action set is discoverable rather than memorized.
 
@@ -190,7 +195,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 131. As a developer, I want `kk new <name> --sidebar` / `--no-sidebar` to override my default per thread, so that one-off threads can opt in or out without changing global config.
 132. As a developer, I want the sidebar pane to render the same Stack + Activity content the overlay's sidebar does, so that there is one mental model for the sidebar regardless of where it lives.
 133. As a developer, I want the sidebar pane restricted to navigation-only keys (j/k/arrows/tab/enter/q/?, plus mouse click-to-focus and scroll). Destructive/creative verbs are not bound, so that accidental focus on the sidebar pane (a real tmux focus accident) cannot mutate state.
-134. As a developer, I want the sidebar pane to spawn at thread birth (during `kk new`'s atomic spawn), and to be re-ensured idempotently at every `kk switch`/`kk reopen` to that thread, so that the pane is reliably present without kk policing tmux mid-session.
+134. As a developer, I want the sidebar pane to spawn during the final activation step of `kk new`'s recoverable creation saga, and to be re-ensured idempotently at every `kk switch`/`kk reopen`, so that the pane is reliably present without pretending tmux participates in a database transaction.
 135. As a developer, I want kk to NOT auto-respawn the sidebar pane within a live session if I deliberately killed it (`prefix+x`), so that maximizing the agent pane is honored until I detach and reattach.
 136. As a developer, I want kk to skip spawning the sidebar pane when my terminal is narrower than `[ui] sidebar_min_terminal_cols` (default 100) and log a warning at `kk new` time, so that the sidebar never renders broken on a narrow terminal.
 137. As a developer, I want toggling `[ui] persistent_sidebar` after threads exist to take effect at next `kk new`/`kk reopen` (not retroactively reshape live sessions), with a config-set warning making the lag visible, so that I'm not surprised when an existing thread stays unchanged.
