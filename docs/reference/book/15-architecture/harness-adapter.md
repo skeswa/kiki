@@ -24,6 +24,19 @@ trait RunningAgent {
 
 `AgentStatus` is `Running | Quiescent | Stuck(duration) | Crashed`. The cascade orchestrator uses `status` and `capabilities` to decide whether soft-pause is viable or hard-escalation is needed.
 
+## Agent display states
+
+`AgentStatus` is the orchestrator's vocabulary. The human-facing surfaces (`kk ls`, `kk log --wide`, the TUI glyph table in [Interface](../12-interface/spec.md)) render a four-value projection of it, folding in two session signals the harness already emits:
+
+| display state | source                                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `working`     | `Running`                                                                                                                                 |
+| `idle`        | `Quiescent`, most recent turn not completed (or no turn yet)                                                                              |
+| `finished`    | `Quiescent`, most recent turn completed (the harness's turn-completion signal; Claude Code's stop event)                                  |
+| `blocked`     | `Stuck(duration)`, `Crashed`, or an unacknowledged attention event such as a permission prompt (see [Observability](../14-observability.md)) |
+
+The projection is display-only: the cascade orchestrator branches on `AgentStatus` and `Capabilities`, never on display states, and renderers project rather than keep a state model of their own.
+
 ## Capabilities
 
 Capabilities are a typed struct:

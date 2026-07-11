@@ -40,6 +40,7 @@ Definitions of the load-bearing terms in kiki's reference. When a term is used i
 
 - **Harness** — an agent runtime kiki spawns and coordinates with (Claude Code in v1; Codex and others deferred). Exposes a `Harness` factory trait + `RunningAgent` instance trait.
 - **Capabilities** — typed struct returned by a `Harness` describing what it supports (`soft_pause`, `session_resume`, `structured_tool_hooks`, `mcp_client`, `quiescence_detection`). The cascade orchestrator branches on this struct to degrade gracefully.
+- **Agent display states** — the four-value human-facing projection (`idle`, `working`, `finished`, `blocked`) of `AgentStatus` plus turn-completion and attention signals, defined in [Harness adapter](15-architecture/harness-adapter.md#agent-display-states). Display-only; the orchestrator branches on `AgentStatus`, never on these.
 - **PreToolUse hook** — the Claude Code hook point kiki uses to intercept tool calls for cascade delivery. Implemented by `kk-hook`. Cascade does not use PostToolUse because Claude Code does not fire it for tools blocked by PreToolUse.
 - **`ContextMessage`** — `{ kind: MessageKind, text: String, structured: Option<JSON> }` — the unit of cascade communication queued for a thread's agent.
 

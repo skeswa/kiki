@@ -32,7 +32,7 @@ Two glyphs per row, max. PR appears inline as `#NNNN` only if set.
 | follows arrow       | `←●`  | dim    |
 | current thread mark | `▸`   | accent |
 
-The cascade indicator uses the same three-valued state model as `kk status` (`in sync`, `pending`, `conflicted`). The agent-state indicator uses the harness state model (`idle`, `working`, `finished`, `blocked`). The CLI prints the textual cascade state described in [Commands](../11-commands.md); the TUI projects cascade and agent states to glyphs from the table above.
+The cascade indicator uses the same three-valued state model as `kk status` (`in sync`, `pending`, `conflicted`). The agent-state indicator uses the agent display states (`idle`, `working`, `finished`, `blocked`) defined in [Harness adapter](../15-architecture/harness-adapter.md#agent-display-states). The CLI prints the textual cascade state described in [Commands](../11-commands.md); the TUI projects cascade and agent states to glyphs from the table above.
 
 Every state in this table must be distinguishable by glyph alone, not by color. Color is an accelerator: it makes scanning faster, but `NO_COLOR=1` and color-blind palettes must still convey the state. The `LogRenderer` and `StatusRenderer` projections strip color when `NO_COLOR=1` is set in the environment and rely on glyph + label to carry the signal. See [Invariants](../04-invariants.md).
 
