@@ -14,7 +14,7 @@ kiki exists to make parallel, recursive work patterns cheap enough that a develo
 - Threads provide cooperative isolation. v1 separates workspaces to prevent accidental interference; it does not sandbox same-UID processes.
 - Human-authored prose is preserved. kiki may draft names, descriptions, and PR text, but it must not silently overwrite deliberate human edits.
 - Local transcript data stays local. v1 transcript rows may feed local recall and reopen catch-up; they must not feed externally published artifacts.
-- Cascade safety matters more than eagerness. Descendant workspaces move at agent boundaries or quiescence, not mid-edit.
+- Cascade safety matters more than eagerness. jj may evolve descendant commits immediately in repository state; kiki materializes the resulting working-copy state at agent boundaries or quiescence, not mid-edit. Parent-tip advances that require an explicit rebase use the same boundary.
 
 ## v1 contract
 
@@ -32,7 +32,7 @@ The acceptance slice includes:
 - tmux session lifecycle
 - pluggable harness architecture; the `claude-code` adapter is the only one that ships in v1
 - PreToolUse hook IPC for cascade delivery
-- cascade pause, rebase, inject, acknowledge, and conflict handling
+- cascade classify, pause, reconcile/materialize, inject, acknowledge, and conflict handling
 - transcript capture and local read API
 - stack-aware publish flow
 - enough config layering for defaults, user, repo-local, per-thread, environment, and CLI flags

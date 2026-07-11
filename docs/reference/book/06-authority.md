@@ -24,8 +24,7 @@ This distinction matters. Credentials contain ordinary bugs and misbehaving tool
 Thread-scoped credentials may:
 
 - read their own thread state
-- participate in cascade acknowledgement and delivery for their own thread
-- read and drain their own context queue according to the cascade protocol
+- read cascade status and participate in sync-intent delivery and acknowledgement for their own thread
 - write kiki-owned metadata only where explicitly allowed
 - subscribe to same-repo thread summaries if the sidebar ships
 
@@ -44,7 +43,7 @@ Mutation gating alone does not cover the transcript. Transcript reads are creden
 
 The persistent sidebar may need same-repo sibling summaries. This is the only v1 cross-thread read allowed to `ThreadScoped` credentials.
 
-Allowed fields are summary-only: name, status, PR number, last description, and similar one-line display data. No transcripts, diffs, cascade counters, or write operations are included.
+Allowed fields are summary-only: name, status, PR number, last description, and similar one-line display data. No transcripts, diffs, sync-intent internals, or write operations are included.
 
 The same scope serves both the overlay's Stack and Activity sections and the persistent sidebar's two sections. They are one renderer reading one row set. The Activity section adds _ordering_ by most-recent agent event; it does not add fields.
 

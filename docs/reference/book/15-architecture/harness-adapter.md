@@ -13,7 +13,8 @@ trait Harness {
 
 trait RunningAgent {
     fn thread_id(&self) -> ThreadId;
-    fn session_id(&self) -> SessionId;
+    fn agent_session_id(&self) -> AgentSessionId;
+    fn harness_session_id(&self) -> HarnessSessionId;
     fn pid(&self) -> Pid;
     fn enqueue_context(&self, msg: ContextMessage) -> Result<()>;
     fn restart_with_message(&self, msg: String) -> Result<()>;
@@ -22,17 +23,19 @@ trait RunningAgent {
 }
 ```
 
-`AgentStatus` is `Running | Quiescent | Stuck(duration) | Crashed`. The cascade orchestrator uses `status` and `capabilities` to decide whether soft-pause is viable or hard-escalation is needed.
+`agent_session_id` identifies one kiki-managed process incarnation and changes on every restart. `harness_session_id` identifies the harness conversation and may be reused by `--resume`. This split is required for delivery safety: starting a replacement process retires the previous incarnation and clears its `delivered_intent_id` without acknowledging it, forcing byte-identical redelivery in the new process.
+
+`AgentStatus` is `Running | Quiescent | Stuck(duration) | Crashed`. The cascade orchestrator uses `status` and `capabilities` to decide whether soft-pause is viable and whether pending reconciliation may materialize the managed workspace.
 
 ## Agent display states
 
 `AgentStatus` is the orchestrator's vocabulary. The human-facing surfaces (`kk ls`, `kk log --wide`, the TUI glyph table in [Interface](../12-interface/spec.md)) render a four-value projection of it, folding in two session signals the harness already emits:
 
-| display state | source                                                                                                                                  |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `working`     | `Running`                                                                                                                                 |
-| `idle`        | `Quiescent`, most recent turn not completed (or no turn yet)                                                                              |
-| `finished`    | `Quiescent`, most recent turn completed (the harness's turn-completion signal; Claude Code's stop event)                                  |
+| display state | source                                                                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `working`     | `Running`                                                                                                                                    |
+| `idle`        | `Quiescent`, most recent turn not completed (or no turn yet)                                                                                 |
+| `finished`    | `Quiescent`, most recent turn completed (the harness's turn-completion signal; Claude Code's stop event)                                     |
 | `blocked`     | `Stuck(duration)`, `Crashed`, or an unacknowledged attention event such as a permission prompt (see [Observability](../14-observability.md)) |
 
 The projection is display-only: the cascade orchestrator branches on `AgentStatus` and `Capabilities`, never on display states, and renderers project rather than keep a state model of their own.
@@ -51,7 +54,7 @@ struct Capabilities {
 }
 ```
 
-Cascade behavior degrades cleanly when a capability is absent. A harness without `soft_pause` has `enqueue_context` lower into "queue and deliver on next `--resume`". The daemon checks `capabilities` before deciding the cascade path.
+Cascade behavior degrades cleanly when a capability is absent. For a harness without `soft_pause`, `enqueue_context` leaves the prepared payload on its durable intent for delivery on the next `--resume`. The daemon checks `capabilities` before deciding the cascade path.
 
 ## ContextMessage
 
@@ -74,7 +77,7 @@ The `structured` field carries diff payloads, file lists, etc. for richer agent 
 - Fast-path round-trip target: <5ms typical, imperceptible to agents.
 - Slow path (rebase + payload compose) is bounded by `jj rebase` plus a small constant.
 
-The hook's exact behavior — outbox lookup, decision step, post-stdout `MarkDelivered` — lives in [Cascade](../07-cascade.md).
+The hook's exact behavior — unresolved-intent lookup, boundary probe, decision step, and post-stdout `MarkDelivered(intent_id)` — lives in [Cascade](../07-cascade.md).
 
 ## Hook degradation
 
@@ -82,18 +85,18 @@ When `kkd` is unreachable (socket missing, connection refused, daemon mid-restar
 
 `~/.kiki/repos/<repo_id>/errors/<thread_id>.log` is the catch-all for client-side errors that cannot reach `kkd`. It is created lazily at first failure. The hook learns its absolute path at thread-spawn time, where `kkd` writes it into the per-thread harness config alongside the credential path; the source repo's filesystem is never touched.
 
-Pass-through is not a violation of the cascade safety invariant; it is the explicit precondition's failure mode. The cascade invariant in [Invariants](../04-invariants.md) requires `kkd` to be reachable in order to apply a rebase at a safe boundary. When the daemon is unreachable, no rebase is applied — the working copy is left untouched — and the pending cascade state is durable elsewhere. Two cases:
+Pass-through is not a violation of the cascade safety invariant; it is the explicit precondition's failure mode. The cascade invariant in [Invariants](../04-invariants.md) requires `kkd` to be reachable for kiki to materialize a desired state at a safe boundary. When the daemon is unreachable, jj repository state may already contain native descendant evolution, but kiki leaves the workspace files untouched and preserves or reconstructs the pending intent. Two cases:
 
-- The watcher saw the trigger op before the outage. `pending_cascade_seq` and any associated `context_queue` rows are already in sqlite; they survive the daemon stop.
-- The trigger op happened during the outage. The trigger lives in jj's op log (the upstream source of truth). On `kkd` restart, the op-log catch-up replays missed ops, populates `op_history`, and runs ancestry-impact evaluation — bumping `pending_cascade_seq` and enqueueing `context_queue` rows for affected followers exactly as the live watcher would have.
+- The watcher saw the trigger op before the outage. The `sync_intent` and its normalized trigger rows are already in sqlite; they survive the daemon stop.
+- The trigger op happened during the outage. The trigger lives in jj's op log (the upstream source of truth). On `kkd` restart, op-log catch-up replays missed ops, populates `op_history`, and runs before/after classification to create the same exact-base-transition intent as the live watcher.
 
-Either way, the next successful PreToolUse round-trip after `kkd` returns sees `pending_cascade_seq > applied_cascade_seq`, applies the rebase, composes the synthetic payload, persists it to `cascade_outbox`, and emits it. `cascade_outbox` only ever holds applied-but-not-yet-acknowledged cascades; pending-but-not-yet-applied cascades are not stored there. Cascade delivery is deferred, not dropped.
+Either way, the next successful PreToolUse round-trip after `kkd` returns selects the oldest unresolved intent and probes the workspace immediately. `NativeRewrite` needs no file update for `FreshClean | FreshDirty` and may update `StaleClean`; `ParentAdvance` may mutate only from `FreshClean`. Any dirty or indeterminate state that requires mutation enters `RecoveryRequired` and hard-pauses for edit-preserving recovery. The successful path persists the result, synthetic payload, anchor, and `Materialized` state on the intent in one transaction. Cascade delivery is deferred, not dropped, and outage edits are not silently hidden.
 
-In the deferred window, the agent's tool call may run against a working copy that has not yet picked up an ancestor change. That is the trade-off: the hook prefers an agent that keeps moving over an agent that wedges on a daemon hiccup, and it relies on the queue to make sure the cascade is still delivered the moment `kkd` returns. When `kkd` returns and observes a non-empty `~/.kiki/repos/<repo_id>/errors/<thread_id>.log` for a thread, it surfaces a single notification per thread summarizing the gap.
+In the deferred window, jj repository state may already contain evolved descendants while the workspace files remain stale. The agent's tool call may therefore run against the last materialized files until `kkd` returns. That is the trade-off: the hook prefers an agent that keeps moving over an agent that wedges on a daemon hiccup, and durable intent/op history ensures reconciliation is still delivered. When `kkd` returns and observes a non-empty `~/.kiki/repos/<repo_id>/errors/<thread_id>.log` for a thread, it surfaces a single notification per thread summarizing the gap.
 
 ## Hook chaining
 
-`kk-hook` is installed at thread spawn into a per-thread Claude Code config (scoped to the thread's workspace dir, not polluting user-global). It always runs first. After running the acknowledgement step, if `pending_cascade_seq <= acknowledged_cascade_seq`, the hook returns "continue" and Claude Code's hook chain proceeds to user-defined hooks. Reverted on thread close.
+`kk-hook` is installed at thread spawn into a per-thread Claude Code config (scoped to the thread's workspace dir, not polluting user-global). It always runs first. After acknowledging `agent_sessions.delivered_intent_id`, if no unresolved intent remains, the hook returns "continue" and Claude Code's hook chain proceeds to user-defined hooks. Reverted on thread close.
 
 ## Per-thread harness selection
 
@@ -129,5 +132,5 @@ Cascade-injection row writes are NOT part of this trait — they are performed b
 4. Bookmark create.
 5. `jj new` on the bookmark.
 6. `tmux new-session -d` cd'd into the workspace path.
-7. Harness spawn through `Harness::spawn(SpawnOpts { thread_id, session_id, initial_prompt: Option<String>, harness_args })`. The harness adapter routes the optional initial prompt to the harness's first user-turn input; for Claude Code, this is the harness's startup-message contract.
+7. Harness spawn through `Harness::spawn(SpawnOpts { thread_id, resume_harness_session_id: Option<HarnessSessionId>, initial_prompt: Option<String>, harness_args })`. Every call creates a new kiki `agent_session_id`; the optional harness id is only the conversation to resume. The adapter routes the optional initial prompt to the harness's first user-turn input; for Claude Code, this is the harness's startup-message contract.
 8. `ThreadScoped<thread_id>` credential written to `~/.kiki/repos/<repo_id>/credentials/<thread_id>` (mode `0600`) and per-thread harness hook config installed inside the workspace at the path the harness expects (e.g., `<workspace>/.claude/settings.json` for Claude Code). The harness config references the credential and the per-thread error-log path by absolute path under `~/.kiki/`. The workspace tree itself receives only the harness config file; nothing kiki-internal goes inside the source repo's filesystem.

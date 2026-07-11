@@ -10,7 +10,7 @@ The protagonist is unnamed. The work is to port the iOS Kestrel app to Android, 
 
 The storyboard introduces no new commands, flags, glyphs, or screen elements. Every beat in it grounds out in the normative chapters. Where a beat is load-bearing, it cites the chapter that authorizes it. Where it would require behavior the rest of the book does not authorize, that gap is a finding, not a license to extend the surface here.
 
-Transcripts and wireframes in this chapter render the fields the spec commits to in a plausible terminal shape. Exact spacing, column ordering, and any output text the spec does not pin are illustrative — they show what kiki *might* look like in motion, not what an implementation must emit byte-for-byte. Glyphs and committed output strings (the `in sync` / `pending` / `conflicted` cascade-state words; the empty-state placeholder; the conflict-framing message) are reproduced verbatim from the spec.
+Transcripts and wireframes in this chapter render the fields the spec commits to in a plausible terminal shape. Exact spacing, column ordering, and any output text the spec does not pin are illustrative — they show what kiki _might_ look like in motion, not what an implementation must emit byte-for-byte. Glyphs and committed output strings (the `in sync` / `pending` / `conflicted` cascade-state words; the empty-state placeholder; the conflict-framing message) are reproduced verbatim from the spec.
 
 Acts are time-stamped (`Day · HH:MM — <repo>`) so the temporal arc is legible: product changes its mind twice, work stacks up, a thread is abandoned in flight, a cascade conflicts and recovers, and the week closes with a stack of merged PRs and a quiet TUI.
 
@@ -92,7 +92,7 @@ The sidebar pane is navigation-only: spawn, publish, close, destroy, and interru
 
 ### Mon 14:20 — kestrel-mobile
 
-The skeleton thread is partway through wiring the `NavHost` and theme; the auth flow needs a parallel thread to start on. Auth depends on the navigation skeleton — the `login` destination, the back-stack rules — but it doesn't need to wait for the skeleton to finish. The developer spawns a child thread that follows the skeleton, so any future change to the skeleton's revisions will rebase the auth thread at its next agent boundary (see [Cascade · trigger](../07-cascade.md#trigger)).
+The skeleton thread is partway through wiring the `NavHost` and theme; the auth flow needs a parallel thread to start on. Auth depends on the navigation skeleton — the `login` destination, the back-stack rules — but it doesn't need to wait for the skeleton to finish. The developer spawns a child thread that follows the skeleton, so future native rewrites will materialize in `auth` at its boundary and future parent tips will explicitly advance it there (see [Cascade · classification](../07-cascade.md#classification)).
 
 ```console
 $ kk new auth --follows android-skel -m "Implement password login against the
@@ -127,7 +127,7 @@ A bare `kk` in either thread now opens the overlay with both threads in the Stac
 
 Both threads are working concurrently. The Stack section orders them by `kk log` (parent above child); the Activity section orders the same threads flat by most-recent agent event. `tab` jumps the cursor between the two sections; `enter` switches the tmux client to whichever thread the cursor is on (see [Interface · keymap](spec.md#keymap)).
 
-The follows DAG is, for now, two hops deep: `main → android-skel → auth`. Cascades will travel one hop at a time when ancestors evolve — that is the next act.
+The follows DAG is, for now, two hops deep: `main → android-skel → auth`. jj may evolve several descendant commits in repository state in one operation; kiki will still materialize and explain each affected workspace independently at its own agent boundary. That distinction appears in the next act.
 
 ## Act 4 — Product changes their mind (small)
 
@@ -140,15 +140,15 @@ $ cd ~/code/kestrel-mobile-kiki-android-skel
 $ jj describe -r @- -m "Scaffold Android navigation: NavHost + Material 3 + bottom NavigationBar (Library, Discover, Profile)"
 ```
 
-They run `jj` directly. kiki does not refuse direct `jj`/`gh`/`tmux` operations; it watches the op log and reacts to whatever it sees (see [Invariants](../04-invariants.md)). What kkd sees is an external op — no `kk:` prefix, `op_id` not in `op_attribution` — and an ancestry change that affects the auth thread, which directly follows `android-skel`.
+They run `jj` directly. kiki does not refuse direct `jj`/`gh`/`tmux` operations; it watches the op log and reacts to whatever it sees (see [Invariants](../04-invariants.md)). jj evolves `auth`'s descendant commit in shared repository state as part of the ancestor rewrite, but `auth`'s on-disk files remain at their previously materialized state.
 
-> kkd: the op-log watcher dedupes against `op_attribution`, decides the op is external, walks the follows DAG to find direct descendants of the changed revision, and bumps `pending_cascade_seq` on `auth`. No rebase happens yet. The cascade waits for the auth agent's next PreToolUse boundary, so the agent never operates on stale disk state mid-edit (see [Cascade · invariant](../07-cascade.md#invariant)).
+> kkd: the op-log watcher compares the before/after operation views. Because `auth` already descends from the evolved `android-skel` base, it classifies `NativeRewrite` and stores that exact base transition in a `sync_intent`. It does not schedule another rebase for work jj already evolved (see [Cascade · classification](../07-cascade.md#classification)).
 
-A few seconds later, the auth agent finishes the function it was writing and prepares its next tool call. `kk-hook` intercepts the PreToolUse, calls `PreToolUseDecision`, and the cascade orchestrator applies the rebase, advances `applied_cascade_seq`, composes a synthetic `ContextMessage`, persists it to `cascade_outbox`, and emits it to the agent. The agent receives it as its next turn and acknowledges on its following tool call (see [Cascade · delivery protocol](../07-cascade.md#delivery-protocol)).
+A few seconds later, the auth agent finishes the function it was writing and prepares its next tool call. `kk-hook` intercepts the PreToolUse and the cascade orchestrator probes the workspace. Because it is provably stale and clean, the orchestrator materializes its current evolved state with `jj workspace update-stale`, then atomically stores the result, synthetic `ContextMessage`, anchor, and `Materialized` state on the intent. The agent receives the saved payload as its next turn and acknowledges that intent on its following tool call (see [Cascade · delivery protocol](../07-cascade.md#delivery-protocol)).
 
-In the auth thread's overlay, the Stack row's cascade glyph briefly flips through `●●○` (pending) and back to `──` (in sync) once the agent acknowledges. No toast fires for this cascade — the toast trigger for "cascade applied to a child thread" only fires when ≥ 2 children rebased in coalescence (see [Interface · toasts](spec.md#toasts)), and `auth` is the only descendant.
+In the auth thread's overlay, the Stack row's cascade glyph briefly flips through `●●○` (pending) and back to `──` (in sync) once the agent acknowledges. No toast fires for this cascade — the toast trigger for coalesced child materialization only fires when at least two child reconciliations coalesce (see [Interface · toasts](spec.md#toasts)), and `auth` is the only affected thread.
 
-The agent's view of the change is a single synthetic turn explaining what was rebased; the developer's view is a momentary glyph flip on the Stack row. Neither has to coordinate further. The act is intentionally undramatic — that is what an ambient coordinator looks like when it's working.
+The agent's view of the change is a single synthetic turn explaining what evolved and which files were materialized; the developer's view is a momentary glyph flip on the Stack row. Neither has to coordinate further. The act is intentionally undramatic — that is what an ambient coordinator looks like when it's working.
 
 ## Act 5 — Cross-repo interlude: the copyright bump
 
@@ -244,11 +244,11 @@ The Stack tree's shape is unchanged — there is still one thread following `and
 
 ### Thu 10:08 — kestrel-mobile
 
-Thursday morning, the `android-skel` thread's agent commits a navigation refactor: it moves the auth-related destinations out of the root `NavHost` into a nested `loginGraph`. This changes the same files the `auth-biometric` thread is mid-edit on. The cascade fires; the protected rebase on `auth-biometric` produces a textual conflict.
+Thursday morning, the `android-skel` thread's agent adds a new navigation-refactor revision: it moves the auth-related destinations out of the root `NavHost` into a nested `loginGraph`. The new parent tip is not yet in `auth-biometric`'s ancestry, so the watcher classifies `ParentAdvance`. At `auth-biometric`'s next safe boundary, the explicit advance onto that exact parent commit exposes textual conflicts in the same files the child changed.
 
-`auth-biometric` transitions to `Conflicted`. The cascade orchestrator interrupts the agent and resumes it with conflict framing (see [Cascade · scenario 3](../07-cascade.md#scenario-3-textual-conflict)):
+`auth-biometric` transitions to `Conflicted`. The cascade orchestrator interrupts the agent and resumes it with conflict framing (see [Cascade · scenario 3](../07-cascade.md#scenario-3-conflict)):
 
-> Cascade rebase produced a conflict on auth-biometric. Resolve before continuing.
+> Cascade reconciliation produced conflicts in auth-biometric. Resolve before continuing.
 
 A loud notification fires. The developer happens to have the overlay focused on `android-skel`; from that vantage, `auth-biometric` is a non-current thread, so the conflict surfaces as a toast — toasts for cascade conflicts only fire on non-current threads (see [Interface · toasts](spec.md#toasts)). The conflicted thread's row also turns red:
 
@@ -272,7 +272,7 @@ $ cd ~/code/kestrel-mobile-kiki-auth-biometric
 $ jj resolve
 ```
 
-> kkd: the op-log watcher sees the resolve op like any other external op. Once the rebase no longer conflicts, the thread leaves the `Conflicted` state and cascade work resumes (see [Cascade · conflicts and escalation](../07-cascade.md#conflicts-and-escalation)). The agent is resumed with a synthetic context message describing what was rebased and what the human resolved, and continues.
+> kkd: the op-log watcher sees the resolve op like any other external op. Once the working-copy commit is no longer conflicted, the thread leaves `Conflicted` and reconciliation resumes (see [Cascade · conflicts and escalation](../07-cascade.md#conflicts-and-escalation)). The agent is resumed with a synthetic context message describing the parent advance and what the human resolved, and continues.
 
 The cascade glyph on `auth-biometric` returns to `──`. The conflict cost the developer about eight minutes of focused attention and zero corrupted state.
 
@@ -297,7 +297,7 @@ $ kk log --wide
 ●─main
 ```
 
-Reviewers approve through the day; the skeleton PR merges first. kiki polls GitHub through `gh` and notices the merge. For `auth-biometric`, the parent-merged auto-cascade kicks in (see [Cascade · parent merged](../07-cascade.md#parent-merged)): kiki rebases the child onto the repo default branch, force-pushes with `--force-with-lease`, updates the child PR's base from `android-skel` to `main`, and only then drops the follows link. The link is dropped only after local and remote updates succeed.
+Reviewers approve through the day; the skeleton PR merges first. kiki polls GitHub through `gh` and notices the merge. For `auth-biometric`, kiki records a `ParentAdvance`-shaped transition to the exact merged default-branch commit (see [Cascade · parent merged](../07-cascade.md#parent-merged)). At the child's safe boundary it rebases and materializes the child, then force-pushes with `--force-with-lease`, updates the child PR's base from `android-skel` to `main`, and only then drops the follows link.
 
 > kkd: the parent-merge transition lives in 07-cascade.md's state machine as `FollowingParent → ParentMergePending → DetachedMovedToDefault`. The follows link is dropped only after local and remote updates succeed. The auth-biometric thread is now an independent thread targeting `main`, not a child of `android-skel`.
 
@@ -323,17 +323,17 @@ A final `kk ls --all-repos --all` (the `--all` flag includes closed threads, the
 - `kestrel-docs/android-docs` — closed
 - `kestrel-www/copyright-2026` — closed
 
-Bare `kk` from `kestrel-mobile` opens the overlay with no active work remaining; the closed threads are reachable through `kk ls --all` and `kk reopen <thread>` if anything from the week needs revisiting. Five threads were spawned, one was abandoned, four merged. The follows DAG is empty; the cascade outbox is empty; the daemon is idle.
+Bare `kk` from `kestrel-mobile` opens the overlay with no active work remaining; the closed threads are reachable through `kk ls --all` and `kk reopen <thread>` if anything from the week needs revisiting. Five threads were spawned, one was abandoned, four merged. The follows DAG is empty; no sync intents are unresolved; the daemon is idle.
 
 ## Epilogue
 
 The patterns this storyboard demonstrates and the chapters that authorize them:
 
-- **Branching** — acts 3 and 7. `kk new --follows <parent>` records a live cascade edge in the follows DAG (see [Threads · creation](../05-threads.md#creation), [Cascade · trigger](../07-cascade.md#trigger)).
-- **Merging back** — acts 5 (a single thread merging direct to `main`) and 9 (a stacked publish where the parent merge auto-rebases the child onto `main`) (see [Publishing](../09-publishing.md), [Cascade · parent merged](../07-cascade.md#parent-merged)).
+- **Branching** — acts 3 and 7. `kk new --follows <parent>` records a live cascade edge plus exact synchronization anchors (see [Threads · creation](../05-threads.md#creation), [Cascade · classification](../07-cascade.md#classification)).
+- **Merging back** — acts 5 (a single thread merging direct to `main`) and 9 (a stacked publish where the parent merge reconciles the child onto the exact merged `main` commit at its safe boundary) (see [Publishing](../09-publishing.md), [Cascade · parent merged](../07-cascade.md#parent-merged)).
 - **Abandoning** — act 7's `kk close` of the wrong-direction `auth` thread, retaining the transcript and revisions for possible reuse, in contrast to the irreversible `kk thread destroy` (see [Threads · close](../05-threads.md#close), [Threads · destroy](../05-threads.md#destroy)).
 - **Cross-repo** — acts 1 (registration), 5 (`kestrel-www` copyright bump), 6 (`kestrel-docs` parallel work). One daemon, per-repo registration, `kk ls --all-repos` for the global view (see [Commands · `kk ls`](../11-commands.md#kk-ls)).
-- **Cascade in motion** — act 4 (small ancestor change, hop-by-hop propagation), act 8 (textual conflict and human resolution). Both demonstrate that direct `jj` operations are first-class inputs to the coordinator, not gated by it (see [Cascade](../07-cascade.md), [Invariants](../04-invariants.md)).
+- **Cascade in motion** — act 4 (jj-native ancestor evolution followed by safe materialization), act 8 (explicit parent advance with conflict and human resolution). Both demonstrate that direct `jj` operations are first-class inputs to the coordinator, not gated by it (see [Cascade](../07-cascade.md), [Invariants](../04-invariants.md)).
 - **Stacked publish** — act 9. `kk publish --downstack` publishes ancestors first; the parent merge then auto-migrates descendants onto the repo default branch (see [Commands · `kk publish`](../11-commands.md#kk-publish), [Cascade · parent merged](../07-cascade.md#parent-merged)).
 
 If the storyboard appears to require any behavior the rest of the book does not authorize, that is a finding. The storyboard is illustrative; the specification is normative.

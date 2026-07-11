@@ -39,6 +39,8 @@ Creation must leave the system in one of two states: the thread exists with all 
 
 The follows graph is a DAG. kiki rejects a follows edge that would introduce a cycle.
 
+Creating a follows edge records both the exact parent commit used as the child's initial base and the root of the child's owned stack. Those anchors let later op-view classification distinguish jj-native successor evolution, a new parent tip requiring explicit advance, and out-of-band topology divergence. Bookmark names remain handles, not synchronization targets: every reconciliation pins exact commit and operation ids before it starts.
+
 Users may spawn any number of sibling threads. v1 does not rate-limit human-created threads.
 
 ## Workspace layout
@@ -55,6 +57,8 @@ The per-thread hook credential lives at `~/.kiki/repos/<repo_id>/credentials/<th
 
 Per-thread workspaces prevent accidental file interference during normal cooperative use. They do not prevent a same-UID process from reading or writing sibling workspaces, `~/.kiki`, or shared jj repository state.
 
+Because all workspaces share jj repository state, an ancestor rewrite in one workspace may evolve another thread's recorded working-copy commit immediately while leaving that other workspace's files stale. This is expected. Kiki surfaces the thread as cascade-pending and, after probing for unsnapshotted edits, materializes its current evolved jj state at the managed agent's next safe boundary; see [Cascade](07-cascade.md).
+
 ## Close
 
 `kk close` archives a thread without deleting tracked jj work.
@@ -68,7 +72,7 @@ Close must allowlist kiki-owned ephemeral workspace files — for v1 that means 
 
 Plain `kk close` leaves any open PR untouched. `kk close --discard-pr` is the explicit PR-closing path.
 
-Children of a closed thread auto-detach with notification.
+Children of a closed thread auto-detach with notification. If a child has pending reconciliation from that parent, close must first surface the exact pending base transition and require a choice to reconcile it or discard the follows intent; auto-detach must not silently erase a pending parent change.
 
 Close is intentionally boring. It should be possible to close a thread with confidence that tracked work survives and that local junk is not silently swept away.
 
@@ -133,7 +137,7 @@ Reopen reissues the thread-scoped credential and reinstalls per-thread hook conf
 
 ## Destroy
 
-`kk thread destroy <thread>` is irreversible except through jj operation recovery. It abandons the bookmark, revokes credentials, tombstones the thread row, and deletes transcript rows by default.
+`kk thread destroy <thread>` is irreversible except through jj operation recovery. It abandons the bookmark, revokes credentials, tombstones the thread row, and deletes transcript rows by default. Loss-safety bundles under the repo's centralized `recovery/` directory are not deleted automatically; destroy prints their paths for manual disposition.
 
 `--keep-log` retains transcript rows for explicit destroyed-thread views.
 

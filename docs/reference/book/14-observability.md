@@ -14,17 +14,17 @@ The default notification vocabulary is:
 
 Notification defaults:
 
-| Event                                        | Default                                                                                                |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Agent hit a permission prompt                | Loud notification; mark the thread blocked until acknowledged in the TUI                               |
-| Cascade rebase produced textual conflicts    | Loud notification; mark the thread `Conflicted`                                                        |
-| Follows parent merged                        | Notification on success; warning if detach, rebase, force-push, or PR-base update is pending or failed |
-| Follows parent abandoned                     | Notification and warning; human lifecycle decision required                                            |
-| PR check failed                              | Notification and warning                                                                               |
-| Agent reports goal complete                  | Status mark only                                                                                       |
-| Agent silent beyond configured threshold     | Dim status only                                                                                        |
-| Auto-rename or auto-describe write completed | No notification; visible in audit                                                                      |
-| External branch force-push detected          | Warning; explicit reconciliation required                                                              |
+| Event                                            | Default                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Agent hit a permission prompt                    | Loud notification; mark the thread blocked until acknowledged in the TUI                               |
+| Cascade reconciliation exposed textual conflicts | Loud notification; mark the thread `Conflicted`                                                        |
+| Follows parent merged                            | Notification on success; warning if detach, rebase, force-push, or PR-base update is pending or failed |
+| Follows parent abandoned                         | Notification and warning; human lifecycle decision required                                            |
+| PR check failed                                  | Notification and warning                                                                               |
+| Agent reports goal complete                      | Status mark only                                                                                       |
+| Agent silent beyond configured threshold         | Dim status only                                                                                        |
+| Auto-rename or auto-describe write completed     | No notification; visible in audit                                                                      |
+| External branch force-push detected              | Warning; explicit reconciliation required                                                              |
 
 These defaults are configurable under `[notifications]`.
 
@@ -49,7 +49,7 @@ PR review comments are visible through `kk thread comments` and the TUI PR-comme
 
 ## Parent lifecycle events
 
-When a parent thread merges, each following child is rebased onto the repo default branch, force-pushed with `--force-with-lease` if needed, and detached only after local and remote updates succeed.
+When a parent thread merges, each following child receives a `ParentAdvance`-shaped reconciliation to the exact merged default-branch commit. The rebase and workspace materialization occur at the child's safe boundary; force-push and PR-base update follow, and the child detaches only after local and remote updates succeed.
 
 When a parent bookmark is abandoned externally, kiki surfaces the condition and waits for a human decision. It does not guess a new topology.
 

@@ -80,14 +80,14 @@ The overlay is one screen, three regions stacked vertically:
  STACK                              │  transcript · pi-extensions/codex-conv-tui · tail
                                     │
  ● main             ──    in        │  human  2m 18s ago
- │                                  │   could you check whether the cascade outbox row
+ │                                  │   could you check whether a materialized intent
  ●─pi/refactor      ●●○   wrk       │   is dropped on a hook crash before MarkDelivered?
  │                                  │
  ●─pi/codex-conv ▸  ●●●   ←●        │  agent  2m 04s ago
- │                                  │   reading kiki-core/cascade/outbox.rs ... I see
- ●─pi/agent-tui     ○     idle      │   the row is keyed on applied_cascade_seq >
-                                    │   acknowledged_cascade_seq, so a crash before
- ACTIVITY                           │   MarkDelivered re-enters the same row. Want me
+ │                                  │   reading kiki-core/cascade/intent_store.rs ...
+ ●─pi/agent-tui     ○     idle      │   its saved payload stays deliverable until ack,
+                                    │   so a crash before MarkDelivered re-enters the
+ ACTIVITY                           │   same intent. Want me
                                     │   to add a regression test for that path?
  ● codex-conv     working   2m18s   │
  ● refactor       working    34s    │  human  18s ago
@@ -107,16 +107,15 @@ The overlay is one screen, three regions stacked vertically:
 
  STACK                              │  diff · pi-extensions/codex-conv-tui · jj st --diff
                                     │
- ● main             ──    in        │  M  kiki-core/src/cascade/outbox.rs   +14 -2
+ ● main             ──    in        │  M  kiki-core/src/cascade/intent_store.rs +14 -2
  │                                  │  M  kkd/src/services/cascade.rs       +6  -0
  ●─pi/refactor      ●●○   wrk       │  ?  tests/cascade/crash_before_md.rs  +88
  │                                  │  ─────────────────────────────────────────────
- ●─pi/codex-conv ▸  ●●●   ←●        │  diff --git a/kiki-core/src/cascade/outbox.rs
+ ●─pi/codex-conv ▸  ●●●   ←●        │  diff --git a/kiki-core/src/cascade/intent_store.rs
  │                                  │  +pub fn lookup_pending(&self) -> Option<Row> {
  ●─pi/agent-tui     ○     idle      │  +    self.rows
                                     │  +        .iter()
- ACTIVITY                           │  +        .find(|r| r.applied_cascade_seq
-                                    │  +              > r.acknowledged_cascade_seq)
+ ACTIVITY                           │  +        .find(|i| i.is_deliverable())
  ● codex-conv     working   2m18s   │  +}
  ● refactor       working    34s    │  …
  ◐ session-recall conflicted        │
@@ -138,7 +137,7 @@ The overlay is one screen, three regions stacked vertically:
  ●─pi/refactor      ●●○   wrk       │
  │                                  │  ─ comments ─────────────────────────────────
  ●─pi/codex-conv ▸  ●●●   ←●        │
- │                                  │  @ogul  18m ago  on cascade/outbox.rs:42
+ │                                  │  @ogul  18m ago  on cascade/intent_store.rs:42
  ●─pi/agent-tui     ○     idle      │   nit: drop the lookup_pending wrapper, use
                                     │   the closure inline?
  ACTIVITY                           │
@@ -241,13 +240,13 @@ If the terminal is narrower than `[ui] sidebar_min_terminal_cols` (default 100),
  ╭─ kiki ──────────────────────╮ ╭─ codex-conv-tui ─────────────────────────────────╮
  │                             │ │                                                  │
  │ STACK                       │ │ > human                                          │
- │                             │ │   could you check whether the cascade outbox    │
- │ ● main          ──    in    │ │   row is dropped on a hook crash before          │
+ │                             │ │   could you check whether a materialized intent │
+ │ ● main          ──    in    │ │   is dropped on a hook crash before              │
  │ │                           │ │   MarkDelivered?                                 │
  │ ●─pi/refactor   ●●○  wrk    │ │                                                  │
  │ │                           │ │ ● working   2m 18s   esc to interrupt            │
  │ ●─pi/codex ▸    ●●●  ←●     │ │                                                  │
- │ │                           │ │   reading kiki-core/cascade/outbox.rs ...        │
+ │ │                           │ │   reading kiki-core/cascade/intent_store.rs ...  │
  │ ●─pi/agent     ○     idle   │ │                                                  │
  │                             │ │                                                  │
  │ ACTIVITY                    │ │                                                  │
@@ -298,17 +297,17 @@ Initial focus at thread birth lands on the agent pane so the developer can inter
  ╭─ kiki ──────────────────────╮ ╭─ codex-conv-tui ─────────────────────────────────╮
  │                             │ │                                                  │
  │ STACK                       │ │ > human                                          │
- │                             │ │   could you check whether the cascade outbox    │
- │ ● main          ──    in    │ │   row is dropped on a hook crash before          │
+ │                             │ │   could you check whether a materialized intent │
+ │ ● main          ──    in    │ │   is dropped on a hook crash before              │
  │ │                           │ │   MarkDelivered?                                 │
  │ ●─pi/refactor   ●●○  wrk    │ │                                                  │
  │ │                           │ │ ● working   2m 18s   esc to interrupt            │
  │ ●─pi/codex ▸    ●●●  ←●     │ │                                                  │
- │ │                           │ │   reading kiki-core/cascade/outbox.rs ...        │
+ │ │                           │ │   reading kiki-core/cascade/intent_store.rs ...  │
  │ ●─pi/agent     ○     idle   │ ╰──────────────────────────────────────────────────╯
  │                             │ ╭─ shell ──────────────────────────────────────────╮
  │ ACTIVITY                    │ │ ~/code/pi-extensions-kiki-codex-conv $ jj st     │
- │                             │ │ M  kiki-core/src/cascade/outbox.rs               │
+ │                             │ │ M  kiki-core/src/cascade/intent_store.rs         │
  │ ● codex     wrk    2m18s    │ │ Working copy : qxnopkyl 8a3c2d1e                 │
  │ ● refactor  wrk     34s     │ │ ~/code/pi-extensions-kiki-codex-conv $ _         │
  │ ◐ session   conflict        │ │                                                  │
@@ -361,7 +360,7 @@ Toast triggers (v1):
 - agent finish (`✓`) — notification
 - agent error / blocked (`◐`) — notification
 - cascade conflict on a non-current thread (`◐`) — notification
-- cascade applied to a child thread (`──`, only when ≥ 2 children rebased to coalesce noise) — notification
+- cascade materialized for a child thread (`──`, only when ≥ 2 child reconciliations coalesce) — notification
 - config-set warning that won't take effect until next `kk new` / `kk reopen` — notification
 - auto-archive on PR-merge (`✓`) with `undo` action (v1.x polish; 5s grace — see [Publishing](../09-publishing.md)) — actionable
 

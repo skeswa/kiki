@@ -153,7 +153,7 @@ The v1 surface is read-only. Feeding review comments into agent context is futur
 
 ## `kk thread detach`
 
-`kk thread detach <thread>` removes the thread's live follows edge; see [Cascade](07-cascade.md#detach-and-graph-surgery) for what detach does and does not touch. `attach` and `reparent` are deferred beyond v1.
+`kk thread detach <thread>` removes the thread's live follows edge; see [Cascade](07-cascade.md#detach-and-graph-surgery) for what detach does and does not touch. If reconciliation is pending, detach must present the exact pending base transition and ask whether to reconcile it or discard the follows intent. `attach` and `reparent` are deferred beyond v1.
 
 ## `kk thread destroy`
 
@@ -179,7 +179,7 @@ Destroy requires explicit confirmation.
 
 `kk repo unregister <path>` removes a repo from the per-user registry. It is the explicit counterpart to `kk init`.
 
-By default, `kk repo unregister` removes both the row from `~/.kiki/state.db`'s `repos` table and the centralized state directory at `~/.kiki/repos/<repo_id>/` (threads, transcript, audit log, credentials, and per-thread error logs). The action is irreversible — there is no kiki-managed undo, mirroring `kk thread destroy`'s shape (see [Threads · destroy](05-threads.md#destroy)). The `Admin` authority requirement is the safeguard; v1 does not add a confirmation prompt on top.
+By default, `kk repo unregister` removes both the row from `~/.kiki/state.db`'s `repos` table and the centralized state directory at `~/.kiki/repos/<repo_id>/` (threads, transcript, audit log, credentials, per-thread error logs, and any workspace-recovery bundles). The action is irreversible — there is no kiki-managed undo, mirroring `kk thread destroy`'s shape (see [Threads · destroy](05-threads.md#destroy)). The `Admin` authority requirement is the safeguard; v1 does not add a confirmation prompt on top. If recovery bundles exist, the command prints their paths in its preflight; `--keep-state` is required to retain them.
 
 `--keep-state` preserves the centralized state directory on disk while still removing the registry row. The preserved directory becomes orphaned bytes, useful only for an operator who wants to inspect or copy the contents before deleting them by hand. It does **not** enable any kiki-managed recovery: a future `kk init` at the same canonical path mints a fresh `repo_id` and a fresh state directory; the preserved directory has no link to the new registration. The flag exists because losing transcripts and audit logs by mistyping a path is a high cost, and `--keep-state` is the careful-operator escape hatch — not a recovery contract.
 

@@ -37,11 +37,11 @@ Read these before the invariants. If a story and a normative chapter appear to p
 
 ## Cascade coordination
 
-23. As a developer working in thread A, I want my edits to ancestor revisions to automatically rebase descendant thread B without breaking B's agent, so that refactoring naturally flows downstream.
-24. As a developer in thread B (a child of A), I want my agent to receive a clear "your base changed, here is the diff" signal at the next tool boundary when A's revisions are amended, so that I never act on stale context.
-25. As a developer, I want my thread's working copy to be rebased ONLY at agent tool boundaries or quiescence, never with the agent mid-edit, so that the agent's mental model never diverges from what is on disk.
+23. As a developer working in thread A, I want jj's native evolution of descendant thread B to be materialized safely for B's agent, without redundantly rebasing work jj already evolved, so that refactoring naturally flows downstream.
+24. As a developer in thread B (a child of A), I want my agent to receive a clear "your base changed, here is the diff" signal at the next tool boundary when A's revisions are amended, so that the repository may evolve immediately while B's files and agent context move together.
+25. As a developer, I want kiki to materialize evolved state or perform an explicit follows rebase ONLY at agent tool boundaries or quiescence, never with the managed agent mid-edit, so that the agent's mental model never diverges from what is on disk. I understand that a direct human `jj` command in a stale child workspace is an explicit escape hatch that may materialize it earlier; at the next boundary kiki must probe actual files and recover unsnapshotted edits rather than assume the op log tells the whole story.
 26. As a developer, I want the cascade to handle textual conflicts by marking the thread "conflicted" and surfacing a notification, so that I resolve them deliberately instead of corrupting agent state.
-27. As a developer in a child thread B that follows parent A, I want B to pick up A's new commits automatically (auto-rebased onto A's new tip), so that stacked work stays coordinated without manual rebasing.
+27. As a developer in a child thread B that follows parent A, I want B to pick up A's newly added commits automatically through an explicit boundary-safe `ParentAdvance` reconciliation, so that stacked work stays coordinated without manual rebasing.
 28. As a developer, I want `kk thread detach` to break the live-follow link, so that I can pin a child thread at its current base while the parent advances independently. This is the v1 graph-surgery escape hatch; attach and reparent remain deferred.
 29. As a developer, I want `kk thread attach <child> --to <parent>` to re-establish a follows link, so that I can resume live coupling after a turbulent moment. (Deferred beyond v1.)
 30. As a developer, I want `kk thread reparent <child> --onto <new-parent>` to move a thread under a different parent, so that I can correct stack relationships when I realize the topology was wrong. (Deferred beyond v1.)

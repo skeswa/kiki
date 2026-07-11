@@ -17,16 +17,17 @@ Definitions of the load-bearing terms in kiki's reference. When a term is used i
 
 ## Cascade
 
-- **Cascade rebase** — automatic rebase of descendants when an ancestor changes, with pause-propagate-resume across agents.
-- **Pause-propagate-resume** — the protocol that interrupts a child agent at the next safe boundary, performs the rebase, injects a context message, and resumes the agent.
-- **Core invariant** — a thread's working copy is rebased only at agent tool boundaries or quiescence — never with the agent mid-edit.
+- **Cascade reconciliation** — the follows-aware process that classifies a parent change, waits for the affected managed agent's safe boundary, makes the workspace reflect the desired jj state, injects context, and acknowledges delivery. The reconciliation is either `NativeRewrite` or `ParentAdvance`.
+- **`NativeRewrite`** — jj has already evolved a descendant's commits in repository state because an ancestor was rewritten. The intent pins the exact old-base → evolved-base transition, not the descendant's volatile working-copy commit. Kiki does not rebase the descendant again; at a safe boundary it verifies the current descendant still contains the evolved base and normally materializes it with `jj workspace update-stale`.
+- **`ParentAdvance`** — a parent bookmark gained a new tip that is not already an ancestor of the following child. Kiki explicitly rebases the child's owned stack onto the exact new parent commit at a safe boundary, then materializes the result.
+- **Materialization** — updating a workspace's on-disk files to the working-copy commit already recorded for that workspace in jj repository state. Repository evolution and workspace materialization are separate events.
+- **Pause-propagate-resume** — the protocol that interrupts a child agent at the next safe boundary, reconciles and materializes the desired state, injects a context message, and resumes the agent.
+- **Core invariant** — kiki does not materialize evolved state or perform an explicit follows rebase in a managed workspace while that workspace's managed agent is mid-edit, and it does not resume from a working tree that may hide unsnapshotted edits. Direct human `jj` operations are an explicit escape hatch and may materialize a stale workspace earlier.
 - **Soft pause / Hard escalation** — soft = inject context via PreToolUse hook synthetic tool result. Hard = SIGINT + `--resume` with prepended user message.
-- **`pending_cascade_seq` / `applied_cascade_seq` / `acknowledged_cascade_seq` / `delivered_in_flight_seq`** — three per-thread counters plus one per-agent-session counter that close both the soft-pause-detection race and the delivery-acknowledgement race without depending on PostToolUse (which Claude Code does not fire for tools blocked by PreToolUse).
-  - `pending_cascade_seq` (per thread): bumped when cascade work is enqueued.
-  - `applied_cascade_seq` (per thread): bumped at PreToolUse's decision step after the rebase is applied; captures "working copy moved."
-  - `delivered_in_flight_seq` (per agent session): records what `applied_cascade_seq` was when a synthetic result was returned to that session.
-  - `acknowledged_cascade_seq` (per thread): advanced at the _next_ PreToolUse on that session — the agent's follow-up tool call is the signal that the previous synthetic result was integrated.
-- **`cascade_outbox`** — per-(thread, applied_cascade_seq) row carrying the synthetic payload composed at the decision step. Pins the payload across crash + retry boundaries so the visible `thread_messages` row (written inside the `MarkDelivered` handler, conditional on actual delivery) cannot be a phantom for content the agent never saw. See [cascade outbox](20-decisions/cascade-outbox.md).
+- **`WorkspaceProbe`** — a non-materializing check run immediately before reconciliation. It returns a filesystem fingerprint and classifies the workspace as `FreshClean`, `FreshDirty`, `StaleClean`, `StaleDirty`, or `Unknown`; a backend that cannot prove cleanliness returns `Unknown`, which is handled like dirty state before any mutation.
+- **`WorkspaceRecovery`** — the hard-paused recovery path for a stale workspace with unsnapshotted or indeterminate edits. It runs outside the source workspace, invokes jj's stale-workspace recovery, enumerates divergent successors, and verifies which result retains the edits before anything resumes.
+- **`sync_intent`** — the sole durable record of one ordered cascade reconciliation. It owns kind, base transition, normalized trigger operations, result ids, state (`Detected | Reconciling | Materialized | Delivered | Acknowledged | RecoveryRequired | TopologyDiverged | Superseded`), recovery details, and the byte-stable delivery payload and anchor. UI and delivery queries derive progress from these rows rather than shadow counters.
+- **Embedded cascade outbox** — the payload, anchor, transcript id, and delivery timestamps stored on a materialized `sync_intent`. It pins what the agent sees across crash and retry boundaries without creating a second protocol authority. See the [embedded-outbox design note](20-decisions/cascade-outbox.md).
 
 ## Transcript
 
@@ -39,10 +40,11 @@ Definitions of the load-bearing terms in kiki's reference. When a term is used i
 ## Agent and harness
 
 - **Harness** — an agent runtime kiki spawns and coordinates with (Claude Code in v1; Codex and others deferred). Exposes a `Harness` factory trait + `RunningAgent` instance trait.
+- **Runtime agent incarnation** — one kiki-managed harness process, identified by a kiki UUID separately from the harness's resumable conversation/session id. Delivery acknowledgement belongs to the incarnation, so restarting with the same harness session cannot falsely acknowledge output seen only by the prior process.
 - **Capabilities** — typed struct returned by a `Harness` describing what it supports (`soft_pause`, `session_resume`, `structured_tool_hooks`, `mcp_client`, `quiescence_detection`). The cascade orchestrator branches on this struct to degrade gracefully.
 - **Agent display states** — the four-value human-facing projection (`idle`, `working`, `finished`, `blocked`) of `AgentStatus` plus turn-completion and attention signals, defined in [Harness adapter](15-architecture/harness-adapter.md#agent-display-states). Display-only; the orchestrator branches on `AgentStatus`, never on these.
 - **PreToolUse hook** — the Claude Code hook point kiki uses to intercept tool calls for cascade delivery. Implemented by `kk-hook`. Cascade does not use PostToolUse because Claude Code does not fire it for tools blocked by PreToolUse.
-- **`ContextMessage`** — `{ kind: MessageKind, text: String, structured: Option<JSON> }` — the unit of cascade communication queued for a thread's agent.
+- **`ContextMessage`** — `{ kind: MessageKind, text: String, structured: Option<JSON> }` — the byte-stable cascade communication embedded in a materialized intent for delivery to the thread's agent.
 
 ## Auth
 

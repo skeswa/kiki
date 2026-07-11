@@ -39,7 +39,7 @@ Kiki-authored cascade, reopen catch-up, and hard-escalation messages are `author
 
 `thread_messages` has an FTS5 virtual table over `text`; `kk thread transcript --search <query>` uses that index.
 
-`dedup_key` is the idempotency key. Harness-projected rows use a harness-derived row id, such as Claude Code's JSONL `uuid`. Cascade-injection rows use `cascade:<applied_cascade_seq>` with no session component, because the same cascade payload may be re-delivered across sessions.
+`dedup_key` is the idempotency key. Harness-projected rows use a harness-derived row id, such as Claude Code's JSONL `uuid`. Cascade-injection rows use `cascade:<intent_id>` with no session component, because the same intent payload may be re-delivered across sessions.
 
 ## Capture
 
@@ -69,7 +69,7 @@ For each `(thread_id, session_id)`, kiki stores a `transcript_offsets` row conta
 
 `kk reopen` may reuse a harness session id or create a new one, depending on harness behavior. A reused session resumes from its stored offset. A fresh session starts with a new offset row; the thread transcript is the union of all session ids ordered by thread-local `seq`.
 
-Cascade-injection rows are not projected from harness JSONL. They are written by the `MarkDelivered` handler after stdout delivery, using `dedup_key=cascade:<applied_cascade_seq>` and the anchor pinned in `cascade_outbox`. A retry must re-emit the outbox payload byte-identically. If `@` advances between outbox write and `MarkDelivered`, the transcript row still binds to the outbox anchor.
+Cascade-injection rows are not projected from harness JSONL. They are written by the `MarkDelivered(intent_id)` handler after stdout delivery, using `dedup_key=cascade:<intent_id>` and the payload and anchor embedded in that `sync_intent`. A retry must re-emit the saved payload byte-identically. If `@` advances between intent materialization and `MarkDelivered`, the transcript row still binds to the saved anchor.
 
 ## Reopen catch-up
 

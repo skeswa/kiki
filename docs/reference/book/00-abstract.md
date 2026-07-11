@@ -6,7 +6,7 @@ A dull knife makes for rougher chops, and might ultimately change what you cook.
 
 kiki is designed to help an engineer do their best work and pursue their loftiest ideas by removing the obstructive friction that makes ambitious work feel impractical. That friction encourages a quaint fiction: that engineering should proceed as one tidy line of work, one terminal, one agent, one branch of thought at a time. kiki gives the real tree of work a shape the tools can understand.
 
-Its unit is a **thread**: a line of work with its own jj workspace, tmux session, agent session, bookmark, transcript, and place in the revision graph. A thread can follow another thread. When the parent changes, kiki rebases the child at a safe boundary and tells the agent what changed before it continues.
+Its unit is a **thread**: a line of work with its own jj workspace, tmux session, agent session, bookmark, transcript, and place in the revision graph. A thread can follow another thread. When the parent changes, jj may evolve descendant commits immediately in repository state; kiki waits for a safe boundary before materializing that evolved state in the child's files and telling the agent what changed. When a parent merely gains a new tip that jj cannot infer the child should follow, kiki performs the explicit rebase at that same boundary.
 
 The goal is not to hide `jj`, `tmux`, `gh`, or the agent harness. They remain the tools underneath. kiki is the layer that lets several lines of work stay alive at once without asking the human to keep the whole state of the tree in their head.
 

@@ -4,10 +4,10 @@ kiki state lives in two SQLite databases. All tables are versioned via migration
 
 ## Database split
 
-| Path                                | Scope         | Contents                                              |
-| ----------------------------------- | ------------- | ----------------------------------------------------- |
-| `~/.kiki/state.db`                  | per-user      | repo registry, daemon meta                            |
-| `~/.kiki/repos/<repo_id>/state.db`  | per-repo      | threads, agent sessions, transcripts, cascades, audit |
+| Path                               | Scope    | Contents                                              |
+| ---------------------------------- | -------- | ----------------------------------------------------- |
+| `~/.kiki/state.db`                 | per-user | repo registry, daemon meta                            |
+| `~/.kiki/repos/<repo_id>/state.db` | per-repo | threads, agent sessions, transcripts, cascades, audit |
 
 Both databases live under `~/.kiki/` — kiki's centralized state directory. The source repo's own filesystem holds no kiki state; the per-repo `state.db` lives at `~/.kiki/repos/<repo_id>/state.db`, where `<repo_id>` is a UUID assigned at `kk init` and recorded in the per-user `repos` table. The user-level database knows which repos kkd watches; the per-repo database holds everything that lives or dies with the repo.
 
@@ -24,13 +24,12 @@ The list below is table-level. Column-level definitions are derived from the beh
 
 ### Per-repo (`~/.kiki/repos/<repo_id>/state.db`)
 
-- `threads` — per-thread row carrying `pending_cascade_seq`, `applied_cascade_seq`, `acknowledged_cascade_seq`, and a `lifecycle` column with values `Active | ClosePreflight | CloseCommit | Closed | Orphaned | Destroyed` (see [Threads](../05-threads.md)).
-- `thread_links` — directed follows edges. DAG-validated at insert time.
-- `agent_sessions` — per-session row carrying `delivered_in_flight_seq` and harness `session_id`.
-- `context_queue` — cascade messages with monotonic seq numbers per thread; drained at the next PreToolUse after delivery.
-- `cascade_outbox` — per-(thread, applied_cascade_seq) row carrying `(payload, anchor_change_id, anchor_commit_id, anchor_op_id, prepared_at, delivered_at NULL, transcript_row_id NULL)` with `UNIQUE (thread_id, applied_cascade_seq)`. Pins synthetic payload + anchor at compose time. See [cascade outbox](../20-decisions/cascade-outbox.md).
+- `threads` — per-thread row carrying identity, bookmark/workspace references, and a `lifecycle` column with values `Active | ClosePreflight | CloseCommit | Closed | Orphaned | Destroyed` (see [Threads](../05-threads.md)). Cascade progress is not projected onto this row; it is derived from `sync_intents`.
+- `thread_links` — directed follows edges, DAG-validated at insert time, including the exact last-synchronized parent commit and the child's owned-stack base needed to distinguish alignment from out-of-band topology divergence.
+- `agent_sessions` — one row per runtime process incarnation carrying `(agent_session_id, harness_session_id, started_at, retired_at?, delivered_intent_id?)`. `agent_session_id` is a kiki UUID and changes on every process start even when `--resume` reuses `harness_session_id`. The nullable delivery pointer names the synthetic result emitted by this incarnation but not yet acknowledged by its subsequent boundary.
 - `metadata_writes` — kk-ownership content-hash ledger for descriptions and bookmark names.
-- `cascades` — crash-recovery breadcrumbs for in-flight rebases. The runtime cascade lock is an in-memory `tokio::sync::Mutex` keyed by `thread_id` and is rebuilt on daemon restart from `cascade_outbox` rows where `applied_cascade_seq > acknowledged_cascade_seq`. See [Cascade](../07-cascade.md).
+- `sync_intents` — the sole durable reconciliation and delivery authority. Each row carries `(intent_id, thread_id, seq, kind, from_base_commit_id, to_base_commit_id, classification_op_id, state, planned_op_id?, result_op_id?, result_workspace_commit_id?, payload?, anchor_change_id?, anchor_commit_id?, anchor_op_id?, prepared_at?, delivered_at?, acknowledged_at?, transcript_row_id?, recovery_reason?, recovery_bundle_path?, recovery_fingerprint?, recovery_details?)`, where kind is `NativeRewrite | ParentAdvance` and state is `Detected | Reconciling | Materialized | Delivered | Acknowledged | RecoveryRequired | TopologyDiverged | Superseded`. `UNIQUE (thread_id, seq)` orders intents; sequence allocation and insertion occur in one transaction. Recovery bundles live under `~/.kiki/repos/<repo_id>/recovery/<intent_id>/`, outside the source workspace. The saved payload and anchor are the embedded outbox. The runtime lock remains an in-memory `tokio::sync::Mutex` keyed by `thread_id`; restart recovery resumes from intent state and exact operation ids. See [Cascade](../07-cascade.md) and the [embedded-outbox design note](../20-decisions/cascade-outbox.md).
+- `sync_intent_triggers` — normalized `(intent_id, op_id)` rows with `UNIQUE (intent_id, op_id)`. Coalescing adds observed operation ids here and updates `classification_op_id` to the exact view used for reclassification only while the intent remains pre-materialization; it does not impose a false linear “through” order on jj's operation DAG.
 - `op_attribution` — kk-initiated op-id dedupe so the watcher does not react to its own ops.
 - `op_history` — per-(repo, op_id, workspace_id) cache of `(committed_at, change_id, commit_id, parent_op_id)` with `UNIQUE (repo_id, op_id, workspace_id)`. Per-workspace key is load-bearing because `@` is workspace-local.
 - `pr_links` — thread → PR.
@@ -49,7 +48,8 @@ The list below is table-level. Column-level definitions are derived from the beh
 ## CHECK constraints worth calling out
 
 - `thread_messages`: `(anchor_unknown=FALSE AND change_id IS NOT NULL AND commit_id IS NOT NULL AND op_id IS NOT NULL) OR (anchor_unknown=TRUE AND change_id IS NULL AND commit_id IS NULL AND op_id IS NULL)`. The two states cannot drift apart.
-- `cascade_outbox`: `delivered_at IS NULL` distinguishes outstanding deliveries from completed ones; lookup uses `applied_cascade_seq > acknowledged_cascade_seq` and ignores `delivered_at`.
+- `sync_intents`: both exact base commits are required. `Materialized`, `Delivered`, and `Acknowledged` require a result workspace commit, byte-stable payload, complete anchor triple, and `prepared_at`. `Delivered` additionally requires `delivered_at`; `Acknowledged` requires both delivery and acknowledgement timestamps. `RecoveryRequired` requires `recovery_reason`, `recovery_bundle_path`, and `recovery_fingerprint`. Normal transitions move forward through `Detected → Reconciling → Materialized → Delivered → Acknowledged`. `RecoveryRequired` may return to `Reconciling` only with recorded recovery details or a human choice; `TopologyDiverged` may return only after a recorded human resolution. Only a pre-materialization intent may become `Superseded`.
+- `agent_sessions`: `delivered_intent_id`, when non-null, must reference a `Delivered` intent for the same thread. A partial unique index allows at most one non-retired incarnation to claim an intent. Starting a replacement process retires the old incarnation and clears its pointer without acknowledgement; the new incarnation must receive the saved payload before it can claim or acknowledge the intent. The acknowledgement transaction advances the intent and clears the current pointer together.
 
 ## Migrations
 

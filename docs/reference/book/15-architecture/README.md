@@ -49,7 +49,7 @@ flowchart LR
         McpApi["MCP server\nthread-scoped transcript reads\n(v1.x polish)"]
         Events["server-streaming events"]
         ThreadCtl["ThreadController per thread\nworkspace + tmux + harness lifecycle"]
-        Cascade["CascadeOrchestrator\npause / rebase / inject / acknowledge"]
+        Cascade["CascadeOrchestrator\nclassify / reconcile / materialize / acknowledge"]
         Watcher["jj op-log watcher\nexternal op detection"]
         Transcript["ThreadTranscriptStore\nJSONL tail + local recall"]
         Metadata["MetadataLedger + AICompose\nauto-describe / auto-rename"]

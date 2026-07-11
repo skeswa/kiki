@@ -16,7 +16,7 @@ The proto is partitioned by capability class. Every method declares the minimum 
 | ------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Repo registry      | `RegisterRepo`, `UnregisterRepo`, `ListRepos`              | `Admin`                                                                                               |
 | Thread lifecycle   | `NewThread`, `Close`, `Reopen`, `Destroy`                  | `Admin`                                                                                               |
-| Thread reads (own) | `GetThreadState`, `StreamThreadEvents`, `ReadContextQueue` | `ThreadScoped<T>`                                                                                     |
+| Thread reads (own) | `GetThreadState`, `StreamThreadEvents`, `GetCascadeStatus` | `ThreadScoped<T>`                                                                                     |
 | Repo summaries     | `RepoThreadSummaries` (server-streaming)                   | `ThreadScoped<T>` (read-only sibling summaries, same-repo only — see [Authority](../06-authority.md)) |
 | Cascade hook       | `PreToolUseDecision`, `MarkDelivered`                      | `ThreadScoped<T>`                                                                                     |
 | Transcript         | `ReadTranscript`, `SearchTranscript`                       | `Admin` (human CLI / TUI)                                                                             |

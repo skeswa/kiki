@@ -37,8 +37,13 @@ Required alongside the v1.x polish surface that ships them:
 - `kk init` is idempotent in an already-registered repo (status print + exit 0, no mutation).
 - `kk init` does not pre-validate harness binaries; missing-harness errors surface at `kk new` time only.
 - A thread whose workspace directory has been deleted out-of-band transitions to `Orphaned` at next daemon boot or `kk ls`, fires exactly one notification, and is not auto-recreated or auto-Closed.
-- `kk-hook` returns `continue` and writes to `~/.kiki/repos/<repo_id>/errors/<thread_id>.log` when it cannot reach `kkd` within its connect/overall budget; it does not block the agent's tool call. A cascade that was pending during the outage must still be delivered on the next successful PreToolUse round-trip after `kkd` returns — pass-through defers delivery, never drops it. The deferred state lives in `pending_cascade_seq` and `context_queue` when the watcher saw the trigger before the outage; otherwise the trigger is reconstructed from jj's op log by the daemon-restart op-log catch-up. `cascade_outbox` is asserted to remain empty for unapplied cascades — it only holds applied-but-not-yet-acknowledged rows.
-- Multi-hop cascade in A→B→C: amending A enqueues cascade only on B (via the watcher's external-op route). C's cascade is enqueued only after B's `PreToolUseDecision` applies the rebase, and the enqueue happens via the orchestrator's internal-propagation route — not by the watcher reacting to B's kkd-initiated rebase op (which must remain `op_attribution`-skipped). The internal-propagation enqueue must be in the same transaction as the `cascade_outbox` persist for B.
+- `kk-hook` returns `continue` and writes to `~/.kiki/repos/<repo_id>/errors/<thread_id>.log` when it cannot reach `kkd` within its connect/overall budget; it does not block the agent's tool call. A reconciliation pending during the outage must still be delivered on the next successful PreToolUse round-trip. If the watcher saw the trigger, durable state lives in `sync_intents`; otherwise restart catch-up reconstructs it from jj's op log. If the agent edited the stale tree during the outage, the next probe enters `RecoveryRequired` rather than treating it as clean.
+- Native ancestor evolution: amending A causes jj to evolve B's repository working-copy commit. The classifier records `NativeRewrite` with the exact old-base → evolved-base ids, performs no redundant rebase, and at B's safe boundary verifies that B's current commit still contains that base before materializing it.
+- Parent-tip advance: adding A2 without rewriting A1 leaves B on A1. The classifier records `ParentAdvance` with exact destination A2; B's boundary performs the explicit owned-stack rebase and materializes its result.
+- Multi-workspace cascade in A→B→C: one jj operation may logically evolve both B and C. Both receive independent `NativeRewrite` intents immediately from before/result operation comparison; B and C materialize at their respective boundaries. If an explicit advance of B evolves C, the initiating reconciliation handler records C's intent even though the watcher skips the attributed op.
+- Direct human materialization: running `jj workspace update-stale` directly in stale B may change B's files without creating a new op-log head. The boundary probe detects `FreshClean` or `FreshDirty`, performs no duplicate update, and still delivers context for the unresolved intent.
+- Coalescing updates one pre-materialization intent's base transition and normalized trigger rows. Once payload preparation begins, later work receives a new ordered intent and cannot mutate the saved delivery.
+- A stale workspace with unsnapshotted edits or an `Unknown` probe result enters `RecoveryRequired`, hard-pauses the agent, enumerates divergent successors outside the workspace, and never resumes on a clean successor that hides those edits.
 - `LogRenderer` and `StatusRenderer` produce monochrome-distinguishable output when `NO_COLOR=1` is set; every state in the cascade, agent, and lifecycle vocabularies has a distinct glyph or label without color.
 
 ## Cascade crash tests
@@ -50,11 +55,17 @@ The cascade tests must cover:
 - crash between stdout and `MarkDelivered`
 - crash after `MarkDelivered`
 - agent crash after delivery but before acknowledgement
-- resume with delivered-but-unacknowledged outbox row
+- resume with a delivered-but-unacknowledged intent
 - multiple cascades before first hook coalescing into one delivery
-- `cascade_outbox` lookup ignores `delivered_at` and keys on `applied_cascade_seq > acknowledged_cascade_seq`
+- deliverable-intent lookup and byte-identical retry for both `Materialized` and `Delivered`
+- daemon crash and recovery at every `sync_intent` state, including `RecoveryRequired`
+- `WorkspaceProbe` returning `FreshClean`, `FreshDirty`, `StaleClean`, `StaleDirty`, and `Unknown`, plus fingerprint drift immediately before mutation
+- `jj workspace update-stale` with clean files, unsnapshotted edits, conflicts, direct materialization that creates no new operation, and a concurrently advanced base transition
+- recovery verifies edit-bearing divergent successors before choosing the visible result; ambiguous recovery requires human selection
+- process restart with a reused harness session id retires the old runtime incarnation without acknowledgement and redelivers the saved payload
+- `--no-integrate-operation` plus `jj op integrate` feasibility for planned `ParentAdvance`, including concurrent external operations
 
-They must also cover the worked scenarios in [Cascade](07-cascade.md): ancestor amend, parent bookmark advance, textual conflict, external jj op, and agent crash after delivery. These are scenario tests over observable state, not assertions about private function boundaries.
+They must also cover the worked scenarios in [Cascade](07-cascade.md): native ancestor rewrite, parent bookmark advance, conflict exposure, direct human materialization, and agent crash after delivery. These are scenario tests over observable state, not assertions about private function boundaries.
 
 ## Module-specific obligations
 
@@ -62,7 +73,7 @@ They must also cover the worked scenarios in [Cascade](07-cascade.md): ancestor 
 
 `AuthEnforcer` tests cover Admin-only rejection for thread-scoped credentials, thread-scoped rejection across sibling threads, revoked and malformed credentials, audit-log rows for accepted and rejected parseable attempts, and the MCP status-code ordering in [Roadmap](18-roadmap.md) when that surface ships.
 
-`ThreadTranscriptStore` tests cover FTS search, author/direction preservation, change-aligned reads, tombstoned and redirected changes, JSONL rotation/truncation recovery, offset and row insertion in one transaction, reopen catch-up recursion prevention, `pending_kkd_prepends` FIFO matching, cascade-injection row idempotency, and outbox-pinned anchors.
+`ThreadTranscriptStore` tests cover FTS search, author/direction preservation, change-aligned reads, tombstoned and redirected changes, JSONL rotation/truncation recovery, offset and row insertion in one transaction, reopen catch-up recursion prevention, `pending_kkd_prepends` FIFO matching, cascade-injection row idempotency, and intent-pinned anchors.
 
 `LogRenderer` tests cover stack-aware expansion, collapsed siblings and unrelated threads, `--no-stack`, `--all`, `--wide`, `-r <revset>` disabling collapse, and parser errors when `-r` is combined with collapse flags.
 
