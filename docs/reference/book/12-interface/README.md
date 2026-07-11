@@ -1,6 +1,6 @@
 # Interface
 
-The TUI is not required for the first core implementation slice. The two documents here are the v1 contract if it ships:
+The TUI is v1.x polish, not acceptance slice (see [Orientation](../01-orientation.md)). The two documents here are the v1 contract if it ships:
 
 1. [Specification](spec.md) — vocabulary, glyph language, wireframes, keymaps, toast triggers, mouse, degradation, and the `[ui]` configuration surface.
 2. [Storyboard](storyboard.md) — a worked end-to-end scenario that walks one developer porting an iOS app to Android (with a docs repo and a marketing-site copyright bump along the way) through every branching, merging, and abandoning pattern the rest of the book commits to.

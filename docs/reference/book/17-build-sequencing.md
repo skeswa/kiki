@@ -46,12 +46,13 @@ Build upward in this order:
 1. `OpLogWatcher`, `OpAttribution`, and `AncestryQuery`.
 2. `CascadeOrchestrator` integrated with `kk-hook`.
 3. `MetadataLedger` ownership foundation.
-4. `kk publish` stack flow with editor integration.
-5. `LogRenderer`, `StatusRenderer`, `kk log`, and `kk status`.
-6. Transcript capture, read API, and reopen catch-up.
-7. `kk thread detach` as the graph-surgery escape hatch.
+4. `ConfigLoader` layering and `kk config`.
+5. `kk publish` stack flow with editor integration.
+6. `LogRenderer`, `StatusRenderer`, `kk log`, and `kk status`.
+7. Transcript capture, read API, and reopen catch-up.
+8. `kk thread detach` as the graph-surgery escape hatch.
 
-Post-acceptance polish can then add:
+v1.x polish (enumerated in [Orientation](01-orientation.md)) builds on top of that, in this order:
 
 1. Overlay TUI using gRPC plus shared renderers.
 2. Persistent sidebar pane.
@@ -59,25 +60,24 @@ Post-acceptance polish can then add:
 
 ## Acceptance slice
 
-v1 acceptance slice:
-
 v1 is real when these work together against a real jj+git repo, tmux, Claude Code, and `gh`:
 
 1. Thread lifecycle: `kk init`, contextual `kk new`, `kk switch`, `kk close`, and `kk reopen`.
 2. Safe cascade: parent changes rebase following children at a Claude Code PreToolUse boundary, deliver kiki-authored context, and handle retry and conflict paths.
 3. Publish: `kk publish` publishes stacks top-down and keeps PR text human-owned after creation.
 4. Recall and orientation: transcript capture, `kk thread transcript`, `kk log`, and `kk status`.
-5. Escape hatch: `kk thread detach` breaks a follows edge without broader graph surgery.
-6. Local-only transcript rule: transcripts feed local recall and reopen catch-up, and do not feed publishing or metadata generation.
+5. Configuration: `kk config get|set|unset|edit|show` reads and writes the layered config with source attribution.
+6. Escape hatch: `kk thread detach` breaks a follows edge without broader graph surgery.
+7. Local-only transcript rule: transcripts feed local recall and reopen catch-up, and do not feed publishing or metadata generation.
 
-The overlay TUI, persistent sidebar, AI auto-rename polish, PR merge auto-archive, and full notification vocabulary deepen the demo. They do not replace the acceptance slice.
+The v1.x polish tier deepens the demo. It does not replace the acceptance slice.
 
 ## Budget
 
 The expected v1 build budget is:
 
 - acceptance slice: 5-7 weeks;
-- stretch/demo polish: 2-4 additional weeks;
+- v1.x polish: 2-4 additional weeks;
 - edge-case buffer: 1-2 weeks.
 
 The buffer belongs to op-log edge cases, hook chaining, jj op-id dedupe, transcript offset behavior, cascade retry paths, and sidebar lifecycle details.

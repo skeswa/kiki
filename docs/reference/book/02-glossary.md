@@ -10,6 +10,11 @@ Definitions of the load-bearing terms in kiki's reference. When a term is used i
 - **Ambient coordinator** — kiki's posture: it observes and reacts to jj/tmux/gh state without gatekeeping the underlying tools.
 - **Active / Closed / Orphaned / Destroyed** — thread lifecycle states. Active = workspace and (often) agent live. Closed = soft archive: jj forgets the workspace, kiki removes the materialized directory after loss-prevention preflight plus post-stop recheck, and bookmark + revisions + transcript remain reopenable. Orphaned = the materialized workspace directory is missing while the thread row still says Active (e.g., user ran `rm -rf`, the disk filled, or the dir was moved); kiki notifies once and waits for explicit human resolution via `kk reopen`, `kk thread destroy`, or a future `kk thread restore --to <path>`. Destroyed = `jj abandon`, irreversible except via `jj op restore`.
 
+## Scope tiers
+
+- **Acceptance slice** — what v1 must ship to be accepted. The canonical enumeration lives in [Orientation](01-orientation.md) and nowhere else; chapters describe behavior and link to the ledger for when it ships.
+- **v1.x polish** — post-acceptance work that deepens v1 but must not block the acceptance slice unless explicitly promoted. Enumerated in the same [Orientation](01-orientation.md) ledger.
+
 ## Cascade
 
 - **Cascade rebase** — automatic rebase of descendants when an ancestor changes, with pause-propagate-resume across agents.

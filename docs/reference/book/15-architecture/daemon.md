@@ -15,7 +15,7 @@
 - The cascade state machine. Per-thread `cascade_lock` is held only while applying the rebase + composing the synthetic payload + persisting to `cascade_outbox`.
 - The transcript JSONL tail. The per-(thread, session_id) offset advances atomically with `thread_messages` inserts so persisted state never diverges from inserted rows.
 - Op-log watching. See [`op-log-watcher.md`](op-log-watcher.md).
-- Auto-rename / auto-describe execution loop, when those ship. The `MetadataLedger` content-hash ownership rule is the v1-required foundation; the execution loop is stretch.
+- Auto-rename / auto-describe execution loop, when those ship. The `MetadataLedger` content-hash ownership rule is the v1-required foundation; the execution loop is v1.x polish.
 
 ## What the daemon does NOT own
 

@@ -1,6 +1,6 @@
 # Interface
 
-The TUI is not required for the first core implementation slice. This is the v1 contract if it ships. The TUI is a ratatui-rendered process: `kk` opens it inline, and the persistent sidebar runs as a separate ratatui process inside its own tmux pane. kiki always shows the real agent PTY.
+The TUI is v1.x polish, not acceptance slice (see [Orientation](../01-orientation.md)). This is the v1 contract if it ships. The TUI is a ratatui-rendered process: `kk` opens it inline, and the persistent sidebar runs as a separate ratatui process inside its own tmux pane. kiki always shows the real agent PTY.
 
 ## Vocabulary
 

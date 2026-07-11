@@ -4,15 +4,7 @@ This chapter captures deferred surfaces whose design affects v1 boundaries. Defe
 
 ## v1.x polish
 
-Likely post-acceptance work:
-
-- hook configuration diagnostics;
-- op-log watcher edge cases;
-- additional `kk thread` management commands;
-- status-line and TUI polish;
-- AI auto-describe and auto-rename execution loop once the ownership ledger is proven;
-- PR merge polling and auto-archive;
-- narrow same-thread transcript MCP reads if the human CLI surface is stable.
+The v1.x polish tier is enumerated once, in [Orientation](01-orientation.md); this chapter does not keep a second list. What follows records design boundaries for the deferred surfaces that need them.
 
 ## v2 MCP substrate
 

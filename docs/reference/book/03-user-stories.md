@@ -93,7 +93,7 @@ Read these before the invariants. If a story and a normative chapter appear to p
 64. As a developer, I want `kk close` to take me back to the parent thread's session if it exists, so that I keep working without manual session-switching.
 65. As a developer, I want `kk reopen <thread>` to restore an archived thread (re-create workspace, re-spawn tmux session, re-resume agent), so that I can pick up old work seamlessly.
 66. As a developer, I want children of a closed thread to auto-detach with a notification, so that I am aware of the lifecycle change.
-67. As a developer, I want a merged PR to auto-archive its thread with a 5-second undo grace period, so that completion cleans itself up. (v1.x / demo polish; the core behavior is notifying and updating PR/thread state.)
+67. As a developer, I want a merged PR to auto-archive its thread with a 5-second undo grace period, so that completion cleans itself up. (v1.x polish; the acceptance-slice behavior is notifying and updating PR/thread state.)
 68. As a developer, I want a PR closed-without-merge to surface a notification but NOT auto-archive its thread, so that I can decide whether to keep iterating.
 69. As a developer, I want `kk thread destroy` as a separate, irreversible command (one-way `jj abandon`), so that I have a clear ladder from soft-close to permanent removal.
 70. As a developer, I want plain `kk close` to leave any open PR untouched, with `kk close --discard-pr` as the explicit "also close the PR" option, so that GitHub-visible state is preserved unless I deliberately change it.

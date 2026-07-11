@@ -22,12 +22,12 @@ flowchart LR
         TUI["kk overlay TUI"]
         Sidebar["kk sidebar pane"]
         Hook["kk-hook\nClaude Code PreToolUse sidecar"]
-        AgentMcp["Agent MCP client\nread-only transcript tools\n(stretch/post-v1)"]
+        AgentMcp["Agent MCP client\nread-only transcript tools\n(v1.x polish)"]
         FutureUI["future native / web UI"]
     end
 
     GrpcSock["~/.kiki/kkd.sock\ngRPC over unix socket"]
-    McpSock["~/.kiki/kkd-mcp.sock\nStreamable HTTP MCP over unix socket\n(stretch/post-v1)"]
+    McpSock["~/.kiki/kkd-mcp.sock\nStreamable HTTP MCP over unix socket\n(v1.x polish)"]
     AdminCred["~/.kiki/admin-cred\nread by kk CLI / TUI"]
     HookCred["~/.kiki/repos/<repo_id>/credentials/<thread_id>\nread by kk-hook / sidebar / MCP client"]
 
@@ -46,7 +46,7 @@ flowchart LR
     subgraph Daemon["kkd: single user-scoped daemon"]
         Auth["AuthEnforcer\nAdmin / ThreadScoped"]
         Api["gRPC service\nstable proto contract"]
-        McpApi["MCP server\nthread-scoped transcript reads\n(stretch/post-v1)"]
+        McpApi["MCP server\nthread-scoped transcript reads\n(v1.x polish)"]
         Events["server-streaming events"]
         ThreadCtl["ThreadController per thread\nworkspace + tmux + harness lifecycle"]
         Cascade["CascadeOrchestrator\npause / rebase / inject / acknowledge"]

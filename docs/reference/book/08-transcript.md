@@ -97,7 +97,7 @@ Expected query modes:
 - `--include-tombstoned`
 - `--no-synthesized`
 
-Agent MCP transcript reads are stretch/post-v1. When they ship, they are same-thread only.
+Agent MCP transcript reads are v1.x polish. When they ship, they are same-thread only.
 
 ## Privacy and retention
 

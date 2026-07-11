@@ -48,7 +48,7 @@ The top-level config sections expected in v1:
 
 - `[agent]` — default harness, harness-specific args.
 - `[github]` — backend selection (default `gh` shell-out), poll cadence.
-- `[autorename]` — auto-describe / auto-rename triggers and cadence (stretch execution loop; the v1-required foundation is the `MetadataLedger` ownership ledger).
+- `[autorename]` — auto-describe / auto-rename triggers and cadence (the execution loop is v1.x polish; the v1-required foundation is the `MetadataLedger` ownership ledger).
 - `[notifications]` — per-event behavior (loud / soft / silent) for the attention-event vocabulary (agent permission prompts, cascade conflict, parent merged, parent abandoned, PR check failed, etc.) and `os_provider` (`auto | notify-rust | osascript | tmux | off`) for the OS-native transport. Per-event keys hot-reload; `os_provider` hot-reloads at the next notification dispatch. See [Observability](14-observability.md).
 - `[ui]` — personal-preference keys for the overlay TUI, persistent sidebar, and shell pane (table below).
 - `[reopen]` — `catchup_pairs` (default `10`) controls the size of the `kk reopen` catch-up message.

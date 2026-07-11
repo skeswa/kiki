@@ -20,7 +20,9 @@ kiki exists to make parallel, recursive work patterns cheap enough that a develo
 
 v1 is successful when kiki can create, switch, coordinate, publish, archive, reopen, and inspect agentic work threads without relying on the original PRD as the implementation contract.
 
-The first v1 acceptance surface includes:
+This chapter is the book's scope ledger. When another chapter needs to say whether a surface is acceptance slice or v1.x polish, it links here; no other chapter keeps a competing list. Promoting or demoting a surface is an edit to this chapter alone.
+
+The acceptance slice includes:
 
 - `kk init`, `kk new`, `kk switch`, `kk ls`, `kk close`, `kk reopen`
 - `kk publish`, `kk log`, `kk status`, `kk thread transcript`, `kk thread detach`
@@ -35,17 +37,20 @@ The first v1 acceptance surface includes:
 - stack-aware publish flow
 - enough config layering for defaults, user, repo-local, per-thread, environment, and CLI flags
 
-## Deferred or stretch
+## v1.x polish
 
-These can deepen v1 but must not block the first acceptance slice unless explicitly promoted:
+These deepen v1 but must not block the acceptance slice unless explicitly promoted:
 
 - overlay TUI
 - persistent sidebar pane
-- AI auto-rename polish
-- AI auto-describe polish
+- status-line and TUI polish
 - full notification vocabulary
-- PR-merge auto-archive
-- read-only MCP transcript tools
+- AI auto-describe and auto-rename execution loop, once the ownership ledger is proven (the `MetadataLedger` foundation itself is acceptance slice)
+- PR merge polling and auto-archive
+- narrow same-thread read-only transcript MCP reads, once the human CLI surface is stable
+- hook configuration diagnostics
+- op-log watcher edge cases
+- additional `kk thread` management commands
 
 ## Out of scope for v1
 

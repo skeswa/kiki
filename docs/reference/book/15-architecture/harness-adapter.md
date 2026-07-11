@@ -89,7 +89,7 @@ In the deferred window, the agent's tool call may run against a working copy tha
 - A thread cannot change harness mid-life; `kk thread restart <thread> --harness <new>` is the explicit path (terminates the current agent and respawns).
 - v1: the `Harness` trait is the architectural seam, but only the `claude-code` adapter ships. `kk new --harness <other>` errors with `"unsupported harness in v1"`. `kk new` (no `--harness`) defaults to `claude-code` and errors at spawn time with `"claude-code not on PATH — install it or pass --harness <other> once another adapter ships"` if the binary is missing. `kk init` does not pre-validate the harness binary; the architecture is genuinely BYO-harness, even though v1 ships only one.
 
-`kk thread restart --harness <new>` is not part of the first acceptance slice unless promoted elsewhere; this chapter reserves the semantics so a future implementation does not mutate a thread's harness identity in place.
+`kk thread restart --harness <new>` is not part of the acceptance slice unless promoted in [Orientation](../01-orientation.md); this chapter reserves the semantics so a future implementation does not mutate a thread's harness identity in place.
 
 ## Capture
 
