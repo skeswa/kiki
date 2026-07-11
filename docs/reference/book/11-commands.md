@@ -2,6 +2,8 @@
 
 The CLI is porcelain over the thread model. It should make common kiki operations obvious without pretending to be a complete replacement for `jj`, `tmux`, or `gh`.
 
+Every `kk` invocation presents the `Admin` credential — the binary reads `~/.kiki/admin-cred` on each call — so the sections below do not restate the requirement per command. [Authority](06-authority.md) owns the model, its read-gating rules, and the one exception (`kk switch` needs no `Admin` gate).
+
 ## Context resolution
 
 Commands that act on a thread resolve context in this order:
@@ -114,8 +116,6 @@ Important flags:
 - `--refresh` regenerates title/body for an existing PR only when explicitly requested.
 - `--review-stack` names the default top-down, editor-session-per-PR stack publish; an uncommitted alias that may not ship.
 
-Publishing requires `Admin` authority.
-
 ## `kk close`
 
 `kk close [<thread>]` archives a thread without deleting tracked jj work; see [Threads](05-threads.md#close).
@@ -124,13 +124,9 @@ Important flags:
 
 - `--discard-pr` also closes the open PR. Plain `kk close` leaves PR state untouched.
 
-Close requires `Admin` authority.
-
 ## `kk reopen`
 
 `kk reopen <thread>` restores a closed thread; see [Threads](05-threads.md#reopen) for the restore-and-catch-up semantics.
-
-Reopen requires `Admin` authority.
 
 ## `kk thread transcript`
 
@@ -145,25 +141,19 @@ Important flags:
 - `--include-tombstoned` includes rows for tombstoned or redirected changes.
 - `--no-synthesized` hides kiki-authored synthesized rows.
 
-Human transcript reads require `Admin` authority. Agent MCP transcript reads are a later same-thread-only surface, not the v1 command path.
-
 ## `kk thread comments`
 
 `kk thread comments [<thread>]` lists GitHub PR review comments for the thread's PR.
 
-The v1 surface is read-only and requires `Admin` authority. Feeding review comments into agent context is future work.
+The v1 surface is read-only. Feeding review comments into agent context is future work.
 
 ## `kk thread interrupt`
 
-`kk thread interrupt <thread>` hard-stops and reframes the thread's agent through the harness resume path.
-
-Interrupt requires `Admin` authority. It is the explicit human escape hatch for a stuck or off-track agent and uses the same hard-escalation shape as cascade conflict handling.
+`kk thread interrupt <thread>` hard-stops and reframes the thread's agent through the harness resume path. It is the explicit human escape hatch for a stuck or off-track agent and uses the same hard-escalation shape as cascade conflict handling.
 
 ## `kk thread detach`
 
 `kk thread detach <thread>` removes the thread's live follows edge; see [Cascade](07-cascade.md#detach-and-graph-surgery) for what detach does and does not touch. `attach` and `reparent` are deferred beyond v1.
-
-Detach requires `Admin` authority.
 
 ## `kk thread destroy`
 
@@ -173,7 +163,7 @@ Important flags:
 
 - `--keep-log` retains transcript rows for explicit destroyed-thread views.
 
-Destroy requires `Admin` authority and explicit confirmation.
+Destroy requires explicit confirmation.
 
 ## `kk config`
 
@@ -181,15 +171,13 @@ Destroy requires `Admin` authority and explicit confirmation.
 
 `kk config get <key>` reports the effective value and the source layer. Unknown keys warn rather than error. Structural key changes must tell the user whether they hot-reload, take effect at the next lifecycle event, or require daemon restart.
 
-`kk config` requires `Admin` authority.
-
 ## Deferred thread management commands
 
 `attach`, `reparent`, and `restore --to <path>` (used to re-point an `Orphaned` thread at a moved workspace) are deferred graph-surgery and lifecycle commands.
 
 ## Repo registry
 
-`kk repo unregister <path>` removes a repo from the per-user registry. It requires `Admin` authority (see [Authority](06-authority.md)) and is the explicit counterpart to `kk init`.
+`kk repo unregister <path>` removes a repo from the per-user registry. It is the explicit counterpart to `kk init`.
 
 By default, `kk repo unregister` removes both the row from `~/.kiki/state.db`'s `repos` table and the centralized state directory at `~/.kiki/repos/<repo_id>/` (threads, transcript, audit log, credentials, and per-thread error logs). The action is irreversible — there is no kiki-managed undo, mirroring `kk thread destroy`'s shape (see [Threads · destroy](05-threads.md#destroy)). The `Admin` authority requirement is the safeguard; v1 does not add a confirmation prompt on top.
 

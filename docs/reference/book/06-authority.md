@@ -9,6 +9,7 @@ This distinction matters. Credentials contain ordinary bugs and misbehaving tool
 `Admin`:
 
 - required for global, cross-thread, or destructive daemon mutations
+- required for sensitive reads that cross thread boundaries: transcripts, diffs, and the audit log
 - read by human CLI and TUI from `~/.kiki/admin-cred`
 
 `ThreadScoped<thread_id>`:
@@ -34,6 +35,10 @@ Thread-scoped credentials must not:
 - read sibling transcripts
 - read sibling diffs
 - publish, close, destroy, or reparent threads
+
+## Sensitive reads
+
+Mutation gating alone does not cover the transcript. Transcript reads are credential-gated the same way: `Admin` may read any thread's transcript — the `kk thread transcript` path, since the `kk` binary always presents `~/.kiki/admin-cred` — and `ThreadScoped<T>` may read only thread T's transcript, the contract the v1.x same-thread MCP surface inherits (see [Roadmap](18-roadmap.md)). The same rule covers sibling diffs and the audit log: a read that exposes another thread's working state requires `Admin`.
 
 ## Repo summary exception
 

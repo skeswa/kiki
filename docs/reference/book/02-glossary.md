@@ -45,7 +45,7 @@ Definitions of the load-bearing terms in kiki's reference. When a term is used i
 
 ## Auth
 
-- **`Admin` credential** — required for global, cross-thread, or destructive daemon mutations. Stored at `~/.kiki/admin-cred` (mode `0600`). Read by the human CLI / TUI on each invocation.
+- **`Admin` credential** — required for global, cross-thread, or destructive daemon mutations, and for sensitive cross-thread reads (transcripts, diffs, the audit log). Stored at `~/.kiki/admin-cred` (mode `0600`). Read by the human CLI / TUI on each invocation.
 - **`ThreadScoped<T>` credential** — bound to one thread. Stored at `~/.kiki/repos/<repo_id>/credentials/<thread_id>` (mode `0600`). Read by `kk-hook`, the persistent sidebar, and the same-thread MCP client when MCP ships. The hook's harness config (e.g., the `<workspace>/.claude/settings.json` Claude Code requires in the workspace tree) references that absolute path. Rotated on close and reopen.
 - **Repo-summary read scope** — the small expansion of `ThreadScoped<T>` allowing a sidebar process to subscribe to read-only one-line summaries of sibling threads in the same repo. Same-repo only, read-only, summaries only (no diffs, no transcripts). The single cross-thread read a `ThreadScoped<T>` credential can perform.
 
