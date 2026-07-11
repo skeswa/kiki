@@ -43,7 +43,7 @@ After PR creation, title/body are human territory. Kiki does not silently overwr
 
 v1 may poll GitHub through `gh`.
 
-- merged PR: notify and update thread/PR state. If auto-archive polish ships, close/archive with a 5000ms (5-second) undo grace. The TUI surfaces the grace as an actionable toast with an `undo` action.
+- merged PR: notify and update thread/PR state; that is the acceptance-slice behavior. The v1.x auto-archive polish adds close/archive with a 5000ms (5-second) undo grace, surfaced in the TUI as an actionable toast with an `undo` action.
 - closed without merge: notify only.
 - CI state change: notify only.
 - review comment: expose read-only through `kk thread comments`.

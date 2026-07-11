@@ -4,22 +4,27 @@ Tests should target observable behavior and persisted state, not private impleme
 
 ## Required high-value modules
 
+Acceptance slice:
+
 - `AncestryQuery`
 - `OpAttribution`
 - `MetadataLedger`
 - `CascadeOrchestrator`
 - `ConfigLoader`
 - `ContextDiscovery`
-- `AICompose` if auto-describe / auto-rename execution ships
 - `AuthEnforcer`
 - `ThreadTranscriptStore`
 - `LogRenderer`
 - `StatusRenderer`
-- `SidebarController` if TUI/sidebar ships
-- `PaneLifecycle` if persistent sidebar ships
-- `OverlayController` if overlay TUI ships — open/close, NAVIGATE-mode transitions, preview-mode toggling (`t`/`d`/`c`), chord-ribbon adaptation by selection, narrow-terminal degradation, mouse click-to-focus
-- `ToastQueue` if overlay TUI ships — TTL expiry, click dismiss, action-invocation dismiss, row-focus acknowledgement dismiss, coalescing of cascade-applied events
-- `FormController` if overlay TUI ships — spawn-card field navigation, destructive-confirmation modal flow
+
+Required alongside the v1.x polish surface that ships them:
+
+- `AICompose`
+- `SidebarController`
+- `PaneLifecycle`
+- `OverlayController` — open/close, NAVIGATE-mode transitions, preview-mode toggling (`t`/`d`/`c`), chord-ribbon adaptation by selection, narrow-terminal degradation, mouse click-to-focus
+- `ToastQueue` — TTL expiry, click dismiss, action-invocation dismiss, row-focus acknowledgement dismiss, coalescing of cascade-applied events
+- `FormController` — spawn-card field navigation, destructive-confirmation modal flow
 
 ## Regression tests for resolved spec conflicts
 
@@ -63,7 +68,7 @@ They must also cover the worked scenarios in [Cascade](07-cascade.md): ancestor 
 
 `StatusRenderer` tests cover the kiki header, omission of empty PR/CI/agent fields, follows and children rows, the three-valued cascade state, `--diff`, `--diff --stat`, and `--no-jj`.
 
-`SidebarController`, `OverlayController`, `ToastQueue`, `FormController`, and `PaneLifecycle` are required only if their UI surfaces ship. Their tests cover navigation versus destructive action gating, preview toggles, confirmation cards, disconnected/reconnecting rendering, cursor preservation across event streams, toast TTL/click/action behavior, spawn form navigation, pane ensure-on-attach, user-killed-pane non-respawn during a live session, terminal-too-narrow warnings, and repo-shared `[ui]` rejection.
+`SidebarController`, `OverlayController`, `ToastQueue`, `FormController`, and `PaneLifecycle` tests cover navigation versus destructive action gating, preview toggles, confirmation cards, disconnected/reconnecting rendering, cursor preservation across event streams, toast TTL/click/action behavior, spawn form navigation, pane ensure-on-attach, user-killed-pane non-respawn during a live session, terminal-too-narrow warnings, and repo-shared `[ui]` rejection.
 
 ## Fakes
 

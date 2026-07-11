@@ -13,7 +13,7 @@ The TUI is v1.x polish, not acceptance slice (see [Orientation](../01-orientatio
 - **Chord ribbon** — a one-line keybinding hint at the bottom edge of the overlay. Toggled by `?`. Adapts to current selection (e.g. hides `c` for a thread without a PR).
 - **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](../11-commands.md)). Single source of truth.
 - **Context strip** — the bottom-most line of the overlay or the persistent sidebar pane. One compressed sentence with TUI-specific content. Two forms by context: the overlay form carries repo + bookmark + cascade glyph + agent model + ctx % + last op age; the persistent-sidebar form is shorter (bookmark + cascade glyph + agent glyph) because the agent pane next to it already surfaces model and ctx. This is a TUI footer, separate from the `StatusRenderer`-backed inlined status.
-- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, optional auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., if auto-archive polish ships, the undo grace is 5000ms, overriding the default — see [Publishing](../09-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens a confirmation card.
+- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms, overriding the default — see [Publishing](../09-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens a confirmation card.
 - **Card** — a centered modal panel with title, body, and one or two action buttons. Used for spawn and destructive confirmation.
 
 ## Glyph language
@@ -347,11 +347,11 @@ Toasts are non-modal pills in the overlay's top-right corner, stacking downward.
 Two subtypes share the surface:
 
 - **Notification toast** — no interactive action. The body may include hint text naming an overlay verb (e.g., "tap T to read transcript"); the verb is fielded by the overlay's normal keymap, the toast does not intercept it.
-- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge if that polish ships — see [Publishing](../09-publishing.md)). Toasts never open a confirmation card.
+- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge — see [Publishing](../09-publishing.md)). Toasts never open a confirmation card.
 
 Dismissal rules (apply to both subtypes):
 
-- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms; specific triggers may override, e.g., auto-archive undo grace = 5000ms if that polish ships — see [Publishing](../09-publishing.md))
+- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms; specific triggers may override, e.g., auto-archive undo grace = 5000ms — see [Publishing](../09-publishing.md))
 - click anywhere on the toast pill (excluding the action label, which runs the action) dismisses it
 - moving the keyboard cursor onto the row that issued the toast, or clicking that row, dismisses the toast (treated as "user acknowledged")
 - invoking the toast's action (actionable toasts only) dismisses the toast on completion
@@ -363,7 +363,7 @@ Toast triggers (v1):
 - cascade conflict on a non-current thread (`◐`) — notification
 - cascade applied to a child thread (`──`, only when ≥ 2 children rebased to coalesce noise) — notification
 - config-set warning that won't take effect until next `kk new` / `kk reopen` — notification
-- auto-archive on PR-merge (`✓`) with `undo` action, if that polish ships (5s grace — see [Publishing](../09-publishing.md)) — actionable
+- auto-archive on PR-merge (`✓`) with `undo` action (v1.x polish; 5s grace — see [Publishing](../09-publishing.md)) — actionable
 
 Toasts are overlay-only. The persistent sidebar is navigation-only, and stacking toast UI beside the live agent pane would be ambiguous. When the overlay is closed, OS-native notifications (configured via `[notifications]` — see [Configuration](../13-configuration.md)) carry the same events.
 

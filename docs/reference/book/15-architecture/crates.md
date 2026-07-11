@@ -19,7 +19,7 @@ kiki is a Cargo workspace with four crates. The split exists so the gRPC service
 
 - `OpLogWatcher` — fsnotify on `.jj/repo/op_heads/`, populates `op_history`. See [`op-log-watcher.md`](op-log-watcher.md).
 - `CascadeOrchestrator` — per-thread cascade lock, pause/rebase/inject/acknowledge.
-- `MetadataLedger` + `AICompose` — auto-describe / auto-rename ownership tracking and prompt assembly. `AICompose` is provider-agnostic via an internal `AiProvider` trait. When the execution loop ships, the first provider implementation is Anthropic; the trait is shaped so additional providers (OpenAI, local Ollama, etc.) can land without touching the ledger.
+- `MetadataLedger` + `AICompose` — auto-describe / auto-rename ownership tracking and prompt assembly. `AICompose` is provider-agnostic via an internal `AiProvider` trait. The first provider implementation is Anthropic; the trait is shaped so additional providers (OpenAI, local Ollama, etc.) can land without touching the ledger.
 - `GitHubBackend` (default `GhCli` impl) — PR creation, status polling, comment surfacing.
 - `ConfigLoader` — layered TOML + per-thread sqlite.
 - `AuthEnforcer` — Admin / ThreadScoped capability check on every gRPC call.

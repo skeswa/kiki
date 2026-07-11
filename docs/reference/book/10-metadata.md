@@ -1,6 +1,6 @@
 # Metadata Evolution
 
-kiki may eventually help keep thread names, bookmark names, and revision descriptions current as work changes. The foundation ships in v1 even if the background AI loop does not: kiki must know which prose it owns and which prose belongs to the human.
+kiki may eventually help keep thread names, bookmark names, and revision descriptions current as work changes. The foundation ships in the acceptance slice even though the execution loop is v1.x polish: kiki must know which prose it owns and which prose belongs to the human.
 
 ## Ownership ledger
 
@@ -78,6 +78,6 @@ Auto-describe and auto-rename go through a provider-agnostic `AICompose` seam. `
 - `api_key_env`: env var holding the API key (default `ANTHROPIC_API_KEY` for Anthropic).
 - `api_key_path`: file path holding the API key (alternative to `api_key_env`).
 
-When the execution loop ships, the first provider implementation is Anthropic. The trait surface is generic so additional providers can be added without touching the metadata ledger or the prompt-assembly logic.
+The first provider implementation is Anthropic. The trait surface is generic so additional providers can be added without touching the metadata ledger or the prompt-assembly logic.
 
 The auto-AI loop is opt-in. `[autorename] enabled = false` is the default, so a fresh install never calls a provider until the user configures one.
