@@ -286,7 +286,7 @@ By late Thursday, the navigation skeleton is complete and the biometric-first au
 $ kk publish --downstack --ready
 ```
 
-`--downstack` publishes the current thread plus unpublished descendants, top-down (see [Publishing · flags](../09-publishing.md#flags)). `--ready` opens both PRs ready for review rather than as drafts (see [Publishing · defaults](../09-publishing.md#defaults)). kiki publishes ancestors first, then descendants: skeleton's PR is created with base `main`; auth-biometric's PR is then created with base `android-skel`. Each PR opens a separate editor session so the developer can shape its title and body — the AI-drafted text is a starting point, not the finished version. The transcript is not input to PR drafting (see [Publishing · PR text](../09-publishing.md#pr-text)).
+`--downstack` publishes the current thread plus unpublished descendants, top-down (see [Commands · `kk publish`](../11-commands.md#kk-publish)). `--ready` opens both PRs ready for review rather than as drafts (see [Publishing · defaults](../09-publishing.md#defaults)). kiki publishes ancestors first, then descendants: skeleton's PR is created with base `main`; auth-biometric's PR is then created with base `android-skel`. Each PR opens a separate editor session so the developer can shape its title and body — the AI-drafted text is a starting point, not the finished version. The transcript is not input to PR drafting (see [Publishing · PR text](../09-publishing.md#pr-text)).
 
 Once both editors close and `gh` returns success, `kk log --wide` shows the stack annotated with PR state, CI roll-up, agent state, and last-activity age (see [Commands · `kk log`](../11-commands.md#kk-log)):
 
@@ -334,6 +334,6 @@ The patterns this storyboard demonstrates and the chapters that authorize them:
 - **Abandoning** — act 7's `kk close` of the wrong-direction `auth` thread, retaining the transcript and revisions for possible reuse, in contrast to the irreversible `kk thread destroy` (see [Threads · close](../05-threads.md#close), [Threads · destroy](../05-threads.md#destroy)).
 - **Cross-repo** — acts 1 (registration), 5 (`kestrel-www` copyright bump), 6 (`kestrel-docs` parallel work). One daemon, per-repo registration, `kk ls --all-repos` for the global view (see [Commands · `kk ls`](../11-commands.md#kk-ls)).
 - **Cascade in motion** — act 4 (small ancestor change, hop-by-hop propagation), act 8 (textual conflict and human resolution). Both demonstrate that direct `jj` operations are first-class inputs to the coordinator, not gated by it (see [Cascade](../07-cascade.md), [Invariants](../04-invariants.md)).
-- **Stacked publish** — act 9. `kk publish --downstack` publishes ancestors first; the parent merge then auto-migrates descendants onto the repo default branch (see [Publishing · flags](../09-publishing.md#flags), [Cascade · parent merged](../07-cascade.md#parent-merged)).
+- **Stacked publish** — act 9. `kk publish --downstack` publishes ancestors first; the parent merge then auto-migrates descendants onto the repo default branch (see [Commands · `kk publish`](../11-commands.md#kk-publish), [Cascade · parent merged](../07-cascade.md#parent-merged)).
 
 If the storyboard appears to require any behavior the rest of the book does not authorize, that is a finding. The storyboard is illustrative; the specification is normative.

@@ -1,13 +1,12 @@
 # Publishing
 
-`kk publish` publishes a thread to GitHub through `gh`.
+`kk publish` publishes a thread to GitHub through `gh`. The flag surface lives in [Commands](11-commands.md#kk-publish); this chapter owns the behavior.
 
 Publishing is the point where local work becomes reviewer-facing. That boundary is why PR prose is human territory and why the transcript is not input to the drafter.
 
 ## Defaults
 
-- PRs are draft by default.
-- `--ready` opens ready for review.
+- PRs are draft by default; opening ready-for-review is an explicit flag.
 - PR base is the parent thread's branch when stacked.
 - Unstacked, detached, or parentless threads base on the repo default branch.
 - If a parent is unpublished, `kk publish` publishes unpublished ancestors first, top-down.
@@ -28,16 +27,6 @@ Kiki may AI-draft the PR title and body from diff and thread metadata.
 The transcript is not input to PR drafting in v1.
 
 After PR creation, title/body are human territory. Kiki does not silently overwrite them. `kk publish --refresh` is the explicit regeneration path.
-
-## Flags
-
-- `--no-edit`: use the draft as-is.
-- `--no-ai`: open an empty editor draft.
-- `-m "<title>"`: set title inline.
-- `--downstack`: publish current thread plus unpublished descendants.
-- `--review-stack`: alias for the default top-down stack publish with an editor session per PR, if the alias ships.
-
-`kk publish --refresh` is the explicit regeneration path for PR text after creation.
 
 ## GitHub events
 
