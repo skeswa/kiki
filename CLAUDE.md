@@ -19,9 +19,9 @@ If something in the code disagrees with the spec or architecture, that is a find
 
 ## What kiki is, in one paragraph
 
-kiki (binary `kk`) is a daemon-backed coordinator that ties jujutsu (jj), tmux, Claude Code/Codex, and the GitHub CLI (`gh`) into a single workflow for multi-threaded agentic coding. The atom is a **thread** — a themed sequence of jj revisions on a bookmark, materialized in its own jj workspace, attached to its own tmux session running an agent. Threads can branch off other threads with live-follow semantics; when an ancestor evolves, descendants are auto-rebased and their agents are paused-informed-resumed via a `PreToolUse`-hook-driven synthetic-tool-result mechanism. kiki is an **ambient coordinator**, not a gatekeeper: it watches the jj op log and reacts to whatever it sees (human, agent, or kkd itself), and never refuses direct `jj`/`gh`/`tmux` ops.
+kiki (binary `kk`) is a daemon-backed coordinator that ties jujutsu (jj), tmux, agent harnesses, and eventually the GitHub CLI (`gh`) into a workflow for multi-threaded agentic coding. The atom is a **thread** — a themed sequence of jj revisions whose live head is its managed workspace's `@`; its bookmark is an explicit checkpoint/publication projection. Threads can follow other threads. A managed Claude session reserves `PreToolUse` exclusively for kiki, blocks the entire triggering parallel tool batch during reconciliation, and acknowledges delivery only from a later model turn. kiki remains an **ambient coordinator** for direct `jj`/`gh`/`tmux` operations, but ambiguous external projection changes fail loud into repair rather than being guessed through.
 
-The planned cargo workspace has four crates: `kiki-core` (library — shared types/traits/proto/migrations, no I/O), `kkd` (daemon binary), `kk` (CLI binary that also hosts the TUI as a subcommand), and `kk-hook` (PreToolUse sidecar binary). `kkd` is the gRPC **server**, hosting a stable service over `~/.kiki/kkd.sock`; `kk` and `kk-hook` are the first two **clients** of that service, with no privileged internal API — any future UI (e.g., a native macOS GUI) consumes the same gRPC surface they do. State lives in `~/.kiki/state.db` (cross-repo registry) plus `<repo>/.kiki/state.db` (per-repo runtime). Full layout in `docs/reference/book/15-architecture/crates.md`.
+The planned cargo workspace has four crates: `kiki-core` (library — shared types/traits/proto/migrations, no I/O), `kkd` (daemon binary), `kk` (CLI binary that also hosts the TUI as a subcommand), and `kk-hook` (Claude hook sidecar). `kkd` is the gRPC server over `~/.kiki/kkd.sock`; local clients share that contract. State lives in `~/.kiki/state.db` (cross-repo registry) plus `~/.kiki/repos/<repo_id>/state.db` (per-repo runtime). Remote clients require a future transport and authentication contract rather than inheriting unix-socket assumptions.
 
 ## Implementation-stack tension to be aware of
 
@@ -34,9 +34,10 @@ mise install         # provision Bun (only tool pinned today)
 bun install          # install deps
 bun run index.ts     # run the placeholder entrypoint
 bun run fmt          # format with oxfmt (per package.json's "fmt" script)
+bun run check:docs   # validate local Markdown links, anchors, and stale contract terms
 ```
 
-There is no test runner, linter, or build step configured yet; the project is pre-skeleton. Do not invent commands that aren't in `package.json`.
+There is no implementation test runner, linter, or build step configured yet; the project is pre-skeleton. Do not invent commands that aren't in `package.json`.
 
 ## VCS
 
@@ -54,7 +55,7 @@ Concretely, when you're asked to make multiple changes in one turn:
 
 - Treat each logically distinct change (a refactor, a bugfix, a doc edit, a config tweak) as its own revision. If the diff would warrant a separate bullet in a PR description, it warrants its own revision.
 - Before starting the next change, run `jj new` (or `jj commit -m "..."` to describe-and-advance in one step) so the next edits land on a fresh empty revision rather than amending the prior one.
-- Always provide a description with `-m`. Match the imperative-subject + body style of recent commits — the body should explain *why*, not restate the diff. Never push or hand off an undescribed revision.
+- Always provide a description with `-m`. Match the imperative-subject + body style of recent commits — the body should explain _why_, not restate the diff. Never push or hand off an undescribed revision.
 - If you realize mid-edit that what you're doing is actually two changes, stop and split rather than describing it as one — see the non-interactive recipe below.
 
 > **Multi-line `-m` messages must use real newlines, not `\n`.** Backslash escapes do not expand inside `"..."` or `'...'`, so `-m "subject\n\nbody"` literally embeds the four characters `\n\n` in your description. Reliable bash forms (the Bash tool runs through bash, not the user's interactive fish):
