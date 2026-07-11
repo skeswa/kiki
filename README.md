@@ -61,7 +61,7 @@ The unit of work is a **thread**: a themed sequence of jj revisions on a bookmar
 
 Threads can be related: `kk new add-tests --follows payment-refactor` records a follow-edge in kiki's state. When the parent thread evolves — its bookmark advances, or a revision in its history is amended — kiki rebases the descendant onto the new base and informs its agent at the next safe boundary. The mechanism for that last step is the part of the system that warrants the most careful description, so it gets its own section below.
 
-When the work is ready to leave the local machine, `kk publish` opens an editor with an AI-drafted PR title and body and creates a pull request against the parent thread's branch. If the parent itself has not been published yet, kiki publishes it first, walking up the stack and opening an editor for each, so that the human reviews each PR as it lands. When a parent merges, descendants are rebased onto `main`, force-pushed with `--force-with-lease`, and detached from the merged parent's follow-edge. Auto-archiving merged threads is useful polish, but it is not part of the first acceptance slice unless promoted later.
+When the work is ready to leave the local machine, `kk publish` opens an editor with an AI-drafted PR title and body and creates a pull request against the parent thread's branch. If the parent itself has not been published yet, kiki publishes it first, walking up the stack and opening an editor for each, so that the human reviews each PR as it lands. When a parent merges, descendants are rebased onto `main`, force-pushed with `--force-with-lease`, and detached from the merged parent's follow-edge. Auto-archiving merged threads is useful, but it is v1.x polish, not acceptance slice.
 
 `kk close` is non-destructive. It removes the thread's workspace and tmux session and hides it from default listings, but the bookmark and revisions stay in the repository; `kk reopen` restores the workspace, rebuilds the tmux session, and resumes the agent via its session-id. (A separate `kk thread destroy` exists for actually removing the bookmark, gated behind explicit confirmation.)
 
@@ -127,9 +127,9 @@ For each thread, kkd captures the interleaved text exchange between the user and
 
 Two things the log is _not_. It is not a published artifact: messages live in the per-repo runtime database under `~/.kiki/repos/<repo_id>/state.db`, never in the source repo, and never leave the local machine — agent prose contains dead ends, tool errors, and quoted file contents that should not surface in a PR description. And it is not a structured event log: it captures the narrative (`author: human | agent | kk`, `direction`, `text`), not the token-streaming deltas, the tool-call arguments, or the extended-thinking blocks. The diff still tells you _what_; the log tells you _why_.
 
-The first reader is human: `kk thread transcript [<change>]`, with full-text search over the whole thread. A narrow same-thread MCP reader is a stretch surface that may ship after the human CLI proves stable. Cross-thread reads are deliberately a v2 concern: an agent in B reading agent A's transcript is a pleasing idea with a quiet failure mode (context pollution, prompt leakage between threads), and v1 is the wrong place to ship it without the v2 substrate's safety mechanisms.
+The first reader is human: `kk thread transcript [<change>]`, with full-text search over the whole thread. A narrow same-thread MCP reader is v1.x polish that may ship after the human CLI proves stable. Cross-thread reads are deliberately a v2 concern: an agent in B reading agent A's transcript is a pleasing idea with a quiet failure mode (context pollution, prompt leakage between threads), and v1 is the wrong place to ship it without the v2 substrate's safety mechanisms.
 
-The log feeds back into AI-driven kiki features only at _local_ boundaries — `kk reopen` catch-up in the first acceptance slice, and same-thread agent self-query only if the later MCP surface ships. It is deliberately _not_ read by `kk publish`'s PR-drafter or by auto-describe / auto-rename. A boring PR description costs you nothing irreversible; a PR description that quotes "the user said their boss is being unreasonable about the deadline" costs you a hard-to-undo embarrassment. The local-only stance only holds if local-only-features is a discipline, not a default.
+The log feeds back into AI-driven kiki features only at _local_ boundaries — `kk reopen` catch-up in the acceptance slice, and same-thread agent self-query only if the later MCP surface ships. It is deliberately _not_ read by `kk publish`'s PR-drafter or by auto-describe / auto-rename. A boring PR description costs you nothing irreversible; a PR description that quotes "the user said their boss is being unreasonable about the deadline" costs you a hard-to-undo embarrassment. The local-only stance only holds if local-only-features is a discipline, not a default.
 
 The capture path itself is abstracted behind a `TranscriptAdapter` trait — Claude Code is the v1 implementor, Codex slots in for v2 — so the schema and read API stay harness-neutral while the way bytes flow into the log can vary per harness.
 
@@ -139,7 +139,7 @@ The capture path itself is abstracted behind a `TranscriptAdapter` trait — Cla
 graph TD
     kkd["<b>kkd</b> daemon<br/>Owns all state and behavior<br/>Single user-scoped process"]
     socket[/"Stable gRPC contract over ~/.kiki/kkd.sock"/]
-    mcp[/"Read-only MCP over ~/.kiki/kkd-mcp.sock<br/>(same-thread transcript tools; stretch/post-v1)"/]
+    mcp[/"Read-only MCP over ~/.kiki/kkd-mcp.sock<br/>(same-thread transcript tools; v1.x polish)"/]
     cli["<b>kk</b> CLI"]
     tui["<b>kk</b> TUI<br/>(ratatui)"]
     hook["<b>kk-hook</b><br/>PreToolUse sidecar"]
@@ -195,18 +195,16 @@ $ kk publish
 $ kk close
 ```
 
-When the UI polish surfaces ship, a persistent tmux status-line strip can surface threads needing attention and a tmux keybinding can overlay the TUI for fast switching and spawning. OS-native notifications fire for the core attention cases: agent permission prompts, cascade conflicts, parent lifecycle events, and failed PR checks.
+When the v1.x UI polish ships, a persistent tmux status-line strip can surface threads needing attention and a tmux keybinding can overlay the TUI for fast switching and spawning. OS-native notifications fire for the core attention cases: agent permission prompts, cascade conflicts, parent lifecycle events, and failed PR checks.
 
 ## Roadmap
 
-| Milestone                | Highlights                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **v1 — core acceptance** | Thread atom, live-follow cascade, PreToolUse-based pause-propagate-resume, content-hash ownership ledger for human prose, change-id-aligned thread transcript with human CLI reads and `kk reopen` catch-up, `kk publish` with stack recursion, `kk close`/`kk reopen`, `kk log`/`kk status`, `kk thread detach`, Claude Code adapter. Estimated 7-10 weeks of focused work.                                        |
-| **v1.x / demo polish**   | Overlay TUI and persistent sidebar, hook-config diagnostics, op-log watcher edge cases, status-line themes, AI auto-describe and auto-rename execution loop once the ownership ledger is proven, PR merge polling and auto-archive, narrow same-thread transcript MCP reads if the human CLI surface is stable.                                                                                                     |
-| **v2 — the substrate**   | MCP surface expanded beyond same-thread transcript reads: agents in one thread can post messages to siblings, spawn children, request human review — with causal-chain cycle detection, depth and branching caps, and a complete audit trail. Codex harness adapter (slotting into the v1 `TranscriptAdapter` trait). Native macOS GUI. Direct GitHub REST/GraphQL. PR review-comment ingestion into agent context. |
-| **v3+**                  | jj-lib embedded directly in kkd. Web dashboard. Cross-repository coordinated agent tasks.                                                                                                                                                                                                                                                                                                                           |
+- **v1 — the acceptance slice.** The thread atom, the live-follow cascade with PreToolUse pause-propagate-resume, the change-id-aligned transcript with `kk reopen` catch-up, stacked `kk publish`, and the Claude Code adapter. Estimated 7-10 weeks of focused work.
+- **v1.x — polish.** The overlay TUI and persistent sidebar, the AI auto-describe / auto-rename execution loop, PR-merge auto-archive, same-thread transcript MCP reads.
+- **v2 — the substrate.** Cross-thread agent messaging with causal-chain auditing, the Codex adapter, a native macOS GUI, direct GitHub REST/GraphQL.
+- **v3+.** jj-lib embedded directly in kkd, a web dashboard, cross-repository coordination.
 
-The full spec — including v2's MCP design — lives in the [`docs/reference/`](docs/reference/README.md) reference book.
+The canonical scope ledger — which surface belongs to which tier — is the book's [Orientation chapter](docs/reference/book/01-orientation.md); the full spec, including v2's MCP design, lives in the [`docs/reference/`](docs/reference/README.md) reference book.
 
 ## On the name
 
@@ -242,7 +240,7 @@ A few principles, stated up front, because the reference book's coherence depend
 4. **High cohesion, low coupling.** kkd owns state and behavior; UIs are pure views. Internally, per-thread controllers are isolated from cross-cutting concerns, so killing one thread never destabilizes the daemon.
 5. **Fail loud, not silent.** Cycle detection, force-push reconciliation, parent-thread-abandoned prompts: when the system genuinely cannot determine the right action, it stops and asks rather than guessing.
 6. **No resource policing.** kiki does not cap concurrent agents, model spend, or laptop CPU. Those are the user's decisions, made with the user's tools.
-7. **Local recall, never silent leak.** The thread log is captured for human recall and local agent re-orientation and lives only on the local machine. It feeds back into AI features only at local boundaries (`kk reopen` catch-up in the core slice, same-thread agent self-query if the MCP surface ships); it does not feed into features that produce externally-published artifacts (PR drafts, auto-described revisions). The local-only stance only holds if local-only-features is a discipline, not a default.
+7. **Local recall, never silent leak.** The thread log is captured for human recall and local agent re-orientation and lives only on the local machine. It feeds back into AI features only at local boundaries (`kk reopen` catch-up in the acceptance slice, same-thread agent self-query if the MCP surface ships); it does not feed into features that produce externally-published artifacts (PR drafts, auto-described revisions). The local-only stance only holds if local-only-features is a discipline, not a default.
 
 ## Built on the shoulders of
 
