@@ -26,12 +26,12 @@ flowchart LR
         FutureUI["future native / web UI"]
     end
 
-    GrpcSock["~/.kiki/kkd.sock\ngRPC over unix socket"]
-    McpSock["~/.kiki/kkd-mcp.sock\nStreamable HTTP MCP over unix socket\n(v1.x polish)"]
-    AdminCred["~/.kiki/admin-cred\nbootstrap / broker enrollment only"]
+    GrpcSock["~/.config/kiki/kkd.sock\ngRPC over unix socket"]
+    McpSock["~/.config/kiki/kkd-mcp.sock\nStreamable HTTP MCP over unix socket\n(v1.x polish)"]
+    AdminCred["~/.config/kiki/admin-cred\nbootstrap / broker enrollment only"]
     Broker["enrolled foreground broker\nbegin + display + confirm"]
     Approval["one-shot HumanApproval\nmethod + target + argument + plan digest"]
-    HookCred["~/.kiki/repos/<repo_id>/credentials/<thread_id>\nread by kk-hook / sidebar / MCP client"]
+    HookCred["~/.config/kiki/repos/<repo_id>/credentials/<thread_id>\nread by kk-hook / sidebar / MCP client"]
 
     AdminCred -. bootstrap .-> Auth
     CLI -. foreground confirmation .-> Broker
@@ -75,8 +75,8 @@ flowchart LR
     Watcher --> Transcript
 
     subgraph State["Persistent state"]
-        UserDb["~/.kiki/state.db\nrepo registry, presenters, unscoped audit"]
-        RepoDb["~/.kiki/repos/<repo_id>/state.db\nthreads, credentials, audit, transcripts\n(centralized; no state inside the source repo)"]
+        UserDb["~/.config/kiki/state.db\nrepo registry, presenters, unscoped audit"]
+        RepoDb["~/.config/kiki/repos/<repo_id>/state.db\nthreads, credentials, audit, transcripts\n(centralized; no state inside the source repo)"]
     end
 
     Auth --> UserDb

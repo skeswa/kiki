@@ -130,7 +130,7 @@ kiki keeps it.
 
 In the v1.x transcript layer, kkd captures the interleaved text exchange between the user and the agent — what the user typed, what the agent said back, and the synthetic results kiki injected during cascade — and binds each message to the jj change-id that was `@` when captured. Change-ids survive rebase, so the local recall surface follows the work. An opt-in `kk reopen --catch-up` can preview and send a short transcript-derived catch-up to the resumed harness.
 
-Two things the log is _not_. It is not a published artifact: rows live in the per-repo runtime database under `~/.kiki/repos/<repo_id>/state.db`, never in the source repo, and never feed PR descriptions or automatic revision metadata. “Stored locally” does not mean “never leaves the machine”: when the user opts into catch-up, that selected text may be sent to the configured model provider. It is also not a structured event log: it captures narrative text, not token deltas, structured tool payloads, or extended-thinking blocks.
+Two things the log is _not_. It is not a published artifact: rows live in the per-repo runtime database under `~/.config/kiki/repos/<repo_id>/state.db`, never in the source repo, and never feed PR descriptions or automatic revision metadata. “Stored locally” does not mean “never leaves the machine”: when the user opts into catch-up, that selected text may be sent to the configured model provider. It is also not a structured event log: it captures narrative text, not token deltas, structured tool payloads, or extended-thinking blocks.
 
 The v1.x transcript work starts with the human reader: `kk thread transcript [<change>]`, with full-text search over the whole thread. A narrow same-thread MCP reader may follow after that CLI proves stable. Cross-thread reads remain a v2 concern because context pollution and prompt leakage need a stronger substrate.
 
@@ -143,8 +143,8 @@ The v1.x capture path itself is abstracted behind a `TranscriptAdapter` trait �
 ```mermaid
 graph TD
     kkd["<b>kkd</b> daemon<br/>Owns all state and behavior<br/>Single user-scoped process"]
-    socket[/"Stable gRPC contract over ~/.kiki/kkd.sock"/]
-    mcp[/"Read-only MCP over ~/.kiki/kkd-mcp.sock<br/>(same-thread transcript tools; v1.x polish)"/]
+    socket[/"Stable gRPC contract over ~/.config/kiki/kkd.sock"/]
+    mcp[/"Read-only MCP over ~/.config/kiki/kkd-mcp.sock<br/>(same-thread transcript tools; v1.x polish)"/]
     cli["<b>kk</b> CLI"]
     tui["<b>kk</b> TUI<br/>(ratatui)"]
     hook["<b>kk-hook</b><br/>PreToolUse sidecar"]
@@ -167,7 +167,7 @@ graph TD
 
 Cleanly stated: `kkd` is a single user-scoped daemon, opted into per repository via `kk init`, that owns durable lifecycle sagas, live-head and projection state, jj op-log interpretation, cascade recovery, batch-safe harness delivery, repair plans, and the two-phase approval broker. An operational client first requests a daemon-canonical challenge; a separately enrolled foreground presenter confirms that exact plan; the operation then atomically claims its one-use approval into a durable journal. `kk` and `kk-hook` are local clients of one gRPC contract over a unix socket; transcript, metadata, GitHub, and richer UI services join behind that contract in v1.x. A same-host native GUI can reuse it directly. Remote clients require a future network transport and authentication design rather than inheriting local-socket claims.
 
-State is partitioned into one per-user database and one database per registered repo. `~/.kiki/state.db` is the user-scoped registry of managed repositories, daemon metadata, and audit rows for bootstrap, registry-wide, unknown-repo, and pre-resolution attempts. Each registered repository gets its own runtime database at `~/.kiki/repos/<repo_id>/state.db`, keyed by the UUID minted at `kk init`; that database holds threads, workspaces, agent sessions, hook state, cascades, and repo-resolved audit rows, with transcript and metadata tables added by their v1.x migrations. The source repository's filesystem holds no kiki runtime state; the only kiki file that may live there is optional committed `.kiki.toml`. Removing `~/.kiki/repos/<repo_id>/` removes that repository's kiki runtime state without disturbing other registered repos; `kk repo unregister` is the intended command path.
+State is partitioned into one per-user database and one database per registered repo. `~/.config/kiki/state.db` is the user-scoped registry of managed repositories, daemon metadata, and audit rows for bootstrap, registry-wide, unknown-repo, and pre-resolution attempts. Each registered repository gets its own runtime database at `~/.config/kiki/repos/<repo_id>/state.db`, keyed by the UUID minted at `kk init`; that database holds threads, workspaces, agent sessions, hook state, cascades, and repo-resolved audit rows, with transcript and metadata tables added by their v1.x migrations. The source repository's filesystem holds no kiki runtime state; the only kiki file that may live there is optional committed `.kiki.toml`. Removing `~/.config/kiki/repos/<repo_id>/` removes that repository's kiki runtime state without disturbing other registered repos; `kk repo unregister` is the intended command path.
 
 The implementation language for `kkd` and its CLI clients, per the reference book, is Rust — driven by the long-term path to embedding [jj-lib](https://github.com/jj-vcs/jj) directly in the daemon, by the Send/Sync guarantees the cascade-coordination code wants, and by the maturity of `tonic`/`notify`/`rusqlite`/`ratatui`. The repository as it stands is a Bun+TypeScript scaffold for tooling experiments; the language decision is the first major implementation milestone, gated by the proof-of-concept described in [Build Sequencing](docs/reference/book/17-build-sequencing.md).
 
@@ -246,7 +246,7 @@ A few principles, stated up front, because the reference book's coherence depend
 4. **High cohesion, low coupling.** kkd owns state and behavior; UIs are pure views. Internally, per-thread controllers are isolated from cross-cutting concerns, so killing one thread never destabilizes the daemon.
 5. **Fail loud, not silent.** Cycle detection, force-push reconciliation, parent-thread-abandoned prompts: when the system genuinely cannot determine the right action, it stops and asks rather than guessing.
 6. **No resource policing.** kiki does not cap concurrent agents, model spend, or laptop CPU. Those are the user's decisions, made with the user's tools.
-7. **Locally stored, explicit egress, never silent publication.** Transcript rows live under `~/.kiki/` and never feed PR drafts or automatic revision metadata. Sending selected text for catch-up or returning it through an agent-facing MCP tool is provider egress and requires purpose-specific remembered consent.
+7. **Locally stored, explicit egress, never silent publication.** Transcript rows live under `~/.config/kiki/` and never feed PR drafts or automatic revision metadata. Sending selected text for catch-up or returning it through an agent-facing MCP tool is provider egress and requires purpose-specific remembered consent.
 
 ## Built on the shoulders of
 

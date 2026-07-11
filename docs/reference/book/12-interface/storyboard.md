@@ -24,12 +24,12 @@ Acts are time-stamped (`Day · HH:MM — <repo>`) so the temporal arc is legible
 $ cd ~/code/kestrel-docs && kk init
 registered  ~/code/kestrel-docs  (mon 2026-05-04 09:15:10)
 threads     0 active, 0 closed
-state       ~/.kiki/repos/9b0c1d4f/state.db
+state       ~/.config/kiki/repos/9b0c1d4f/state.db
 
 $ cd ~/code/kestrel-www && kk init
 registered  ~/code/kestrel-www  (mon 2026-05-04 09:15:32)
 threads     0 active, 0 closed
-state       ~/.kiki/repos/2e7a8c5b/state.db
+state       ~/.config/kiki/repos/2e7a8c5b/state.db
 ```
 
 The developer returns to `kestrel-mobile` and types bare `kk`. The repo is registered and the TUI ships, so the overlay opens in `NAVIGATE` mode — but with no threads to navigate, it shows the empty-state placeholder, with `n` and `?` as the only active verbs (see [Interface · spec](spec.md#overlay)).
@@ -48,7 +48,7 @@ The developer returns to `kestrel-mobile` and types bare `kk`. The repo is regis
  ─────────────────────────────────────────────────────────────────────────────────────
 ```
 
-> kkd: `kk init` adds a row to `~/.kiki/state.db` (the cross-repo registry) under a freshly minted `<repo_id>` UUID, then creates `~/.kiki/repos/<repo_id>/` for per-repo runtime state — `state.db` (including the daemon-enforced append-only audit table), gitignored config, per-thread credentials, and per-thread error logs live under that directory. Nothing is written inside the source repo's filesystem.
+> kkd: `kk init` adds a row to `~/.config/kiki/state.db` (the cross-repo registry) under a freshly minted `<repo_id>` UUID, then creates `~/.config/kiki/repos/<repo_id>/` for per-repo runtime state — `state.db` (including the daemon-enforced append-only audit table), gitignored config, per-thread credentials, and per-thread error logs live under that directory. Nothing is written inside the source repo's filesystem.
 
 ## Act 2 — The skeleton thread
 

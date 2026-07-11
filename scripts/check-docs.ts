@@ -266,8 +266,12 @@ for (const file of files) {
       message: "stale capitalized cascade state; canonical value is conflicted",
     },
     {
-      pattern: /(?:~\/\.kiki|\.kiki\/)[^\n` ]*audit\.log\b/gi,
+      pattern: /(?:~\/\.config\/kiki|\.kiki\/)[^\n` ]*audit\.log\b/gi,
       message: "standalone audit file is stale; SQLite is authoritative",
+    },
+    {
+      pattern: /~\/\.kiki(?:\/|\b)/g,
+      message: "legacy state root; use ~/.config/kiki",
     },
     {
       pattern: /kk init[^\n]{0,100}\b(?:requires|validates)\b[^\n]{0,40}\bgh\b/gi,

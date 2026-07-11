@@ -5,7 +5,7 @@
 ## Lifecycle
 
 - One `kkd` per user.
-- First-run bootstrap: started on first `kk` invocation. State files in `~/.kiki/` are created with mode `0700`; the gRPC socket and credential files are mode `0600`.
+- First-run bootstrap: started on first `kk` invocation. State files in `~/.config/kiki/` are created with mode `0700`; the gRPC socket and credential files are mode `0600`.
 - Reboot survival: `kkd` is intended to be resurrectable across restarts via launchd / systemd-user. Recovery on restart reads sqlite; threads survive crashes and reboots.
 - Per-thread `ThreadController` actors supervise durable lifecycle sagas and die only after a thread is closed or destroyed coherently; cross-cutting components include the op-log watcher, cascade orchestrator, projection reconciler, and approval broker. AI and GitHub workers join later with their v1.x features.
 

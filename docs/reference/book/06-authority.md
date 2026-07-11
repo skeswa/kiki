@@ -9,7 +9,7 @@ The important v1 property is narrower: a normal `kk` subprocess does not receive
 `ThreadScoped<thread_id>`:
 
 - is bound to one thread;
-- is written to `~/.kiki/repos/<repo_id>/credentials/<thread_id>` with mode `0600`;
+- is written to `~/.config/kiki/repos/<repo_id>/credentials/<thread_id>` with mode `0600`;
 - is read by `kk-hook` and by a `kk` invocation whose discovered context is that thread;
 - is rotated when an incarnation ends and when a thread reopens;
 - authorizes ordinary same-thread reads and mutations only.
@@ -102,7 +102,7 @@ The CLI resolves a contextual thread as described in [Commands](11-commands.md#c
 Every parseable daemon transport attempt produces exactly one authoritative SQLite audit row with request id, method/path, credential and approval identity when identifiable, declared scope, compact argument summary, outcome, and timestamp.
 
 - Once a valid target repo is resolved, the row belongs to that repo's `audit_log` table.
-- Bootstrap, approval-presenter enrollment, repo listing, registration attempts before a repo exists, unknown-repo targets, and requests that fail before repo resolution belong to the per-user `user_audit_log` table in `~/.kiki/state.db`.
+- Bootstrap, approval-presenter enrollment, repo listing, registration attempts before a repo exists, unknown-repo targets, and requests that fail before repo resolution belong to the per-user `user_audit_log` table in `~/.config/kiki/state.db`.
 - Unauthenticated rows allow null credential/approval ids and retain only a safe presented-identity fingerprint; audit logging must not persist raw credentials.
 
 An attempt is written to one sink, never mirrored to both. If the target resolves during registration, the registration request remains in the user-level sink where it began; later repo-scoped calls use the new per-repo sink.

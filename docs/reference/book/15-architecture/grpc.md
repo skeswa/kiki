@@ -4,7 +4,7 @@
 
 ## Transport
 
-- Socket: `~/.kiki/kkd.sock`, mode `0600`.
+- Socket: `~/.config/kiki/kkd.sock`, mode `0600`.
 - Protocol: gRPC (`tonic`) with proto3 schema-versioned via field-add discipline. Server-streaming RPCs are used for event subscriptions.
 - Filesystem permissions on the socket are necessary but not sufficient — `AuthEnforcer` validates the credential carried on every call.
 

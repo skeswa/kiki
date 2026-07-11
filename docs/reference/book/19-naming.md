@@ -8,9 +8,9 @@ The tool is named **kiki**. The command is `kk`.
 - CLI binary: `kk`
 - Daemon binary: `kkd`
 - Hook sidecar: `kk-hook` (exclusive `PreToolUse` admission plus `PostToolBatch` completion reporting for the Claude adapter)
-- User state directory: `~/.kiki/`
+- User state directory: `~/.config/kiki/`
 - User config: `~/.config/kiki/config.toml`
-- Per-repo state and gitignored config: `~/.kiki/repos/<repo_id>/` (centralized; the source repo's filesystem holds no kiki state)
+- Per-repo state and gitignored config: `~/.config/kiki/repos/<repo_id>/` (centralized; the source repo's filesystem holds no kiki state)
 - Repo-shared committed config: `<repo>/.kiki.toml` (the only kiki file that lives inside the source repo, and only when the team commits one)
 
 ## Command style

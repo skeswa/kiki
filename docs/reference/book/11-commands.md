@@ -33,7 +33,7 @@ Plan drift, expiry, terminal loss, cancellation, replay, or a non-interactive pr
 It verifies prerequisites:
 
 - jj is initialized — hard error if not, with a message naming `jj init --colocate` as the typical fix.
-- `kkd` can write the per-repo state directory at `~/.kiki/repos/<repo_id>/` — hard error if not writable. The source repo's filesystem itself receives no writes; the only kiki file that may live there is the optional committed `<repo>/.kiki.toml` (the repo-shared config layer), which `kk init` does not create.
+- `kkd` can write the per-repo state directory at `~/.config/kiki/repos/<repo_id>/` — hard error if not writable. The source repo's filesystem itself receives no writes; the only kiki file that may live there is the optional committed `<repo>/.kiki.toml` (the repo-shared config layer), which `kk init` does not create.
 
 `kk init` does not require `gh`, network access, or GitHub authentication. Those checks occur lazily at `kk publish`; `kk doctor --github` is the explicit non-mutating preflight once publishing ships.
 
@@ -245,7 +245,7 @@ The acceptance slice provides `kk config get|show` for the minimal supported con
 
 `kk repo unregister <path>` removes a repo from the per-user registry. It is the explicit counterpart to `kk init`.
 
-By default, `kk repo unregister` removes both the row from `~/.kiki/state.db`'s `repos` table and the centralized state directory at `~/.kiki/repos/<repo_id>/` (threads, optional transcript rows, SQLite audit rows, credentials, per-thread error logs, and any workspace-recovery bundles). The action is irreversible — there is no kiki-managed undo, mirroring `kk thread destroy`'s shape (see [Threads · destroy](05-threads.md#destroy)). It therefore requires a one-shot foreground approval bound to the canonical repo path, repo id, and whether state is retained. Non-interactive unregister is unavailable in v1. If recovery bundles exist, the command prints their paths in its preflight; `--keep-state` is required to retain them.
+By default, `kk repo unregister` removes both the row from `~/.config/kiki/state.db`'s `repos` table and the centralized state directory at `~/.config/kiki/repos/<repo_id>/` (threads, optional transcript rows, SQLite audit rows, credentials, per-thread error logs, and any workspace-recovery bundles). The action is irreversible — there is no kiki-managed undo, mirroring `kk thread destroy`'s shape (see [Threads · destroy](05-threads.md#destroy)). It therefore requires a one-shot foreground approval bound to the canonical repo path, repo id, and whether state is retained. Non-interactive unregister is unavailable in v1. If recovery bundles exist, the command prints their paths in its preflight; `--keep-state` is required to retain them.
 
 `--keep-state` preserves the centralized state directory on disk while still removing the registry row. The preserved directory becomes orphaned bytes, useful only for an operator who wants to inspect or copy the contents before deleting them by hand. It does **not** enable any kiki-managed recovery: a future `kk init` at the same canonical path mints a fresh `repo_id` and a fresh state directory; the preserved directory has no link to the new registration. The flag exists because losing transcripts and audit logs by mistyping a path is a high cost, and `--keep-state` is the careful-operator escape hatch — not a recovery contract.
 

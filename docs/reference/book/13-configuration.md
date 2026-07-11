@@ -12,7 +12,7 @@ From lowest to highest:
 
 1. hardcoded defaults
 2. user config: `~/.config/kiki/config.toml`
-3. repo-local gitignored config: `~/.kiki/repos/<repo_id>/config.toml`
+3. repo-local gitignored config: `~/.config/kiki/repos/<repo_id>/config.toml`
 4. `KIKI_*` environment
 5. CLI flags
 
@@ -67,7 +67,7 @@ Remembered transcript-egress consent is durable privacy state, not a configurati
 
 | key               | type   | default                             | scope                       |
 | ----------------- | ------ | ----------------------------------- | --------------------------- |
-| `user_state_dir`  | string | `~/.kiki/`                          | structural — daemon restart |
+| `user_state_dir`  | string | `~/.config/kiki/`                   | structural — daemon restart |
 | `user_state_db`   | string | `<user_state_dir>/state.db`         | structural — daemon restart |
 | `kkd_socket`      | string | `<user_state_dir>/kkd.sock`         | structural — daemon restart |
 | `repo_state_dir`  | string | `<user_state_dir>/repos/<repo_id>/` | structural — daemon restart |

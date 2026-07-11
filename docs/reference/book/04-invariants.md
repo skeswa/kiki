@@ -22,7 +22,7 @@ Thread creation, close, reopen, repair, and destroy span SQLite, jj, the filesys
 
 Thread workspaces prevent accidental file interference during normal use. They should not be documented, tested, or presented as filesystem security.
 
-A same-UID process can read sibling workspaces, `~/.kiki`, and shared jj repository state. v1 accepts that fact and scopes credentials to reduce accidental blast radius, not to defeat an adversary with the user's privileges.
+A same-UID process can read sibling workspaces, `~/.config/kiki`, and shared jj repository state. v1 accepts that fact and scopes credentials to reduce accidental blast radius, not to defeat an adversary with the user's privileges.
 
 ## Cascade materializes only at safe boundaries
 

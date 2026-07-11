@@ -8,7 +8,7 @@ Transcript capture, transcript reads, and transcript-backed reopen catch-up are 
 
 ## Storage
 
-Transcript rows live in `~/.kiki/repos/<repo_id>/state.db`. The source repo's filesystem holds no transcript state — kiki centralizes all per-repo runtime under `~/.kiki/`.
+Transcript rows live in `~/.config/kiki/repos/<repo_id>/state.db`. The source repo's filesystem holds no transcript state — kiki centralizes all per-repo runtime under `~/.config/kiki/`.
 
 Transcript rows are stored locally. They must not feed:
 
