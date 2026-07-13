@@ -4,48 +4,50 @@ This chapter defines what kiki is. Later chapters define how it behaves.
 
 ## The tool
 
-kiki (`kk`) is an agentic coding workflow coordinator. It gives a developer a first-class unit for a themed line of work: a jj-backed revision stack, an isolated workspace, a tmux session, and an agent session that can be paused, resumed, published, archived, and composed with related work.
+kiki (`kk`) is an agentic coding workflow coordinator. It gives a developer a first-class unit for a themed line of work: a jj-backed revision stack, an isolated workspace, a tmux session, and an agent session that can be paused, resumed, archived, and composed with related work. Publishing and transcript-backed recall build on that unit after the coordination core is proven.
 
-kiki exists to make parallel, recursive work patterns cheap enough that a developer can maximally utilize and collaborate with agents. Today, switching between agent-led lines of inquiry means stashes, branches, rebases, lost terminals, and reconstructed context. kiki makes that machinery ambient: threads branch from other threads, follow live ancestor changes, and carry enough local transcript and status context that the human can get oriented without needing to resort to archaeology.
+kiki exists to make parallel, recursive work patterns cheap enough that a developer can maximally utilize and collaborate with agents. Today, switching between agent-led lines of inquiry means stashes, branches, rebases, lost terminals, and reconstructed context. kiki makes the coordination machinery ambient: threads branch from other threads, follow live ancestor changes, and expose enough durable state that the human can see what needs attention.
 
 ## Principles
 
 - kiki coordinates ambiently. Developers may still use `jj`, `tmux`, and `gh` directly.
 - Threads provide cooperative isolation. v1 separates workspaces to prevent accidental interference; it does not sandbox same-UID processes.
 - Human-authored prose is preserved. kiki may draft names, descriptions, and PR text, but it must not silently overwrite deliberate human edits.
-- Local transcript data stays local. v1 transcript rows may feed local recall and reopen catch-up; they must not feed externally published artifacts.
-- Cascade safety matters more than eagerness. Descendant workspaces move at agent boundaries or quiescence, not mid-edit.
+- Transcript data, when transcript capture ships, is stored locally and never feeds publication. An explicitly requested reopen catch-up may send selected local rows to the configured model provider; that egress requires consent.
+- Cascade safety matters more than eagerness. jj may evolve descendant commits immediately in repository state; kiki materializes the resulting working-copy state at agent boundaries or quiescence, not mid-edit. Parent live-head advances that require an explicit rebase use the same boundary.
 
 ## v1 contract
 
-v1 is successful when kiki can create, switch, coordinate, publish, archive, reopen, and inspect agentic work threads without relying on the original PRD as the implementation contract.
+The acceptance slice is successful when kiki can create, switch, coordinate, archive, reopen, repair, and inspect agentic work threads safely. It deliberately tests the coordination primitive before adding publication, conversational memory, or a rich UI.
 
-The first v1 acceptance surface includes:
+This chapter is the book's scope ledger. When another chapter needs to say whether a surface is acceptance slice or v1.x polish, it links here; no other chapter keeps a competing list. Promoting or demoting a surface is an edit to this chapter alone.
 
-- `kk init`, `kk new`, `kk switch`, `kk ls`, `kk close`, `kk reopen`
-- `kk publish`, `kk log`, `kk status`, `kk thread transcript`, `kk thread detach`
-- `kk config get|set|unset|edit|show`
-- per-user daemon with per-repo opt-in
-- jj workspace + bookmark backed thread identity
-- tmux session lifecycle
-- pluggable harness architecture; the `claude-code` adapter is the only one that ships in v1
-- PreToolUse hook IPC for cascade delivery
-- cascade pause, rebase, inject, acknowledge, and conflict handling
-- transcript capture and local read API
-- stack-aware publish flow
-- enough config layering for defaults, user, repo-local, per-thread, environment, and CLI flags
+The acceptance slice includes:
 
-## Deferred or stretch
+- `kk init`, `kk repo unregister`, `kk new`, `kk switch`, `kk ls`, `kk close`, `kk reopen`, and `kk repair`
+- `kk log`, `kk status`, `kk thread detach`, `kk thread audit`, and approval-gated `kk audit log`
+- the minimum `kk config get|show` inspection surface and configuration needed to select the harness and relocate state or workspaces
+- a per-user daemon, per-repo registration, durable lifecycle sagas, and restart recovery
+- stable thread identity, a workspace `@` as the live thread head, and a bookmark as a checkpoint/publication projection
+- a deliberately linear owned-stack contract that stops at ambiguous topology
+- jj workspace and tmux session lifecycle, including recoverable close and creation failure states
+- the pluggable harness boundary; the `claude-code` adapter is the only adapter implemented initially
+- exclusive managed-hook setup, batch-aware cascade delivery, reconciliation/materialization, acknowledgement, and conflict recovery
+- broad projection-divergence detection, narrow automatic repair, and explicit human-directed repair for ambiguous cases
+- SQLite-backed scoped and unscoped operational audit and the two-phase one-shot human-approval path needed by consequential operations
 
-These can deepen v1 but must not block the first acceptance slice unless explicitly promoted:
+## v1.x polish
 
-- overlay TUI
-- persistent sidebar pane
-- AI auto-rename polish
-- AI auto-describe polish
-- full notification vocabulary
-- PR-merge auto-archive
-- read-only MCP transcript tools
+These deepen v1 but must not block the acceptance slice unless explicitly promoted:
+
+- stack-aware GitHub publishing through `gh`, with authentication checked when publishing rather than at registration
+- transcript capture, human transcript reads, consented opt-in reopen catch-up, same-thread MCP consent, and provider-consent management
+- overlay TUI, persistent sidebar, status-line polish, and the full notification vocabulary
+- metadata ownership tracking followed by AI auto-describe and auto-rename execution
+- PR merge polling, comments, CI presentation, and auto-archive
+- narrow same-thread read-only transcript MCP reads, after the human transcript surface is stable
+- full layered configuration mutation through `set|unset|edit`, repo-shared and per-thread layers, and feature-specific sections
+- additional harness/version diagnostics, non-core op-log compatibility cases, and additional `kk thread` management commands
 
 ## Out of scope for v1
 
@@ -53,7 +55,7 @@ These can deepen v1 but must not block the first acceptance slice unless explici
 - resource caps for agents
 - Codex and non-Claude-Code harness adapters
 - broad MCP substrate for cross-thread agent messaging or spawning
-- webhooks; GitHub polling is sufficient for v1
+- webhooks; later GitHub integration may poll instead
 - full-screen multiplexer behavior beyond tmux integration
 
 ## Non-goals
@@ -64,5 +66,5 @@ v1 leaves these problems alone:
 - kiki does not manage CPU, memory, token, or model spend.
 - kiki does not block direct use of `jj`, `gh`, or `tmux`.
 - kiki does not mirror the full `jj` CLI surface. When users need arbitrary jj behavior, they should run `jj`.
-- kiki does not publish local transcript prose, summarize it into PRs, or feed it into auto-describe or auto-rename.
+- kiki does not publish local transcript prose, summarize it into PRs, or feed it into auto-describe or auto-rename. Consented reopen catch-up is model input, not publication.
 - kiki does not defend against an actively malicious same-UID process that can read files and invoke `kk`.

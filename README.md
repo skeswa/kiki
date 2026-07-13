@@ -33,7 +33,7 @@ graph TD
 
     main --> A
     main --> C
-    A ==>|"follows<br/>auto-rebase + inform on evolve"| B
+    A ==>|"follows<br/>reconcile + inform on evolve"| B
 
     classDef trunk fill:#1a1a1a,stroke:#888,color:#fff
     classDef thread fill:#f5f5f5,stroke:#888,color:#222
@@ -41,11 +41,11 @@ graph TD
     linkStyle 2 stroke:#3b82f6,stroke-width:2.5px
 ```
 
-<p align="center"><sub><i>Each thread is its own jj workspace, tmux session, and agent. <code>add-tests</code> <b>follows</b> <code>payment-refactor</code> — when its parent evolves, kiki rebases <code>add-tests</code> onto the new base and informs Agent B at the next safe boundary.</i></sub></p>
+<p align="center"><sub><i>Each thread is its own jj workspace, tmux session, and agent. <code>add-tests</code> <b>follows</b> <code>payment-refactor</code> — when its parent evolves, jj updates repository history and kiki reconciles <code>add-tests</code>'s files and informs Agent B at the next safe boundary.</i></sub></p>
 
-kiki is a single workflow for working on several pieces of code at once, with several AI agents at once. It ties together [jujutsu (jj)](https://github.com/jj-vcs/jj), [tmux](https://github.com/tmux/tmux), [Claude Code](https://claude.com/claude-code), and the GitHub CLI behind a single command, `kk`. Each thread — the atom of the system, sketched above — is isolated on disk so concurrent edits don't stomp on each other, and related in history so a refactor and the test-writing it implies can run alongside one another instead of one after the other. When the ground shifts under a thread, kiki rebases it and tells its agent without losing the agent's in-flight reasoning; that mechanism gets its own section below.
+kiki is a single workflow for working on several pieces of code at once, with several AI agents at once. It ties together [jujutsu (jj)](https://github.com/jj-vcs/jj), [tmux](https://github.com/tmux/tmux), [Claude Code](https://claude.com/claude-code), and the GitHub CLI behind a single command, `kk`. Each thread — the atom of the system, sketched above — is isolated on disk so concurrent edits don't stomp on each other, and related in history so a refactor and the test-writing it implies can run alongside one another instead of one after the other. When the ground shifts under a thread, jj may evolve its history immediately; kiki waits for a safe boundary before materializing that state in the thread's files and telling its agent. That mechanism gets its own section below.
 
-The complete reference book is at [`docs/reference/README.md`](docs/reference/README.md); what's actually built today is captured in the [Status](#status) section below.
+The complete reference book is at [`docs/reference/README.md`](docs/reference/README.md); its Orientation chapter is the sole scope ledger, and what's actually built today is captured in the [Status](#status) section below.
 
 ## What problem is being solved
 
@@ -57,29 +57,31 @@ kiki is an attempt to build that tool.
 
 ## The design, briefly
 
-The unit of work is a **thread**: a themed sequence of jj revisions on a bookmark, materialized in its own jj workspace, attached to its own tmux session running an agent. Threads are isolated on disk (one workspace each, no shared working copy) and related in history (they share the underlying jj repository). A thread is the thing you spawn, switch between, publish, and close.
+The unit of work is a **thread**: a themed sequence of jj revisions with a live head at its managed workspace's `@`, attached to its own tmux session running an agent. A bookmark is an explicit checkpoint and publication projection; it is not assumed to move merely because `jj new` created another revision. Threads are isolated on disk (one workspace each, no shared working copy) and related in history (they share the underlying jj repository). A thread is the thing you spawn, switch between, publish, and close.
 
-Threads can be related: `kk new add-tests --follows payment-refactor` records a follow-edge in kiki's state. When the parent thread evolves — its bookmark advances, or a revision in its history is amended — kiki rebases the descendant onto the new base and informs its agent at the next safe boundary. The mechanism for that last step is the part of the system that warrants the most careful description, so it gets its own section below.
+Threads can be related: `kk new add-tests --follows payment-refactor` records a follow-edge in kiki's state. When an ancestor is amended, jj itself evolves descendants in repository state and may leave their workspace files stale; kiki materializes each affected workspace and informs its agent at that agent's next safe boundary. When the parent's live head instead gains a new commit, kiki explicitly rebases the child's provably linear owned stack onto that exact commit at the same boundary. Ambiguous or merged topology stops for a human instead of expanding an inferred revset. The distinction is load-bearing, so it gets its own section below.
 
-When the work is ready to leave the local machine, `kk publish` opens an editor with an AI-drafted PR title and body and creates a pull request against the parent thread's branch. If the parent itself has not been published yet, kiki publishes it first, walking up the stack and opening an editor for each, so that the human reviews each PR as it lands. When a parent merges, descendants are rebased onto `main`, force-pushed with `--force-with-lease`, and detached from the merged parent's follow-edge. Auto-archiving merged threads is useful polish, but it is not part of the first acceptance slice unless promoted later.
+After the coordination core is proven, the first v1.x `kk publish` flow checkpoints the thread bookmark, opens an editor with a deterministic title/body template, and creates a pull request against the parent thread's branch. It makes no model call; AI drafting arrives later with metadata evolution. If the parent itself has not been published yet, kiki publishes it first, walking up the stack and opening an editor for each, so that the human reviews each PR as it lands. When a parent merges, descendants reconcile locally onto the exact merged `main` commit at their safe boundaries. The resulting lease-protected force-push and PR-base update remain a named remote plan until separately approved in the foreground; the follow-edge is removed only after those effects are observed coherent.
 
-`kk close` is non-destructive. It removes the thread's workspace and tmux session and hides it from default listings, but the bookmark and revisions stay in the repository; `kk reopen` restores the workspace, rebuilds the tmux session, and resumes the agent via its session-id. (A separate `kk thread destroy` exists for actually removing the bookmark, gated behind explicit confirmation.)
+`kk close` is non-destructive. It freezes the managed process tree, rechecks the exact approved loss-safety plan, checkpoints without snapshotting, reconciles child detaches, and only then removes the tmux session and workspace. A failed recheck or child step resumes and verifies the original session instead of leaving a dead thread labeled active. `kk reopen` runs a durable saga that remains closed until the replacement is ready. A later, separately approved `kk thread destroy` removes kiki's thread identity and local projections while preserving jj revisions by default; `--abandon-revisions` requires its own exact-chain approval.
 
 ## How an agent learns its base just changed
 
-Several of the harder design questions reduce to one: when an ancestor revision is amended while a descendant thread's agent is actively editing, how does the agent come to know that its working copy has been rebased without losing the thread of what it was doing?
+Several of the harder design questions reduce to one: when an ancestor revision is amended while a descendant thread's agent is actively editing, how does the agent come to know that jj evolved its working-copy commit without changing the thread's files underneath it?
 
 The honest answer is that current agent harnesses were not designed with this case in mind. Sending the agent a SIGINT and restarting it via `--resume` is reliable but disruptive — it loses the in-flight reasoning and forces a fresh framing of the work. What we want is something gentler: a mechanism that interrupts the agent at a moment when the interruption is cheap, hands it the new context in a form it already knows how to read, and lets it carry on.
 
-Claude Code's `PreToolUse` hook turns out to be exactly that mechanism. The hook fires immediately before any tool invocation, can return arbitrary text that the agent reads as the tool's result, and can block the in-flight tool. kiki uses this primitive as a gate, coordinated by four counters: three live on the thread — `pending_cascade_seq` advances when a cascade is enqueued, `applied_cascade_seq` when the rebase actually runs, `acknowledged_cascade_seq` when the agent's next tool call confirms the synthetic result was integrated — and the fourth, `delivered_in_flight_seq`, lives on the agent's session and is set once a synthetic result has been written to the agent's stdout.
+Claude Code's `PreToolUse` hook supplies that boundary, but only when kiki can prove exclusive control of that hook class for the managed session; current Claude Code runs matching handlers concurrently, so v1 does not pretend user `PreToolUse` hooks can safely run after kiki. Kiki first classifies the jj transition from before/after operation views. A `NativeRewrite` pins a **base transition**: jj already evolved the descendant's repository commits from `from_base_commit` onto `to_base_commit`, so kiki normally needs only to materialize the stale workspace. A `ParentAdvance` means the parent's exact live head is outside the child's ancestry, so kiki explicitly rebases the child's validated single-parent owned stack onto `to_base_commit`.
 
-When the op-log watcher observes a change that requires rebasing a descendant thread, the daemon does not run `jj rebase` immediately. Instead it bumps the thread's `pending_cascade_seq` counter and enqueues a cascade message. On the agent's next tool call, `PreToolUse` claims the cascade lock, asks the daemon to apply the rebase under the hook's protection, advances `applied_cascade_seq`, _reads_ the cascade queue, releases the lock, and returns a synthetic tool result of the form _"Your base was rebased onto X. Files {a, b} have new contents. Re-read them before continuing."_
+Each transition lives in one durable `sync_intents` row. That row is the protocol authority: it owns the ordered intent sequence, normalized trigger operation ids, state, planned and result operation ids, result workspace commit, recovery details, and the byte-stable payload and transcript anchor used for delivery. There are no shadow progress counters, context queue, or separate cascade-outbox table whose state can disagree with it.
 
-The hook then — and only then, after the synthetic result has actually been emitted on stdout — issues a separate `MarkDelivered` RPC to set `delivered_in_flight_seq`. This ordering is the load-bearing detail of the protocol: writing the marker last means every crash window degrades to _double delivery_ (next PreToolUse re-delivers from the un-drained queue) rather than _false acknowledgement_ (queue drained for a cascade the agent never saw).
+On the agent's next tool batch, the first `PreToolUse` claims the reconciliation lock and atomically binds the intent's durable `Block` barrier to the runtime incarnation, model turn, and tool batch **before** probing or mutating the workspace. Every sibling call observes that same decision, including after a hook or daemon restart. A provably clean stale workspace may then be materialized with `jj workspace update-stale`; a stale workspace with dirty or indeterminate on-disk edits enters `RecoveryRequired` and hard-pauses the agent. Recovery runs outside the source workspace, preserves and enumerates jj's divergent successors, verifies where the edits landed, and resumes only when kiki can prove the visible result still contains them.
 
-When the agent's follow-up tool call eventually comes — and that follow-up is the strongest signal that the agent has actually integrated the synthetic result — that next `PreToolUse` runs an acknowledgement step first, promoting `delivered_in_flight_seq` into the thread's `acknowledged_cascade_seq` and draining the queue up to that point. Only then does it consider whether to deliver another cascade. PostToolUse is deliberately not part of this state machine: Claude Code does not fire PostToolUse for tools that PreToolUse blocked, so tying acknowledgement to PostToolUse would silently lose every cascade. If the agent crashes between delivery and the follow-up tool call, the queue is undrained and a fresh `--resume` session — initialized with `delivered_in_flight_seq=0` — will see `pending_cascade_seq > acknowledged_cascade_seq` and re-deliver the cascade idempotently. The blast radius is at most one tool-call interval, and the agent never sees a working copy it didn't expect or silently misses a cascade.
+After successful reconciliation, kiki atomically records the result, transcript anchor, payload, and `Materialized` state while preserving the already-bound barrier. The hook emits that saved payload and only then calls `MarkDelivered(intent_id, incarnation_id, model_turn_id, tool_batch_id)`. `MarkDelivered` records delivery; it does not arm the barrier. Writing delivery after stdout makes a crash cause idempotent redelivery rather than false acknowledgement.
 
-The invariant that falls out of this ordering is the property that makes the whole design defensible: a thread's working copy is rebased only when the agent is at a tool boundary — never when it is mid-edit. The daemon does not perform the rebase until the hook fires; the hook fires only at tool boundaries; and tool boundaries are by construction moments when no edit is in flight. When the rebase fails — that is, when it produces a textual conflict the agent must consciously resolve — kiki escalates: SIGINT the agent, restart with `--resume` and a framing message that tells it what happened, and notify the human. The cascade does not silently advance through conflicts.
+`PostToolBatch` closes the delivery barrier after every call in the triggering batch has been blocked. Only a later `PreToolUse` produced by a later model turn may acknowledge the intent; another concurrent call from the original batch is never acknowledgement evidence. If the agent or hook crashes before that later turn, the replacement incarnation gets the exact saved payload again. A harness without a reliable batch-completion boundary uses `RestartStartup`: the replacement receives the payload as its first one-use-tagged startup message, reports ready with that `startup_delivery_id`, and only its first matching tagged `PreToolUse` proves acceptance and acknowledges delivery.
+
+The resulting invariant is deliberately about the workspace, not the shared repository: kiki materializes evolved files or performs an explicit follows rebase only at the managed agent's boundary, never mid-edit. A direct human `jj` command in a stale child workspace is an explicit escape hatch and may materialize it earlier; kiki discovers the current file state at its next boundary rather than pretending every command was gated or observable in the op log. If reconciliation exposes a conflicted jj commit, kiki escalates: SIGINT the agent, restart with `--resume` and a framing message, and notify the human.
 
 ```mermaid
 sequenceDiagram
@@ -90,30 +92,33 @@ sequenceDiagram
     participant agentB as Agent B
 
     agentA->>kkd: amends ancestor revision X
-    Note over kkd: op-log watcher detects op<br>identifies B as affected
-    kkd->>kkd: bump B.pending_cascade_seq<br>enqueue ContextMessage<br>no jj rebase yet
+    Note over kkd: jj evolves B in repository state<br>B's on-disk workspace is stale
+    kkd->>kkd: classify NativeRewrite X1→X2<br>insert sync intent in Detected
 
-    agentB->>hookB: PreToolUse — next tool call
-    Note over hookB: ack step: delivered_in_flight_seq=0<br>nothing to acknowledge
-    hookB->>kkd: is pending_cascade_seq > acknowledged_cascade_seq?
-    Note over kkd: yes — claim cascade lock<br>apply jj rebase, advance applied_cascade_seq<br>read but do not drain the queue<br>release lock
+    agentB->>hookB: PreToolUse — tool batch begins
+    Note over hookB: no prior delivery barrier<br>claim reconciliation lock
+    hookB->>kkd: request oldest unresolved intent
+    Note over kkd: claim reconciliation lock<br>bind durable Block barrier first<br>probe workspace immediately<br>StaleClean → jj workspace update-stale<br>save result + payload as Materialized<br>while preserving barrier
     kkd-->>hookB: synthetic tool result content
-    hookB-->>agentB: writes synthetic result to stdout<br>and blocks original tool call
-    Note over agentB: reads result as tool output<br>re-reads affected files — reasons further
-    hookB->>kkd: MarkDelivered with session_id and applied_cascade_seq
-    Note over kkd: NOW set session.delivered_in_flight_seq<br>written AFTER stdout — a crash here<br>causes double-delivery, not false-ack
+    hookB-->>agentB: writes synthetic result to stdout<br>and blocks every call in this batch
+    hookB->>kkd: MarkDelivered(intent + incarnation + turn + batch)
+    Note over kkd: mark intent Delivered<br>preserve pre-bound barrier<br>written AFTER stdout — a crash here<br>causes double-delivery, not false-ack
 
-    agentB->>hookB: PreToolUse — follow-up tool call
-    Note over hookB: ack step: delivered_in_flight_seq > 0<br>promote into acknowledged_cascade_seq<br>drain queue, clear delivered_in_flight_seq
-    hookB->>kkd: is pending_cascade_seq > acknowledged_cascade_seq?
-    Note over kkd: no — fast-path pass-through
+    agentB->>hookB: PostToolBatch — triggering batch closed
+    hookB->>kkd: MarkToolBatchComplete(incarnation + turn + batch)
+    Note over hookB: barrier becomes awaiting-later-turn<br>payload will enter the next model request
+    Note over agentB: reads result, re-reads affected files,<br>and produces a later model turn
+    agentB->>hookB: PreToolUse — later-turn tool call
+    Note over hookB: acknowledge delivered intent<br>clear delivery barrier
+    hookB->>kkd: request oldest unresolved intent
+    Note over kkd: none — fast-path pass-through
     hookB-->>agentB: tool proceeds normally
-    Note over agentB,kkd: If agent crashes BEFORE the follow-up PreToolUse,<br>fresh --resume session has delivered_in_flight_seq=0<br>queue is still undrained → idempotent re-delivery
+    Note over agentB,kkd: A concurrent PreToolUse from the original batch never acks.<br>If the agent crashes before the later turn,<br>replacement gets a new incarnation id<br>and byte-identical RestartStartup delivery;<br>its first matching tagged boundary proves acceptance.
 ```
 
 ## kiki does not gatekeep
 
-A design choice that pervades the rest of the system: kiki watches the jj op log and reacts to whatever it sees, regardless of who initiated the operation. A human running `jj rebase` directly in a thread's workspace, an agent invoking `jj` via Bash, kkd itself rebasing a child onto a parent's new tip — all three flow through the same code path. The daemon does not refuse direct jj or gh or tmux invocations, does not require its CLI to be the channel for repository operations, and does not maintain a separate, authoritative copy of the world. The op log is the source of truth.
+A design choice that pervades the rest of the system: kiki watches the jj op log and reacts to whatever it sees, regardless of who initiated the operation. An agent invoking `jj` via Bash and kkd advancing a child onto a parent's new tip both become before/after jj views that the same classifier interprets. A human updating a stale workspace directly is also supported, although the file materialization may produce no new op and is then discovered by the boundary probe. The daemon does not refuse direct jj or gh or tmux invocations and does not maintain a competing version-history model. The op log is the source of truth for repository evolution; the current filesystem and jj workspace metadata are the source of truth for materialization.
 
 This is not a small choice. Building kiki as a gatekeeper — wrapping every jj invocation, intercepting every tmux command — would be a substantial undertaking and would degrade the user's existing relationship with those tools. Building it as an ambient coordinator that observes and reacts is harder in some ways (the daemon must distinguish its own operations from external ones to avoid self-triggered loops; it must coalesce rapid-fire op storms into single cascades) but produces a tool that is additive rather than invasive. The tmux-server analogy is exact: tmux does not refuse to let you `cd` somewhere weird in a pane, and it does not get upset if you launch a process outside a session. kiki holds the same posture.
 
@@ -123,23 +128,23 @@ Diffs are a record of what changed; they are not a record of what was _said_. Th
 
 kiki keeps it.
 
-For each thread, kkd captures the interleaved text exchange between the user and the agent — what the user typed, what the agent said back, the synthetic tool results kiki itself injected during cascade — and binds each message to the jj change-id that was `@` when the message was captured. The result is a log that travels with the work: change-ids are preserved by `jj rebase`, so when a descendant cascades onto a new base its message bindings come along for free, no re-anchoring required. When the agent crashes and `kk reopen` brings it back, kkd seeds the resumed session with a catch-up message synthesized from the log, so the resume is not a cold start.
+In the v1.x transcript layer, kkd captures the interleaved text exchange between the user and the agent — what the user typed, what the agent said back, and the synthetic results kiki injected during cascade — and binds each message to the jj change-id that was `@` when captured. Change-ids survive rebase, so the local recall surface follows the work. An opt-in `kk reopen --catch-up` can preview and send a short transcript-derived catch-up to the resumed harness.
 
-Two things the log is _not_. It is not a published artifact: messages live in the per-repo runtime database under `~/.kiki/repos/<repo_id>/state.db`, never in the source repo, and never leave the local machine — agent prose contains dead ends, tool errors, and quoted file contents that should not surface in a PR description. And it is not a structured event log: it captures the narrative (`author: human | agent | kk`, `direction`, `text`), not the token-streaming deltas, the tool-call arguments, or the extended-thinking blocks. The diff still tells you _what_; the log tells you _why_.
+Two things the log is _not_. It is not a published artifact: rows live in the per-repo runtime database under `~/.config/kiki/repos/<repo_id>/state.db`, never in the source repo, and never feed PR descriptions or automatic revision metadata. “Stored locally” does not mean “never leaves the machine”: when the user opts into catch-up, that selected text may be sent to the configured model provider. It is also not a structured event log: it captures narrative text, not token deltas, structured tool payloads, or extended-thinking blocks.
 
-The first reader is human: `kk thread transcript [<change>]`, with full-text search over the whole thread. A narrow same-thread MCP reader is a stretch surface that may ship after the human CLI proves stable. Cross-thread reads are deliberately a v2 concern: an agent in B reading agent A's transcript is a pleasing idea with a quiet failure mode (context pollution, prompt leakage between threads), and v1 is the wrong place to ship it without the v2 substrate's safety mechanisms.
+The v1.x transcript work starts with the human reader: `kk thread transcript [<change>]`, with full-text search over the whole thread. A narrow same-thread MCP reader may follow after that CLI proves stable. Cross-thread reads remain a v2 concern because context pollution and prompt leakage need a stronger substrate.
 
-The log feeds back into AI-driven kiki features only at _local_ boundaries — `kk reopen` catch-up in the first acceptance slice, and same-thread agent self-query only if the later MCP surface ships. It is deliberately _not_ read by `kk publish`'s PR-drafter or by auto-describe / auto-rename. A boring PR description costs you nothing irreversible; a PR description that quotes "the user said their boss is being unreasonable about the deadline" costs you a hard-to-undo embarrassment. The local-only stance only holds if local-only-features is a discipline, not a default.
+The log feeds back into AI-driven features only through explicit, provider-aware consent: catch-up in v1.x, and same-thread self-query only if the later MCP surface ships. MCP is local IPC on its first hop, but its tool result normally becomes hosted-model input, so missing `transcript_mcp` consent fails closed before any row is returned. The log is deliberately not read by PR drafting, auto-describe, or auto-rename. Local storage and no-publication are separate promises from provider egress, and the UI must say which boundary an action crosses.
 
-The capture path itself is abstracted behind a `TranscriptAdapter` trait — Claude Code is the v1 implementor, Codex slots in for v2 — so the schema and read API stay harness-neutral while the way bytes flow into the log can vary per harness.
+The v1.x capture path itself is abstracted behind a `TranscriptAdapter` trait — Claude Code is the first implementor, and later harnesses can add projectors — so the schema and read API stay harness-neutral while the way bytes flow into the log can vary per harness.
 
 ## Architecture
 
 ```mermaid
 graph TD
     kkd["<b>kkd</b> daemon<br/>Owns all state and behavior<br/>Single user-scoped process"]
-    socket[/"Stable gRPC contract over ~/.kiki/kkd.sock"/]
-    mcp[/"Read-only MCP over ~/.kiki/kkd-mcp.sock<br/>(same-thread transcript tools; stretch/post-v1)"/]
+    socket[/"Stable gRPC contract over ~/.config/kiki/kkd.sock"/]
+    mcp[/"Read-only MCP over ~/.config/kiki/kkd-mcp.sock<br/>(same-thread transcript tools; v1.x polish)"/]
     cli["<b>kk</b> CLI"]
     tui["<b>kk</b> TUI<br/>(ratatui)"]
     hook["<b>kk-hook</b><br/>PreToolUse sidecar"]
@@ -160,9 +165,9 @@ graph TD
     class mcp,gui,remote future
 ```
 
-Cleanly stated: `kkd` is a single user-scoped daemon (one process per user, opted into per-repository via `kk init`) that owns all state and behavior — thread lifecycle, the jj op-log watcher, the cascade orchestrator, the agent harness adapters, the thread-log capture path, the metadata ownership ledger, and the GitHub poller. `kk`, the TUI if it ships, and the small `kk-hook` PreToolUse sidecar are clients of a stable gRPC contract over a unix socket. A later same-thread MCP server may expose narrowly scoped transcript retrieval tools to the calling thread (broader cross-thread MCP is the v2 substrate). There is no privileged internal API. A native macOS GUI written next year will consume the same gRPC surface today's clients do; that is the property that makes the design durable.
+Cleanly stated: `kkd` is a single user-scoped daemon, opted into per repository via `kk init`, that owns durable lifecycle sagas, live-head and projection state, jj op-log interpretation, cascade recovery, batch-safe harness delivery, repair plans, and the two-phase approval broker. An operational client first requests a daemon-canonical challenge; a separately enrolled foreground presenter confirms that exact plan; the operation then atomically claims its one-use approval into a durable journal. `kk` and `kk-hook` are local clients of one gRPC contract over a unix socket; transcript, metadata, GitHub, and richer UI services join behind that contract in v1.x. A same-host native GUI can reuse it directly. Remote clients require a future network transport and authentication design rather than inheriting local-socket claims.
 
-State is partitioned into one per-user database and one database per registered repo. `~/.kiki/state.db` is the user-scoped registry of managed repositories and daemon metadata. Each registered repository gets its own runtime database at `~/.kiki/repos/<repo_id>/state.db`, keyed by the UUID minted at `kk init`; that database holds threads, workspaces, agent sessions, hook state, transcripts, cascades, the metadata-ownership ledger, and op-attribution state. The source repository's filesystem holds no kiki runtime state; the only kiki file that may live there is optional committed `.kiki.toml`. Removing `~/.kiki/repos/<repo_id>/` removes that repository's kiki runtime state without disturbing other registered repos; `kk repo unregister` is the intended command path.
+State is partitioned into one per-user database and one database per registered repo. `~/.config/kiki/state.db` is the user-scoped registry of managed repositories, daemon metadata, and audit rows for bootstrap, registry-wide, unknown-repo, and pre-resolution attempts. Each registered repository gets its own runtime database at `~/.config/kiki/repos/<repo_id>/state.db`, keyed by the UUID minted at `kk init`; that database holds threads, workspaces, agent sessions, hook state, cascades, and repo-resolved audit rows, with transcript and metadata tables added by their v1.x migrations. The source repository's filesystem holds no kiki runtime state; the only kiki file that may live there is optional committed `.kiki.toml`. Removing `~/.config/kiki/repos/<repo_id>/` removes that repository's kiki runtime state without disturbing other registered repos; `kk repo unregister` is the intended command path.
 
 The implementation language for `kkd` and its CLI clients, per the reference book, is Rust — driven by the long-term path to embedding [jj-lib](https://github.com/jj-vcs/jj) directly in the daemon, by the Send/Sync guarantees the cascade-coordination code wants, and by the maturity of `tonic`/`notify`/`rusqlite`/`ratatui`. The repository as it stands is a Bun+TypeScript scaffold for tooling experiments; the language decision is the first major implementation milestone, gated by the proof-of-concept described in [Build Sequencing](docs/reference/book/17-build-sequencing.md).
 
@@ -188,25 +193,23 @@ $ kk ls
 # Move between sessions
 $ kk switch auth-refactor
 
-# Publish the stack, top-down
+# v1.x: publish the stack, top-down
 $ kk publish
 
 # Close when done; the workspace is removed but revisions persist
 $ kk close
 ```
 
-When the UI polish surfaces ship, a persistent tmux status-line strip can surface threads needing attention and a tmux keybinding can overlay the TUI for fast switching and spawning. OS-native notifications fire for the core attention cases: agent permission prompts, cascade conflicts, parent lifecycle events, and failed PR checks.
+When the v1.x UI polish ships, a persistent tmux status-line strip can surface threads needing attention and a tmux keybinding can overlay the TUI for fast switching and spawning. Toasts exist only inside the overlay; a visible persistent sidebar remains state-only, so OS/tmux notifications still carry attention events when the overlay is closed. Core notifications cover permission prompts, cascade conflicts, and local parent lifecycle events; failed PR checks join only with v1.x GitHub polling.
 
 ## Roadmap
 
-| Milestone                | Highlights                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **v1 — core acceptance** | Thread atom, live-follow cascade, PreToolUse-based pause-propagate-resume, content-hash ownership ledger for human prose, change-id-aligned thread transcript with human CLI reads and `kk reopen` catch-up, `kk publish` with stack recursion, `kk close`/`kk reopen`, `kk log`/`kk status`, `kk thread detach`, Claude Code adapter. Estimated 7-10 weeks of focused work.                                        |
-| **v1.x / demo polish**   | Overlay TUI and persistent sidebar, hook-config diagnostics, op-log watcher edge cases, status-line themes, AI auto-describe and auto-rename execution loop once the ownership ledger is proven, PR merge polling and auto-archive, narrow same-thread transcript MCP reads if the human CLI surface is stable.                                                                                                     |
-| **v2 — the substrate**   | MCP surface expanded beyond same-thread transcript reads: agents in one thread can post messages to siblings, spawn children, request human review — with causal-chain cycle detection, depth and branching caps, and a complete audit trail. Codex harness adapter (slotting into the v1 `TranscriptAdapter` trait). Native macOS GUI. Direct GitHub REST/GraphQL. PR review-comment ingestion into agent context. |
-| **v3+**                  | jj-lib embedded directly in kkd. Web dashboard. Cross-repository coordinated agent tasks.                                                                                                                                                                                                                                                                                                                           |
+- **v1 — the acceptance slice.** The thread atom with explicit live-head semantics, recoverable create/close, provably linear live-follow cascade, batch-safe Claude Code delivery, projection repair, and basic `ls` / `log` / `status` / minimal configuration.
+- **v1.x — workflow completion and polish.** Stacked publishing, local transcript capture and consented reopen catch-up, metadata ownership and later AI evolution, the overlay TUI and sidebar, GitHub polling, auto-archive, and same-thread transcript MCP reads.
+- **v2 — the substrate.** Cross-thread agent messaging with causal-chain auditing, the Codex adapter, a native macOS GUI, direct GitHub REST/GraphQL.
+- **v3+.** jj-lib embedded directly in kkd, a web dashboard, cross-repository coordination.
 
-The full spec — including v2's MCP design — lives in the [`docs/reference/`](docs/reference/README.md) reference book.
+The canonical scope ledger — which surface belongs to which tier — is the book's [Orientation chapter](docs/reference/book/01-orientation.md); the full spec, including v2's MCP design, lives in the [`docs/reference/`](docs/reference/README.md) reference book.
 
 ## On the name
 
@@ -218,7 +221,7 @@ The second reason is more important. A [_kiki_](<https://en.wikipedia.org/wiki/K
 
 ## Status
 
-Pre-alpha. Spec phase. The reference book has absorbed the original PRD and survived one Codex review pass; implementation has not begun. The repository's TypeScript scaffolding is provisional and exists to make tooling decisions easier; the production code is slated to be Rust per the spec, and the language decision will be revisited at the gating proof-of-concept.
+Pre-alpha. Spec phase. The reference book has absorbed the original PRD and multiple adversarial review passes; implementation has not begun. The repository's TypeScript scaffolding is provisional and exists to make tooling decisions easier; the production code is slated to be Rust per the spec, and the language decision will be revisited at the gating proof-of-concept.
 
 If this looks like a tool that would change how you work, the most useful thing you can do today is read the reference book and file an issue on anything that strikes you as wrong, missing, or under-specified. The spec is durable enough that pre-implementation feedback is genuinely actionable.
 
@@ -228,6 +231,7 @@ If this looks like a tool that would change how you work, the most useful thing 
 mise install         # provision pinned tooling (Bun, currently)
 bun install          # install dev dependencies (oxfmt, types)
 bun run fmt          # format
+bun run check:docs   # verify local links, anchors, and stale contract terms
 ```
 
 Once the v1 build begins this section will gain `cargo build`, `cargo test`, and `kk` invocations.
@@ -242,7 +246,7 @@ A few principles, stated up front, because the reference book's coherence depend
 4. **High cohesion, low coupling.** kkd owns state and behavior; UIs are pure views. Internally, per-thread controllers are isolated from cross-cutting concerns, so killing one thread never destabilizes the daemon.
 5. **Fail loud, not silent.** Cycle detection, force-push reconciliation, parent-thread-abandoned prompts: when the system genuinely cannot determine the right action, it stops and asks rather than guessing.
 6. **No resource policing.** kiki does not cap concurrent agents, model spend, or laptop CPU. Those are the user's decisions, made with the user's tools.
-7. **Local recall, never silent leak.** The thread log is captured for human recall and local agent re-orientation and lives only on the local machine. It feeds back into AI features only at local boundaries (`kk reopen` catch-up in the core slice, same-thread agent self-query if the MCP surface ships); it does not feed into features that produce externally-published artifacts (PR drafts, auto-described revisions). The local-only stance only holds if local-only-features is a discipline, not a default.
+7. **Locally stored, explicit egress, never silent publication.** Transcript rows live under `~/.config/kiki/` and never feed PR drafts or automatic revision metadata. Sending selected text for catch-up or returning it through an agent-facing MCP tool is provider egress and requires purpose-specific remembered consent.
 
 ## Built on the shoulders of
 

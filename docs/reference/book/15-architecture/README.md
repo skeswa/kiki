@@ -21,18 +21,22 @@ flowchart LR
         CLI["kk CLI"]
         TUI["kk overlay TUI"]
         Sidebar["kk sidebar pane"]
-        Hook["kk-hook\nClaude Code PreToolUse sidecar"]
-        AgentMcp["Agent MCP client\nread-only transcript tools\n(stretch/post-v1)"]
+        Hook["kk-hook\nexclusive PreToolUse + PostToolBatch sidecar"]
+        AgentMcp["Agent MCP client\nread-only transcript tools\n(v1.x polish)"]
         FutureUI["future native / web UI"]
     end
 
-    GrpcSock["~/.kiki/kkd.sock\ngRPC over unix socket"]
-    McpSock["~/.kiki/kkd-mcp.sock\nStreamable HTTP MCP over unix socket\n(stretch/post-v1)"]
-    AdminCred["~/.kiki/admin-cred\nread by kk CLI / TUI"]
-    HookCred["~/.kiki/repos/<repo_id>/credentials/<thread_id>\nread by kk-hook / sidebar / MCP client"]
+    GrpcSock["~/.config/kiki/kkd.sock\ngRPC over unix socket"]
+    McpSock["~/.config/kiki/kkd-mcp.sock\nStreamable HTTP MCP over unix socket\n(v1.x polish)"]
+    AdminCred["~/.config/kiki/admin-cred\nbootstrap / broker enrollment only"]
+    Broker["enrolled foreground broker\nbegin + display + confirm"]
+    Approval["one-shot HumanApproval\nmethod + target + argument + plan digest"]
+    HookCred["~/.config/kiki/repos/<repo_id>/credentials/<thread_id>\nread by kk-hook / sidebar / MCP client"]
 
-    AdminCred -. read .-> CLI
-    AdminCred -. read .-> TUI
+    AdminCred -. bootstrap .-> Auth
+    CLI -. foreground confirmation .-> Broker
+    TUI -. foreground confirmation .-> Broker
+    Broker -. issues after persisted challenge .-> Approval
     HookCred -. read .-> Hook
     HookCred -. read .-> Sidebar
     HookCred -. read .-> AgentMcp
@@ -44,17 +48,17 @@ flowchart LR
     AgentMcp --> McpSock
 
     subgraph Daemon["kkd: single user-scoped daemon"]
-        Auth["AuthEnforcer\nAdmin / ThreadScoped"]
+        Auth["AuthEnforcer + approval broker\nThreadScoped / HumanApproval\nAdmin bootstrap only"]
         Api["gRPC service\nstable proto contract"]
-        McpApi["MCP server\nthread-scoped transcript reads\n(stretch/post-v1)"]
+        McpApi["MCP server\nthread-scoped transcript reads\n(v1.x polish)"]
         Events["server-streaming events"]
         ThreadCtl["ThreadController per thread\nworkspace + tmux + harness lifecycle"]
-        Cascade["CascadeOrchestrator\npause / rebase / inject / acknowledge"]
+        Cascade["CascadeOrchestrator\nclassify / reconcile / batch barrier / acknowledge"]
         Watcher["jj op-log watcher\nexternal op detection"]
-        Transcript["ThreadTranscriptStore\nJSONL tail + local recall"]
-        Metadata["MetadataLedger + AICompose\nauto-describe / auto-rename"]
-        Github["GitHub poller / publisher"]
-        Config["ConfigLoader\nlayered TOML + thread sqlite"]
+        Transcript["ThreadTranscriptStore\nJSONL tail + consented recall\n(v1.x)"]
+        Metadata["MetadataLedger + AICompose\nauto-describe / auto-rename\n(v1.x)"]
+        Github["GitHub poller / publisher\n(v1.x)"]
+        Config["ConfigLoader\nminimal acceptance keys\nfull layering in v1.x"]
     end
 
     GrpcSock --> Auth --> Api
@@ -71,11 +75,12 @@ flowchart LR
     Watcher --> Transcript
 
     subgraph State["Persistent state"]
-        UserDb["~/.kiki/state.db\nrepo registry + daemon meta"]
-        RepoDb["~/.kiki/repos/<repo_id>/state.db\nthreads, credentials, audit, transcripts\n(centralized; no state inside the source repo)"]
+        UserDb["~/.config/kiki/state.db\nrepo registry, presenters, unscoped audit"]
+        RepoDb["~/.config/kiki/repos/<repo_id>/state.db\nthreads, credentials, audit, transcripts\n(centralized; no state inside the source repo)"]
     end
 
     Auth --> UserDb
+    Approval -. validate and claim .-> Auth
     Auth --> RepoDb
     Api --> UserDb
     Api --> RepoDb

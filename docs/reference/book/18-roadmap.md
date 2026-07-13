@@ -4,15 +4,7 @@ This chapter captures deferred surfaces whose design affects v1 boundaries. Defe
 
 ## v1.x polish
 
-Likely post-acceptance work:
-
-- hook configuration diagnostics;
-- op-log watcher edge cases;
-- additional `kk thread` management commands;
-- status-line and TUI polish;
-- AI auto-describe and auto-rename execution loop once the ownership ledger is proven;
-- PR merge polling and auto-archive;
-- narrow same-thread transcript MCP reads if the human CLI surface is stable.
+The v1.x tier is enumerated once, in [Orientation](01-orientation.md); this chapter does not keep a second list. What follows records design boundaries for deferred surfaces that need them. Only the scope ledger can promote a surface into the acceptance slice.
 
 ## v2 MCP substrate
 
@@ -38,7 +30,7 @@ When the same-thread transcript MCP surface ships, each call is checked in this 
 MCP-specific status-code contract:
 
 1. Missing, malformed, revoked, or signature-invalid credentials are `Unauthenticated`.
-2. Well-formed credentials that are not `ThreadScoped<T>` are `PermissionDenied`; Admin belongs on the gRPC and CLI surface, not the narrow MCP surface.
+2. Well-formed credentials that are not `ThreadScoped<T>` are `PermissionDenied`; neither reusable Admin authority nor one-shot human approvals are exposed through the narrow transcript MCP surface.
 3. If the request names a thread both in the URL path and in an explicit argument, and they differ, the request is `InvalidArgument`.
 4. If the credential authorizes thread T and the request asks for thread U, where U is not T, the request is `PermissionDenied`.
 
@@ -49,10 +41,10 @@ The daemon must not silently re-dispatch a request to the thread authorized by t
 The v2 substrate divides tools by authority:
 
 - same-thread, low-risk tools may be self-acting, such as setting status or requesting human attention;
-- publish and close may be exposed only as human-confirmed same-thread intents;
-- cross-thread reads may be auto-allowed only within explicit policy;
+- publish and close may be requested only as intents that stop at the foreground one-shot human-approval boundary;
+- cross-thread summaries may be auto-allowed only within the minimal summary policy; sensitive cross-thread reads require a foreground one-shot approval and therefore are not autonomous MCP tools;
 - cross-thread posts and agent-driven spawns are rate-limited and causal-chain tracked;
-- cross-thread close, destroy, publish, and revision rewriting remain unavailable to agents.
+- cross-thread close, destroy, publish, and revision rewriting remain unavailable to agents; an agent request cannot itself satisfy or retain the human approval.
 
 Destroy is not exposed to agents, including on the caller's own thread.
 

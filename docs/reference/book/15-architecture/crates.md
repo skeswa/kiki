@@ -17,13 +17,14 @@ kiki is a Cargo workspace with four crates. The split exists so the gRPC service
 
 `kkd` is one daemon binary but is split-by-concern internally. A `ThreadController` owns each thread's lifecycle and dies with the thread; a small set of cross-cutting components own daemon-wide concerns:
 
-- `OpLogWatcher` — fsnotify on `.jj/repo/op_heads/`, populates `op_history`. See [`op-log-watcher.md`](op-log-watcher.md).
-- `CascadeOrchestrator` — per-thread cascade lock, pause/rebase/inject/acknowledge.
-- `MetadataLedger` + `AICompose` — auto-describe / auto-rename ownership tracking and prompt assembly. `AICompose` is provider-agnostic via an internal `AiProvider` trait. When the execution loop ships, the first provider implementation is Anthropic; the trait is shaped so additional providers (OpenAI, local Ollama, etc.) can land without touching the ledger.
-- `GitHubBackend` (default `GhCli` impl) — PR creation, status polling, comment surfacing.
-- `ConfigLoader` — layered TOML + per-thread sqlite.
-- `AuthEnforcer` — Admin / ThreadScoped capability check on every gRPC call.
-- `ThreadTranscriptStore` — JSONL tail, projection, FTS5 read API.
+- `OpLogWatcher` — fsnotify on `.jj/repo/op_heads/`, populates normalized operation nodes, parent edges, workspace projections, and the observed frontier. See [`op-log-watcher.md`](op-log-watcher.md).
+- `CascadeOrchestrator` — per-thread reconciliation lock; classify native rewrite versus parent advance; materialize; hold the parallel-batch delivery barrier; acknowledge only from a later model turn.
+- `ProjectionReconciler` — compare stable identity with workspace, bookmark, path, and tmux projections; auto-normalize only unique identity-preserving drift; produce named `kk repair` plans otherwise.
+- `MetadataLedger` + `AICompose` (v1.x) — auto-describe / auto-rename ownership tracking and prompt assembly.
+- `GitHubBackend` (v1.x; default `GhCli` impl) — PR creation, status polling, comment surfacing.
+- `ConfigLoader` — the acceptance slice's minimal daemon/harness/path/notification keys; v1.x adds the full layered TOML and per-thread SQLite surface enumerated in [Configuration](../13-configuration.md).
+- `AuthEnforcer` + approval broker — `ThreadScoped` checks for ordinary work, persisted begin/display/confirm challenges and one-shot plan-bound `HumanApproval` for consequential operations, and Admin only for bootstrap or foreground-presenter enrollment.
+- `ThreadTranscriptStore` (v1.x) — JSONL tail, projection, FTS5 read API, and provider-egress consent state.
 - `JjBackend` — v1 `JjCli` implementation shells out to `jj` and parses structured template output. A later `JjLib` implementation can swap behind the same trait.
 
 This split keeps "killing thread foo's tmux session" from becoming entangled with global daemon state and leaves room to extract per-thread supervisors into separate processes later without rewriting business logic.

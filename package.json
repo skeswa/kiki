@@ -2,6 +2,7 @@
   "name": "kiki",
   "private": true,
   "scripts": {
+    "check:docs": "bun scripts/check-docs.ts",
     "fmt": "oxfmt"
   },
   "devDependencies": {

@@ -6,6 +6,8 @@ These notes are part of the book, but they are not a higher authority than the b
 
 Read:
 
-1. [Cascade outbox](cascade-outbox.md)
-2. [Transcript anchoring](transcript-anchoring.md)
-3. [Rejected alternatives](rejected.md)
+1. [Embedded cascade outbox](cascade-outbox.md)
+2. [Native evolution and workspace materialization](native-evolution.md)
+3. [Transcript anchoring](transcript-anchoring.md)
+4. [Thread head and lifecycle sagas](thread-head-and-sagas.md)
+5. [Rejected alternatives](rejected.md)
