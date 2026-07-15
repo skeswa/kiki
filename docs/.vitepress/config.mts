@@ -64,7 +64,7 @@ export default defineConfig({
       options: {
         detailedView: true,
         translations: {
-          button: { buttonText: "search docs", buttonAriaLabel: "Search the kiki reference" },
+          button: { buttonText: "search docs", buttonAriaLabel: "search docsK" },
         },
       },
     },
