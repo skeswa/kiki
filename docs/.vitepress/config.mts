@@ -52,9 +52,22 @@ export default defineConfig({
   themeConfig: {
     siteTitle: "kiki",
     nav: [
-      { text: "home", link: "/" },
-      { text: "reference", link: "/reference/" },
-      { text: "roadmap", link: "/reference/book/18-roadmap" },
+      {
+        text: "guide",
+        link: "/reference/book/05-threads",
+        activeMatch: "^/reference/book/05-threads",
+      },
+      {
+        text: "reference",
+        link: "/reference/",
+        activeMatch: "^/reference/(?!book/(?:05-threads|18-roadmap))",
+      },
+      {
+        text: "roadmap",
+        link: "/reference/book/18-roadmap",
+        activeMatch: "^/reference/book/18-roadmap",
+      },
+      { text: "home", link: "/", activeMatch: "^/$" },
       { text: "github ↗", link: "https://github.com/skeswa/kiki", noIcon: true },
     ],
     sidebar,

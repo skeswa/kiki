@@ -25,11 +25,13 @@
   --vp-c-brand-3: #32b87e;
   --vp-c-brand-soft: rgba(72, 213, 151, 0.1);
   --vp-code-block-bg: #060907;
+  --vp-code-line-height: 1.9;
   --vp-code-line-highlight-color: rgba(72, 213, 151, 0.07);
   --vp-custom-block-tip-border: var(--kiki-green);
   --vp-custom-block-tip-bg: rgba(72, 213, 151, 0.055);
   --vp-custom-block-warning-border: rgba(240, 160, 90, 0.42);
   --vp-custom-block-warning-bg: rgba(240, 160, 90, 0.05);
+  --vp-layout-max-width: 1400px;
   --vp-nav-height: 56px;
   --vp-sidebar-width: 290px;
   color-scheme: dark;
@@ -71,51 +73,180 @@ button {
   border-bottom: 0 !important;
 }
 
-.VPNavBar .container {
-  max-width: 1400px;
+.VPNavBar .container,
+.VPNavBar.has-sidebar .container {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--vp-layout-max-width) !important;
+  margin: 0 auto;
+  padding: 0 32px 0 0;
+}
+
+.VPNavBar .container > .title,
+.VPNavBar.has-sidebar .container > .title,
+.VPNavBarTitle,
+.VPNavBar.has-sidebar .VPNavBarTitle {
+  position: static !important;
+  flex: 0 0 auto;
+  width: max-content !important;
+}
+
+.VPNavBar .container > .title,
+.VPNavBar.has-sidebar .container > .title {
+  padding: 0 !important;
+}
+
+.VPNavBarTitle .title,
+.VPNavBar.has-sidebar .VPNavBarTitle .title {
+  width: auto;
+}
+
+.VPNavBar .content,
+.VPNavBar.has-sidebar .content {
+  position: static !important;
+  flex: 1 1 auto;
+  width: auto !important;
+  padding: 0 !important;
+}
+
+.VPNavBar .content-body {
+  width: 100%;
+  justify-content: flex-end;
 }
 
 .VPNavBarTitle .title {
-  gap: 9px;
+  gap: 10px;
   border-bottom: 0 !important;
   color: var(--kiki-ink);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
 }
 
 .VPNavBarTitle .title::before {
   content: "💅🏾";
+  flex: none;
+  width: 22px;
   font-size: 15px;
   letter-spacing: 0;
 }
 
 .VPNavBarTitle .title::after {
-  content: "v0.0 · pre-alpha";
-  margin-left: 2px;
-  color: rgba(200, 214, 205, 0.35);
-  font-size: 9px;
+  content: "/ reference";
+  margin-left: 0;
+  color: rgba(200, 214, 205, 0.4);
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 0;
 }
 
-.VPNavBarMenuLink,
-.VPNavBarMenuGroup .text {
-  color: rgba(200, 214, 205, 0.62);
+html:has(.kiki-home-page) .VPNavBarTitle .title::after {
+  content: "v0.0 · pre-alpha";
   font-size: 11px;
+  color: rgba(200, 214, 205, 0.4);
 }
 
-.VPNavBarMenuLink:hover,
-.VPNavBarMenuLink.active {
+.VPNavBarMenu {
+  gap: 24px;
+}
+
+.VPNavBarMenu .VPNavBarMenuLink,
+.VPNavBarMenuGroup .text {
+  padding: 0;
+  color: rgba(200, 214, 205, 0.65);
+  font-size: 12.5px;
+}
+
+.VPNavBarMenu .VPNavBarMenuLink:hover,
+.VPNavBarMenu .VPNavBarMenuLink.active {
   color: var(--kiki-green);
 }
 
 .DocSearch-Button,
 .VPNavBarSearch .DocSearch-Button {
+  width: 226px;
+  min-width: 226px;
   height: 30px;
+  padding: 0 10px 0 12px;
   border: 1px solid rgba(72, 213, 151, 0.24);
   border-radius: 0;
   background: transparent;
+}
+
+.VPNavBarSearch {
+  flex: 0 0 auto;
+  margin-left: auto;
+  margin-right: 24px;
+  padding-left: 0;
+}
+
+.VPNavBarSearch .DocSearch-Button-Placeholder {
+  margin: 0 !important;
+  padding: 0 !important;
+  color: rgba(200, 214, 205, 0.4);
+  font-size: 0 !important;
+  line-height: 1;
+}
+
+.DocSearch-Button-Placeholder::before {
+  content: "search docs";
+  font-size: 12px;
+}
+
+.DocSearch-Button-Keys {
+  display: flex;
+  height: 18px;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 5px;
+  border: 1px solid rgba(72, 213, 151, 0.25);
+  border-radius: 0;
+}
+
+.DocSearch-Button-Keys::before {
+  content: "⌘K";
+  font-family: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.DocSearch-Button-Keys .DocSearch-Button-Key {
+  display: none !important;
+}
+
+.DocSearch-Search-Icon {
+  display: none;
+}
+
+html:has(.kiki-home-page) .VPNavBar .container {
+  max-width: 1304px !important;
+  padding: 0 32px;
+}
+
+html:has(.kiki-home-page) .VPNavBarMenu {
+  gap: 28px;
+}
+
+html:has(.kiki-home-page) .VPNavBarSearch {
+  margin-right: 28px;
+}
+
+html:has(.kiki-home-page) .VPNavBarSearch .DocSearch-Button {
+  width: 206px;
+  min-width: 206px;
+}
+
+html:has(.kiki-home-page) .DocSearch-Button-Placeholder::before {
+  content: "search";
+}
+
+html:has(.kiki-home-page) .VPNavBarMenuLink[href$="/reference/book/05-threads"] {
+  display: none;
+}
+
+html:has(.kiki-home-page) .VPNavBarMenuLink.active {
+  order: -1;
 }
 
 .VPLocalSearchBox .shell {
@@ -124,9 +255,14 @@ button {
   background: #09100e;
 }
 
-.VPSidebar {
+/* Extra specificity beats the default theme's scoped background-color rule. */
+.Layout aside.VPSidebar {
   border-right: 1px solid var(--kiki-line);
   background: var(--kiki-bg);
+}
+
+.VPSidebar .group + .group {
+  border-top-color: transparent;
 }
 
 .VPSidebarItem.level-0 {
@@ -147,14 +283,26 @@ button {
   font-weight: 400;
 }
 
-.VPSidebarItem.level-1.is-active > .item {
+.VPSidebarItem.level-1 > .item {
   margin: 0 -10px;
   padding: 4px 10px;
+}
+
+.VPSidebarItem.level-1.is-active > .item {
   background: rgba(72, 213, 151, 0.07);
 }
 
 .VPSidebarItem.level-1.is-active > .item .text {
   color: var(--kiki-green);
+}
+
+.ch-no {
+  margin-right: 5px;
+  color: rgba(200, 214, 205, 0.32);
+}
+
+.VPSidebarItem.level-1.is-active > .item .text .ch-no {
+  color: rgba(72, 213, 151, 0.55);
 }
 
 .VPDoc .container {
@@ -165,9 +313,29 @@ button {
   max-width: 760px;
 }
 
-.VPDocAside {
-  border-left: 1px solid rgba(72, 213, 151, 0.11);
-  padding-left: 24px;
+.VPDoc .aside {
+  position: relative;
+  border-left: 1px solid var(--kiki-line);
+}
+
+/* Bridge the VPDoc top padding so the aside rule meets the nav border. */
+.VPDoc .aside::before {
+  content: "";
+  position: absolute;
+  top: -48px;
+  left: -1px;
+  width: 1px;
+  height: 48px;
+  background: var(--kiki-line);
+}
+
+.VPDocAsideOutline .content {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.VPDocAsideOutline .outline-marker {
+  display: none;
 }
 
 .VPDocAsideOutline .outline-title {
@@ -188,9 +356,50 @@ button {
   color: var(--kiki-green);
 }
 
+@media (min-width: 960px) {
+  .VPContent.has-sidebar::before,
+  .VPContent.has-sidebar::after {
+    content: "";
+    position: fixed;
+    top: var(--vp-nav-height);
+    bottom: 0;
+    /* Above the sidebar (z 25), below the nav (z 30), so the left rule
+       stays visible over the sidebar's opaque background. */
+    z-index: 26;
+    width: 1px;
+    background: var(--kiki-line);
+    pointer-events: none;
+  }
+
+  .VPContent.has-sidebar::before {
+    left: max(0px, calc((100vw - var(--vp-layout-max-width)) / 2));
+  }
+
+  .VPContent.has-sidebar::after {
+    right: max(0px, calc((100vw - var(--vp-layout-max-width)) / 2));
+  }
+}
+
+.doc-crumb {
+  margin-bottom: 28px;
+  color: rgba(200, 214, 205, 0.38);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.doc-crumb .crumb-sep {
+  margin: 0 8px;
+}
+
+.doc-crumb .crumb-leaf {
+  color: var(--kiki-green);
+}
+
 .vp-doc {
   color: rgba(200, 214, 205, 0.68);
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.8;
 }
 
@@ -205,15 +414,15 @@ button {
 
 .vp-doc h1 {
   margin-bottom: 22px;
-  font-size: 34px;
-  line-height: 1.25;
+  font-size: 36px;
+  line-height: 1.2;
 }
 
 .vp-doc h2 {
-  margin: 42px 0 12px;
+  margin: 44px 0 14px;
   border-top: 0;
   padding-top: 0;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .vp-doc h2::before {
@@ -253,6 +462,61 @@ button {
   margin: 24px 0;
   border: 1px solid rgba(72, 213, 151, 0.22);
   border-radius: 0;
+  padding-top: 20px;
+}
+
+.vp-doc [class*="language-"] > span.lang {
+  top: 16px;
+  right: auto;
+  left: 24px;
+  color: rgba(200, 214, 205, 0.38);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.vp-doc [class*="language-"]:hover > button.copy + span.lang,
+.vp-doc [class*="language-"] > button.copy:focus + span.lang {
+  opacity: 1;
+}
+
+.vp-doc [class*="language-"] > button.copy {
+  top: 9px;
+  right: 16px;
+  width: auto;
+  height: auto;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: none;
+  opacity: 1;
+  color: var(--kiki-green);
+  font-family: inherit;
+  font-size: 11.5px;
+}
+
+.vp-doc [class*="language-"] > button.copy::after {
+  content: "copy";
+}
+
+.vp-doc [class*="language-"] > button.copy:hover,
+.vp-doc [class*="language-"] > button.copy.copied,
+.vp-doc [class*="language-"] > button.copy:hover.copied {
+  border: 0;
+  background-color: transparent;
+  background-image: none;
+  color: var(--kiki-green-hot);
+}
+
+.vp-doc [class*="language-"] > button.copy.copied::after {
+  content: "copied";
+}
+
+.vp-doc [class*="language-"] > button.copy.copied::before,
+.vp-doc [class*="language-"] > button.copy:hover.copied::before {
+  display: none;
 }
 
 .vp-doc table {
@@ -267,20 +531,81 @@ button {
 }
 
 .vp-doc tr:nth-child(2n) {
-  background: rgba(72, 213, 151, 0.025);
+  background: transparent;
 }
 
 .vp-doc th,
 .vp-doc td {
   border-color: var(--kiki-line);
+  padding: 13px 20px;
+}
+
+.vp-doc th {
+  background: transparent;
+  color: rgba(200, 214, 205, 0.5);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-align: left;
+  text-transform: uppercase;
 }
 
 .custom-block {
+  margin: 28px 0;
   border-radius: 0;
+  padding: 18px 22px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: rgba(200, 214, 205, 0.68);
+}
+
+.custom-block p {
+  margin: 10px 0 0;
+}
+
+.custom-block .custom-block-title {
+  display: inline;
+  margin: 0;
+  font-weight: 600;
+}
+
+.custom-block .custom-block-title + p {
+  display: inline;
+  margin: 0;
+}
+
+.custom-block.tip .custom-block-title {
+  color: var(--kiki-green);
+}
+
+.custom-block.info .custom-block-title,
+.custom-block.note .custom-block-title {
+  color: var(--kiki-ink);
+}
+
+.custom-block.warning .custom-block-title,
+.custom-block.caution .custom-block-title,
+.custom-block.danger .custom-block-title {
+  color: var(--kiki-orange);
+}
+
+.custom-block.info,
+.custom-block.note {
+  border: 1px solid var(--kiki-line-strong);
+  background: rgba(72, 213, 151, 0.03);
+}
+
+.custom-block.danger {
+  border-color: rgba(240, 160, 90, 0.42);
+  background: rgba(240, 160, 90, 0.05);
 }
 
 .VPDocFooter {
   border-top-color: var(--kiki-line);
+}
+
+.VPDocFooter .pager-link {
+  border-radius: 0;
 }
 
 .VPFooter {
@@ -311,7 +636,7 @@ button {
   border-right: 1px solid var(--kiki-line);
   border-left: 1px solid var(--kiki-line);
   color: var(--kiki-copy);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .kiki-home p,
@@ -328,24 +653,24 @@ button {
 }
 
 .home-hero {
-  padding: 92px 32px 72px;
+  padding: 96px 32px 76px;
   border-bottom: 1px solid var(--kiki-line);
 }
 
 .eyebrow {
   color: var(--kiki-green);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
 .home-hero h1 {
   max-width: 920px;
-  margin-top: 24px;
+  margin-top: 26px;
   color: var(--kiki-ink);
   font-size: clamp(36px, 4.35vw, 56px);
   font-weight: 500;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.01em;
   line-height: 1.12;
 }
 
@@ -380,11 +705,11 @@ button {
 }
 
 .hero-deck {
-  max-width: 670px;
-  margin-top: 30px !important;
-  color: rgba(200, 214, 205, 0.68);
-  font-size: 13px;
-  line-height: 1.72;
+  max-width: 640px;
+  margin-top: 34px !important;
+  color: rgba(200, 214, 205, 0.7);
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .hero-deck strong,
@@ -398,17 +723,17 @@ button {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-top: 34px;
+  gap: 14px;
+  margin-top: 40px;
 }
 
 .button {
   display: inline-flex;
-  min-height: 38px;
+  min-height: 39px;
   align-items: center;
   justify-content: center;
-  padding: 0 20px;
-  font-size: 11px;
+  padding: 0 22px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -433,18 +758,20 @@ button {
 }
 
 .hero-actions > code {
-  margin-left: 10px;
-  padding: 0;
-  background: transparent;
-  color: rgba(200, 214, 205, 0.42);
-  font-size: 10.5px;
+  margin-left: 14px;
+  padding: 0 !important;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+  color: rgba(200, 214, 205, 0.62) !important;
+  font-size: 12px !important;
 }
 
 .hero-actions code i,
 .demo-command i {
   display: inline-block;
-  width: 7px;
-  height: 13px;
+  width: 8px;
+  height: 14px;
   margin-left: 4px;
   background: var(--kiki-green);
   vertical-align: -2px;
@@ -458,7 +785,7 @@ button {
 }
 
 .fact-strip > div {
-  padding: 21px 32px;
+  padding: 26px 32px;
   border-right: 1px solid var(--kiki-line);
 }
 
@@ -468,13 +795,13 @@ button {
 
 .fact-strip dt {
   color: rgba(200, 214, 205, 0.62);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .fact-strip dd {
-  margin-top: 5px;
+  margin-top: 6px;
   color: var(--kiki-ink);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .fact-strip dd.status {
@@ -483,72 +810,72 @@ button {
 
 .ledger-row {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 380px 1fr;
   border-bottom: 1px solid var(--kiki-line);
 }
 
 .ledger-row > header {
-  padding: 40px 32px;
+  padding: 44px 32px;
   border-right: 1px solid var(--kiki-line);
 }
 
 .ledger-row > header > p:last-child:not(:first-child) {
-  margin-top: 13px;
+  margin-top: 14px;
   color: rgba(200, 214, 205, 0.62);
-  font-size: 11px;
+  font-size: 12.5px;
   line-height: 1.7;
 }
 
 .row-copy {
-  max-width: 760px;
-  padding: 38px 32px 42px;
+  max-width: 700px;
+  padding: 44px 32px;
 }
 
 .row-copy p {
   color: rgba(200, 214, 205, 0.62);
-  font-size: 12px;
-  line-height: 1.78;
+  font-size: 13.5px;
+  line-height: 1.75;
   text-wrap: pretty;
 }
 
 .row-copy p + p {
-  margin-top: 15px;
+  margin-top: 18px;
 }
 
 .row-copy p.lead {
   color: var(--kiki-ink);
-  font-size: 18px;
-  line-height: 1.52;
+  font-size: 22px;
+  line-height: 1.5;
 }
 
 .thread-demo {
   min-width: 0;
-  padding: 38px 32px 42px;
+  padding: 44px 32px;
 }
 
 .demo-command {
   min-height: 18px;
-  margin-bottom: 23px !important;
+  margin-bottom: 26px !important;
   color: var(--kiki-ink);
-  font-size: 10.5px;
+  font-size: 12.5px;
 }
 
 .demo-command > span {
-  margin-right: 7px;
+  margin-right: 8px;
   color: rgba(200, 214, 205, 0.34);
 }
 
 .trunk {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 12px;
   color: var(--kiki-ink);
-  font-size: 11px;
+  font-size: 12.5px;
 }
 
 .trunk i {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--kiki-ink);
 }
@@ -559,16 +886,17 @@ button {
 
 .trunk-line {
   width: 1px;
-  height: 24px;
-  margin-left: 4px;
+  height: 26px;
+  margin-left: 5px;
   background: var(--kiki-line-strong);
 }
 
 .thread-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  max-width: 720px;
+  gap: 20px;
+  align-items: start;
+  max-width: 640px;
 }
 
 .thread-stack {
@@ -577,7 +905,7 @@ button {
 
 .thread-cards article {
   min-width: 0;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--kiki-line-strong);
   background: transparent;
   opacity: 1;
@@ -601,7 +929,7 @@ button {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  font-size: 10px;
+  font-size: 12.5px;
 }
 
 .thread-cards article strong {
@@ -614,20 +942,20 @@ button {
 .thread-cards article span {
   flex: none;
   color: var(--kiki-green);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .thread-cards article small {
   display: block;
-  margin-top: 4px;
+  margin-top: 5px;
   color: rgba(200, 214, 205, 0.62);
-  font-size: 8.5px;
+  font-size: 11px;
 }
 
 .follow-line {
   position: relative;
   height: 31px;
-  margin-left: 4px;
+  margin-left: 5px;
   border-left: 1px dashed var(--kiki-green);
 }
 
@@ -637,22 +965,22 @@ button {
   left: 10px;
   width: max-content;
   color: var(--kiki-green);
-  font-size: 8px;
+  font-size: 11px;
 }
 
 .demo-note {
   min-height: 18px;
   margin-top: 24px !important;
   color: var(--kiki-green);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .thread-explainer {
-  max-width: 680px;
-  margin-top: 18px !important;
-  color: rgba(200, 214, 205, 0.56);
-  font-size: 11px;
-  line-height: 1.72;
+  max-width: 600px;
+  margin-top: 26px !important;
+  color: rgba(200, 214, 205, 0.6);
+  font-size: 13px;
+  line-height: 1.75;
   text-wrap: pretty;
 }
 
@@ -661,13 +989,13 @@ button {
   flex-direction: column;
   align-self: start;
   width: min(620px, calc(100% - 64px));
-  margin: 40px 32px;
-  padding: 19px 21px;
+  margin: 44px 32px;
+  padding: 22px 24px;
   border: 1px solid rgba(72, 213, 151, 0.23);
   background: #060907;
   color: rgba(200, 214, 205, 0.7);
-  font-size: 10.5px;
-  line-height: 1.95;
+  font-size: 12.5px;
+  line-height: 2;
   overflow-x: auto;
 }
 
@@ -694,20 +1022,20 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1px;
-  margin: 40px 32px;
+  margin: 44px 32px;
   border: 1px solid var(--kiki-line);
   background: var(--kiki-line);
 }
 
 .principle-grid article {
-  padding: 19px 20px;
+  padding: 22px 24px;
   background: var(--kiki-bg);
 }
 
 .principle-grid h2 {
   margin: 0;
   color: var(--kiki-ink);
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
 }
@@ -721,39 +1049,39 @@ button {
 }
 
 .principle-grid p {
-  margin-top: 7px;
+  margin-top: 8px;
   color: rgba(200, 214, 205, 0.62);
-  font-size: 9.5px;
+  font-size: 12px;
   line-height: 1.65;
 }
 
 .roadmap-list {
-  margin: 28px 32px 40px;
+  margin: 44px 32px;
 }
 
 .roadmap-list article {
   display: grid;
-  grid-template-columns: 56px 170px 1fr;
-  gap: 14px;
+  grid-template-columns: 70px 210px 1fr;
+  gap: 18px;
   align-items: baseline;
-  padding: 14px 0;
+  padding: 18px 0;
   border-bottom: 1px solid rgba(72, 213, 151, 0.1);
 }
 
 .roadmap-list strong {
   color: var(--kiki-green);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .roadmap-list b {
   color: var(--kiki-ink);
-  font-size: 10px;
+  font-size: 12.5px;
   font-weight: 500;
 }
 
 .roadmap-list p {
   color: rgba(200, 214, 205, 0.62);
-  font-size: 9.5px;
+  font-size: 12px;
   line-height: 1.65;
 }
 
@@ -764,7 +1092,7 @@ button {
 }
 
 .closing-grid > div {
-  padding: 40px 32px;
+  padding: 44px 32px;
 }
 
 .closing-grid > div:first-child {
@@ -772,26 +1100,26 @@ button {
 }
 
 .closing-grid > div > p:not(.eyebrow, .closing-lead) {
-  margin-top: 15px;
+  margin-top: 18px;
   color: rgba(200, 214, 205, 0.58);
-  font-size: 10.5px;
-  line-height: 1.75;
+  font-size: 13px;
+  line-height: 1.8;
 }
 
 .closing-lead {
-  max-width: 440px;
+  max-width: 420px;
   color: var(--kiki-ink);
-  font-size: 17px;
-  line-height: 1.48;
+  font-size: 22px;
+  line-height: 1.45;
 }
 
 .home-footer {
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  padding: 18px 32px;
+  padding: 22px 32px;
   color: rgba(200, 214, 205, 0.62);
-  font-size: 9px;
+  font-size: 11.5px;
 }
 
 @keyframes kiki-blink {
@@ -806,6 +1134,11 @@ button {
 }
 
 @media (max-width: 960px) {
+  .VPNavBar .container,
+  .VPNavBar.has-sidebar .container {
+    padding: 0 24px;
+  }
+
   .VPNavBarTitle .title::after {
     display: none;
   }
@@ -828,6 +1161,31 @@ button {
 }
 
 @media (max-width: 700px) {
+  .VPNavBar .container,
+  .VPNavBar.has-sidebar .container {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 24px !important;
+  }
+
+  .VPNavBarSearch,
+  html:has(.kiki-home-page) .VPNavBarSearch {
+    margin-right: 12px;
+  }
+
+  .VPNavBarSearch .DocSearch-Button,
+  html:has(.kiki-home-page) .VPNavBarSearch .DocSearch-Button {
+    min-width: 40px;
+    width: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .DocSearch-Search-Icon {
+    display: block;
+  }
+
   .kiki-home {
     width: 100%;
     border: 0;
