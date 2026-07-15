@@ -40,6 +40,18 @@ The [reference book](docs/reference/README.md) covers commands, safety rules, ar
 
 Read the spec and [open an issue](https://github.com/skeswa/kiki/issues) if a design choice looks wrong or incomplete. This is the point when objections can still reshape the implementation.
 
+## Documentation site
+
+The reference book is also a VitePress site. The site deploys to GitHub Pages from `main`, while pull requests run the same strict docs and production-build checks without deploying.
+
+```sh
+bun run docs:dev      # local development server
+bun run docs:check    # links, contract terms, and production build
+bun run docs:preview  # preview the last production build
+```
+
+GitHub Pages must use **GitHub Actions** as its publishing source. The project-pages base path defaults to `/kiki/`; set `VITEPRESS_BASE` and `VITEPRESS_SITE_URL` when moving to a custom domain.
+
 ## License
 
 [MIT](LICENSE) © 2026 Sandile Keswa
