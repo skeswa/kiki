@@ -18,15 +18,15 @@ Read it as a small spec book: first the reason for the tool, then the model, the
 10. [Publishing](book/09-publishing.md)
 11. [Metadata Evolution](book/10-metadata.md)
 12. [Commands](book/11-commands.md)
-13. [Interface](book/12-interface/)
+13. [Interface](book/12-interface/README.md)
 14. [Configuration](book/13-configuration.md)
 15. [Observability](book/14-observability.md)
-16. [Architecture](book/15-architecture/)
+16. [Architecture](book/15-architecture/README.md)
 17. [Testing](book/16-testing.md)
 18. [Build Sequencing](book/17-build-sequencing.md)
 19. [Roadmap](book/18-roadmap.md)
 20. [Naming](book/19-naming.md)
-21. [Decisions](book/20-decisions/)
+21. [Decisions](book/20-decisions/README.md)
 
 ## Authority
 

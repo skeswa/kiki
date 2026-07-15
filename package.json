@@ -3,11 +3,17 @@
   "private": true,
   "scripts": {
     "check:docs": "bun scripts/check-docs.ts",
+    "docs:build": "vitepress build docs",
+    "docs:check": "bun run check:docs && bun run docs:build",
+    "docs:dev": "vitepress dev docs",
+    "docs:preview": "vitepress preview docs",
     "fmt": "oxfmt"
   },
   "devDependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.7",
     "@types/bun": "latest",
-    "oxfmt": "^0.47.0"
+    "oxfmt": "^0.47.0",
+    "vitepress": "^1.6.4"
   },
   "peerDependencies": {
     "typescript": "^5"
