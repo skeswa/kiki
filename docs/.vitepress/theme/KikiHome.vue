@@ -291,14 +291,14 @@ onBeforeUnmount(() => clearInterval(timer));
       <div>
         <p class="eyebrow">on the name</p>
         <p>
-          <strong>kk</strong> sits on the home row immediately beside <strong>jj</strong> — a quiet
+          <strong>kk</strong> sits on the home row immediately beside <strong>jj</strong>, a quiet
           acknowledgement that one tool works underneath the other. And a kiki is a gathering where
           everyone shows up as themselves and the room is richer for the multiplicity. 💅🏾
         </p>
       </div>
       <div>
         <p class="closing-lead">
-          The spec is durable enough that pre-implementation feedback is genuinely actionable.
+          The spec is settled; the code is not. Feedback filed now changes the design.
         </p>
         <div class="hero-actions">
           <a class="button primary" :href="withBase('/reference/')">read the book →</a>

@@ -40,8 +40,6 @@ When two live chapters appear to conflict, use this order:
 4. [Architecture](book/15-architecture/)
 5. [Testing](book/16-testing.md), [Build Sequencing](book/17-build-sequencing.md), [Roadmap](book/18-roadmap.md), [Naming](book/19-naming.md), and [Decisions](book/20-decisions/)
 
-The numbered chapters carry the contract.
-
 ## Language
 
 The words **must**, **must not**, **may**, and **should** are normative in the ordinary RFC sense. The voice is plain by design: kiki coordinates expensive, stateful work, and the docs should say exactly what they mean.

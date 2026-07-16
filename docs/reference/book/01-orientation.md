@@ -6,7 +6,7 @@ This chapter defines what kiki is. Later chapters define how it behaves.
 
 kiki (`kk`) is an agentic coding workflow coordinator. It gives a developer a first-class unit for a themed line of work: a jj-backed revision stack, an isolated workspace, a tmux session, and an agent session that can be paused, resumed, archived, and composed with related work. Publishing and transcript-backed recall build on that unit after the coordination core is proven.
 
-kiki exists to make parallel, recursive work patterns cheap enough that a developer can maximally utilize and collaborate with agents. Today, switching between agent-led lines of inquiry means stashes, branches, rebases, lost terminals, and reconstructed context. kiki makes the coordination machinery ambient: threads branch from other threads, follow live ancestor changes, and expose enough durable state that the human can see what needs attention.
+kiki exists to make parallel, recursive work patterns cheap enough that a developer can get the most out of agents and collaborate with them. Today, switching between agent-led lines of inquiry means stashes, branches, rebases, lost terminals, and reconstructed context. kiki makes the coordination machinery ambient: threads branch from other threads, follow live ancestor changes, and expose enough durable state that the human can see what needs attention.
 
 ## Principles
 
