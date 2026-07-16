@@ -26,13 +26,8 @@ export default defineConfig({
     ["meta", { name: "color-scheme", content: "dark" }],
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: "kiki" }],
-    [
-      "link",
-      {
-        rel: "icon",
-        href: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%230b1210'/%3E%3Cpath d='M9 23 22 10l2 2-13 13H9v-2Z' fill='%2348d597'/%3E%3Cpath d='m19 9 2-2 4 4-2 2-4-4Z' fill='%23f0a05a'/%3E%3C/svg%3E",
-      },
-    ],
+    // Noto Emoji artwork (Apache 2.0) — attribution in docs/public/favicon.LICENSE.txt.
+    ["link", { rel: "icon", type: "image/png", sizes: "128x128", href: `${base}favicon.png` }],
   ],
   transformPageData(pageData) {
     const canonicalPath = pageData.relativePath
