@@ -93,7 +93,7 @@ const roadmap = [
   [
     "v2",
     "the substrate",
-    "Cross-thread messaging, the Codex adapter, native macOS UI, and direct GitHub APIs.",
+    "Cross-thread messaging, further harness adapters, native macOS UI, and direct GitHub APIs.",
   ],
   [
     "v3+",
@@ -150,7 +150,9 @@ onBeforeUnmount(() => clearInterval(timer));
       </div>
       <div>
         <dt>harness</dt>
-        <dd>Claude Code</dd>
+        <dd>
+          <SlotCycle :phrases="['Claude Code', 'Codex', 'bring your own']" :interval="3000" />
+        </dd>
       </div>
       <div>
         <dt>license</dt>
@@ -251,7 +253,7 @@ onBeforeUnmount(() => clearInterval(timer));
         <code><i>$</i> kk ls</code>
         <b>&nbsp;&nbsp;running&nbsp;&nbsp;auth-refactor&nbsp;&nbsp;—&nbsp;&nbsp;claude-code</b>
         <b
-          >&nbsp;&nbsp;running&nbsp;&nbsp;add-tests&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;auth-refactor&nbsp;&nbsp;claude-code</b
+          >&nbsp;&nbsp;running&nbsp;&nbsp;add-tests&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;auth-refactor&nbsp;&nbsp;codex</b
         >
         <code><i>$</i> kk switch auth-refactor</code>
         <code><i>$</i> kk close <span># workspace removed, revisions persist</span></code>
