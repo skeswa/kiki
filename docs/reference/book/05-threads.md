@@ -58,7 +58,7 @@ Successful creation leaves all required v1 projections and an `Active` row. Unsu
 
 `kk new` without a name may derive a placeholder from the initial prompt. The placeholder is kiki-owned metadata and follows the metadata ownership rules.
 
-`kk new --harness <name>` selects the harness for the thread. v1 accepts only `claude-code`; unsupported harness names error clearly.
+`kk new --harness <name>` selects the harness for the thread. v1 accepts `claude-code` and `codex`; unsupported harness names error clearly.
 
 The follows graph is a DAG. kiki rejects a follows edge that would introduce a cycle.
 
@@ -87,7 +87,7 @@ This default is overridable via `[paths] workspaces_root` (see [Configuration](1
 
 Sibling-of-repo is the default for two reasons: it matches jj's natural `jj workspace add ../<name>` ergonomics, and it leaves the workspace discoverable next to the repo without nesting another working copy inside the parent's working copy.
 
-The per-thread hook credential lives at `~/.config/kiki/repos/<repo_id>/credentials/<thread_id>` (mode `0600`), and preferred launch-scoped harness settings live under `~/.config/kiki/repos/<repo_id>/harness/<thread_id>/`. If the adapter cannot use isolated launch settings, it may merge a hash-owned fragment into `<workspace>/.claude/settings.local.json` with prior bytes and restoration metadata stored outside the workspace. It never writes tracked `<workspace>/.claude/settings.json`. Per-thread client error logs live at `~/.config/kiki/repos/<repo_id>/errors/<thread_id>.log`.
+The per-thread hook credential lives at `~/.config/kiki/repos/<repo_id>/credentials/<thread_id>` (mode `0600`), and launch-scoped harness settings live under `~/.config/kiki/repos/<repo_id>/harness/<thread_id>/` — Claude Code's generated settings file or Codex's generated `CODEX_HOME`. If the Claude Code adapter cannot use isolated launch settings, it may merge a hash-owned fragment into `<workspace>/.claude/settings.local.json` with prior bytes and restoration metadata stored outside the workspace. It never writes tracked `<workspace>/.claude/settings.json`, and the Codex adapter never writes anything under `<workspace>/.codex/`. Per-thread client error logs live at `~/.config/kiki/repos/<repo_id>/errors/<thread_id>.log`.
 
 ## Workspace isolation
 
@@ -126,7 +126,7 @@ After an exact recheck succeeds, kiki records the proof and checkpoints the pare
 
 A child checkpoint/detach failure occurs before that kill. Kiki compensates already-deleted edges only when their exact pre-detach topology is still restorable, resumes the parent's prior process states, and returns `Active` only after proving both restoration and session usability. If an edge cannot be restored exactly or resume cannot be proved, the parent remains frozen with its workspace present and becomes `CloseFailed`; it is never left dead. A failure after the session kill while forgetting or deleting likewise becomes `CloseFailed`, with completed steps recorded and remaining data preserved where possible. On daemon restart, `CloseCommit` recovery consults the journal: before a valid final proof it attempts a verified resume; after a valid proof it revalidates the frozen process set, approved fingerprint, and child-step journal or stops in `CloseFailed`; after the session-killed step it completes the idempotent forget/delete sequence. It never guesses `Active` from a leftover directory.
 
-Launch-scoped harness settings live outside the workspace and cannot self-block close. If the adapter had to merge kiki's fragment into `<workspace>/.claude/settings.local.json`, close may remove or restore only that hash-owned fragment; a file changed since installation is user territory and stops for repair. Kiki never writes or allowlists tracked `<workspace>/.claude/settings.json`. The hook credential and per-thread error log live under `~/.config/kiki/repos/<repo_id>/` and are revoked or removed independently. User-created untracked or ignored files that would be deleted still require explicit handling.
+Launch-scoped harness settings — including a Codex thread's generated `CODEX_HOME` — live outside the workspace and cannot self-block close. If the Claude Code adapter had to merge kiki's fragment into `<workspace>/.claude/settings.local.json`, close may remove or restore only that hash-owned fragment; a file changed since installation is user territory and stops for repair. Kiki never writes or allowlists tracked `<workspace>/.claude/settings.json`, and never touches `<workspace>/.codex/`. The hook credential and per-thread error log live under `~/.config/kiki/repos/<repo_id>/` and are revoked or removed independently. User-created untracked or ignored files that would be deleted still require explicit handling.
 
 Plain `kk close` leaves any open PR untouched. `kk close --discard-pr` is the explicit PR-closing path.
 

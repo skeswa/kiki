@@ -10,4 +10,5 @@ Read:
 2. [Native evolution and workspace materialization](native-evolution.md)
 3. [Transcript anchoring](transcript-anchoring.md)
 4. [Thread head and lifecycle sagas](thread-head-and-sagas.md)
-5. [Rejected alternatives](rejected.md)
+5. [Codex as a second v1 harness](codex-adapter.md)
+6. [Rejected alternatives](rejected.md)

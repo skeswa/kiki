@@ -31,7 +31,7 @@ The acceptance slice includes:
 - stable thread identity, a workspace `@` as the live thread head, and a bookmark as a checkpoint/publication projection
 - a deliberately linear owned-stack contract that stops at ambiguous topology
 - jj workspace and tmux session lifecycle, including recoverable close and creation failure states
-- the pluggable harness boundary; the `claude-code` adapter is the only adapter implemented initially
+- the pluggable harness boundary, with the `claude-code` and `codex` adapters implemented
 - exclusive managed-hook setup, batch-aware cascade delivery, reconciliation/materialization, acknowledgement, and conflict recovery
 - broad projection-divergence detection, narrow automatic repair, and explicit human-directed repair for ambiguous cases
 - SQLite-backed scoped and unscoped operational audit and the two-phase one-shot human-approval path needed by consequential operations
@@ -53,7 +53,7 @@ These deepen v1 but must not block the acceptance slice unless explicitly promot
 
 - filesystem sandboxing or security isolation between threads
 - resource caps for agents
-- Codex and non-Claude-Code harness adapters
+- harness adapters beyond `claude-code` and `codex`
 - broad MCP substrate for cross-thread agent messaging or spawning
 - webhooks; later GitHub integration may poll instead
 - full-screen multiplexer behavior beyond tmux integration

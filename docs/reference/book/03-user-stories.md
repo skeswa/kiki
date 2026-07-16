@@ -16,11 +16,11 @@ Read these before the invariants. If a story and a normative chapter appear to p
 
 ## Thread creation
 
-8. As a developer, I want `kk new <name>` to spawn a thread with its own jj workspace, tmux session, and Claude Code agent, so that I start a new line of work instantly.
+8. As a developer, I want `kk new <name>` to spawn a thread with its own jj workspace, tmux session, and managed agent (Claude Code by default), so that I start a new line of work instantly.
 9. As a developer, I want `kk new` (no name) to derive a placeholder name from my initial prompt, so that I do not have to commit to a name upfront.
 10. As a developer, I want `kk new <name> --follows <parent>` to create a child thread coupled to a parent, so that I can stack work on top of a work-in-progress feature.
 11. As a developer, I want `kk new <name> --no-follow` to create a snapshot fork (no live coupling), so that I can branch off the current state without inheriting future changes when the contextual default would otherwise follow the current thread.
-12. As a developer, I want `kk new --harness <name>` to override the default agent harness for a single thread, so that once additional harnesses ship I can pick the right one per task. (v1: only `claude-code` is accepted; any other harness name errors with a clear "unsupported harness, see [agent.default_harness] config" message until further adapters are added.)
+12. As a developer, I want `kk new --harness <name>` to override the default agent harness for a single thread, so that I can pick the right one per task — Claude Code for one thread, Codex for its sibling. (v1: `claude-code` and `codex` are accepted; any other harness name errors with a clear "unsupported harness, see [agent.default_harness] config" message until further adapters are added.)
 13. As a developer, I want each thread to live in its own jj workspace so agents in different threads do not accidentally interfere with each other's files in the course of normal cooperative work, so that parallel agentic work stays in its own lane. (This is a cooperative isolation property, not filesystem access control; see Trust model: same-UID processes can still reach sibling workspaces.)
 14. As a developer, I want to spawn N sibling threads off the same starting point in parallel (e.g., one per caller of a function I'm refactoring), so that I can fan out migration work across agents simultaneously.
     14a. As a developer, I want the active workspace's `@` to be the thread's live head while its bookmark remains an explicit checkpoint/publication projection, so that ordinary `jj new` behavior cannot silently leave kiki following or publishing the wrong commit.
@@ -51,8 +51,8 @@ Read these before the invariants. If a story and a normative chapter appear to p
 32. As a developer, I want the v1.x GitHub integration to move a child locally onto the exact merged default-branch commit, then present a one-shot-approved remote force-push/PR-base plan and detach only after local and remote state agree, so that stacked work survives the parent landing without silently reusing an older publish approval.
 33. As a developer, I want kk to escalate from soft-pause to SIGINT+resume only when the safety contract requires it—dirty or indeterminate files before mutation, textual conflicts or divergent successors, ambiguous topology, an unprovable delivery barrier, prolonged pure thinking with no boundary, or my explicit `kk thread interrupt`—so that disruption is rare but never preferred over edit or delivery safety.
 34. As a developer, I want `kk thread interrupt <thread>` as the explicit human escape hatch to hard-stop and re-frame an agent, so that I can rescue a stuck or off-track thread.
-    34a. As a developer, I want kiki to block every tool call in a parallel Claude tool batch when one call triggers reconciliation, and to acknowledge delivery only after that batch closes and a later model turn begins, so that a sibling call from the same batch cannot observe new files before the agent receives the explanation.
-    34b. As a developer, I want v1 managed Claude sessions to reserve `PreToolUse` exclusively for kiki, with a clear startup diagnostic when effective user hooks would race it, so that the safe boundary is real rather than configuration-order folklore.
+    34a. As a developer, I want kiki to block every tool call in a dispatched tool batch when one call triggers reconciliation, and to acknowledge delivery only after that batch closes and a later model turn begins, so that a sibling call from the same batch cannot observe new files before the agent receives the explanation. (Claude Code's parallel batch is the hard case; Codex's proven-serial dispatch makes each batch a single call.)
+    34b. As a developer, I want v1 managed sessions — Claude Code and Codex alike — to reserve the pre-tool boundary exclusively for kiki, with a clear startup diagnostic when effective user hooks would race it, so that the safe boundary is real rather than configuration-order folklore.
 
 ## Ambient coordinator
 
@@ -135,9 +135,10 @@ Read these before the invariants. If a story and a normative chapter appear to p
 ## Hooks and harness integration
 
 88. As a developer, I want kk to launch its managed Claude session with isolated, launch-scoped hook settings, so that my non-kk Claude Code work is unaffected and tracked `.claude/settings.json` is never overwritten.
-89. As a developer, I want kiki to refuse an unsafe managed session when it cannot prove exclusive control of `PreToolUse`, while preserving unrelated hook types only when the harness can isolate them, so that concurrent user hooks cannot race workspace reconciliation.
+89. As a developer, I want kiki to refuse an unsafe managed session when it cannot prove exclusive control of the pre-tool boundary, while preserving unrelated hook types only when the harness can isolate them, so that concurrent user hooks cannot race workspace reconciliation.
 90. As a developer, I want any fallback merge into `.claude/settings.local.json` to preserve prior bytes through a content-hash ownership record and restore only kiki's own fragment on close, so that nothing user-owned is overwritten or deleted.
-91. As a developer with a less-capable harness (Codex without rich hook support), I want kk to gracefully degrade to SIGINT+resume for context delivery, so that the tool still works just less smoothly.
+91. As a developer, I want kk to launch its managed Codex session under a generated launch-scoped `CODEX_HOME` with kiki's hooks pre-trusted and my own `~/.codex/` configuration structurally excluded, so that my non-kk Codex work is unaffected and nothing under `<workspace>/.codex/` is ever written.
+    91a. As a developer on a harness version that cannot prove its batch boundary (a Codex version whose dispatch discipline changed, or a Claude Code version without an unambiguous batch-completion signal), I want kk to gracefully degrade to proof-carrying restart+resume for context delivery, so that the tool still works, just less smoothly. A version that cannot supply the restart proofs either is unsupported for managed execution, not silently approximated.
 92. As a developer, I want the `kk-hook` sidecar to add imperceptible latency (target <5ms typical) to each agent tool call, so that the hook never feels in the way.
 
 ## Trust model and auditability

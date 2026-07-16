@@ -1,6 +1,6 @@
 # Build Sequencing
 
-The riskiest v1 assumption is the cascade path across jj native descendant evolution, stale-workspace materialization, explicit parent-tip advance, and Claude Code's parallel tool boundary. Validate that before investing in the full daemon. A sequential single-hook demo is not sufficient evidence.
+The riskiest v1 assumption is the cascade path across jj native descendant evolution, stale-workspace materialization, explicit parent-tip advance, and each harness's tool boundary — Claude Code's parallel batch and Codex's proven-serial hook coverage. Validate that before investing in the full daemon. A sequential single-hook demo is not sufficient evidence for Claude Code, and Claude Code's proofs are not evidence for Codex.
 
 ## Proof of concept
 
@@ -8,6 +8,7 @@ Before committing to the full architecture, build a one-shot proof of concept:
 
 1. Create two jj workspaces sharing a parent revision.
 2. Launch a Claude Code agent in the descendant workspace with a generated, launch-scoped settings source. Prove that kiki is the only matching `PreToolUse` hook even when user-global, project, and project-local fixtures define competing `PreToolUse` hooks; prove that tracked `.claude/settings.json` is untouched. If launch isolation is unavailable, exercise the ownership-tracked `.claude/settings.local.json` fallback and prove both inherited-hook exclusion and conflict-safe restoration.
+   2a. Launch a Codex agent the same way under a generated `CODEX_HOME` with kiki's hooks pre-trusted and authentication provisioned. Prove that user-global `~/.codex/`, workspace `.codex/`, plugin, and managed-policy hook fixtures do not execute in the managed process; prove the pinned version dispatches tools serially (subagents included) and requests a new tool only after the model consumed the previous call's result, fires `PreToolUse` for every workspace-observing tool (or that the generated config disables the rest), returns a deny payload to the model byte-identically while the denied tool never executes, and emits `Stop` on turn completion. Prove that a denied call fires no post-tool event, so the blocked single-call batch's completion must be reported by the next turn-scoped hook event rather than the emitting hook's own crash-fragile RPC; that the launcher converts a dead sidecar under an active barrier into a generic blocking deny; that the session record durably contains each tool result as returned to the model, so acknowledgement can require the byte-identical delivery receipt while a contrary receipt redelivers on the arriving batch; that the generated config pins the harness-side hook timeout above the slow-path bound; and that acknowledgement keys on a serially later `tool_use_id` rather than Codex's step-spanning `turn_id`. A failed proof drops that version to `RestartStartup` or unsupported.
 3. Amend the ancestor revision from the parent workspace and prove that jj evolves the descendant in repository state while leaving its files stale.
 4. Prove that kiki can classify that exact base transition as `NativeRewrite` without pinning the volatile child tip, then use `WorkspaceProbe` to distinguish `FreshClean`, `FreshDirty`, `StaleClean`, `StaleDirty`, and `Unknown` at a PreToolUse boundary.
 5. Prove that the parent workspace's `@` advances independently of its bookmark, persist that exact live head, and classify `ParentAdvance` from it. Explicitly rebase only a validated single-parent child chain; prove that merge, multiple-root, and foreign-descendant fixtures stop as `TopologyDiverged`.
@@ -21,7 +22,7 @@ Before committing to the full architecture, build a one-shot proof of concept:
 13. Crash thread creation at every external step and prove the blocked harness launcher cannot execute before the journal, credential, exclusive settings, live head, checkpoint, and tmux projections are durable.
 14. Freeze a session containing agent, shell, and child processes; prove a failed final close check resumes and verifies that same session, while a failed resume becomes `CloseFailed` and never dead `Active`.
 
-The PoC needs no daemon, no TUI, and no polished CLI. Shell scripts are enough. It should answer whether the hardest coordination primitive is real. Failure of exclusive hook isolation or batch-boundary identification blocks soft cascade delivery; v1 must use hard restart for the affected Claude version or declare it unsupported.
+The PoC needs no daemon, no TUI, and no polished CLI. Shell scripts are enough. It should answer whether the hardest coordination primitive is real. Failure of exclusive hook isolation or batch-boundary identification blocks soft cascade delivery; v1 must use hard restart for the affected harness version or declare it unsupported.
 
 ## First commit
 
@@ -45,7 +46,7 @@ After the PoC:
 5. persisted live head plus bookmark checkpoint at that exact commit
 6. credential and isolated hook-settings preparation
 7. tmux session creation behind the database-backed launch gate
-8. Claude Code exec as the final creation step
+8. harness exec (Claude Code or Codex) as the final creation step
 
 This slice should spawn a thread, attach to it, and start the agent only after exclusive hook ownership has been verified. No cascade, AI metadata, publish flow, or TUI is required.
 
@@ -68,13 +69,13 @@ v1.x polish (enumerated in [Orientation](01-orientation.md)) builds on top of th
 
 ## Acceptance integration gate
 
-[Orientation](01-orientation.md#v1-contract) is the sole enumeration of the acceptance slice. The integration gate exercises every item in that ledger together against a real jj repo, tmux, and Claude Code; this chapter defines build order, not a second scope list. Passing the gate requires neither `gh` nor network access beyond the configured harness. V1.x work deepens the accepted coordinator and cannot substitute for a missing ledger item.
+[Orientation](01-orientation.md#v1-contract) is the sole enumeration of the acceptance slice. The integration gate exercises every item in that ledger together against a real jj repo, tmux, and each shipped harness — Claude Code and Codex; this chapter defines build order, not a second scope list. Passing the gate requires neither `gh` nor network access beyond the configured harness. V1.x work deepens the accepted coordinator and cannot substitute for a missing ledger item.
 
 ## Budget
 
 The expected v1 build budget is:
 
-- acceptance slice: 5-7 weeks;
+- acceptance slice: 5-7 weeks, plus up to 1 week for the second harness adapter's launch-isolation and boundary proofs (the protocol, sidecar, and orchestrator are shared; the Codex-specific work is the generated `CODEX_HOME`, the version fixtures, and the gate);
 - first v1.x workflow tranche (publish and transcript): 3-5 additional weeks;
 - edge-case buffer: 1-2 weeks.
 

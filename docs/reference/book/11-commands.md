@@ -37,7 +37,7 @@ It verifies prerequisites:
 
 `kk init` does not require `gh`, network access, or GitHub authentication. Those checks occur lazily at `kk publish`; `kk doctor --github` is the explicit non-mutating preflight once publishing ships.
 
-`kk init` does **not** verify that any specific harness binary is installed. The harness contract is pluggable (see [Harness adapter](15-architecture/harness-adapter.md)); v1 ships only the `claude-code` adapter, but kiki does not refuse registration on a host that has not installed a harness yet. The check happens at `kk new` time instead: spawning a thread with the configured default harness errors if that harness's binary is missing.
+`kk init` does **not** verify that any specific harness binary is installed. The harness contract is pluggable (see [Harness adapter](15-architecture/harness-adapter.md)); v1 ships the `claude-code` and `codex` adapters, but kiki does not refuse registration on a host that has not installed a harness yet. The check happens at `kk new` time instead: spawning a thread with the configured default harness errors if that harness's binary is missing.
 
 The first installation may explicitly use Admin bootstrap to enroll the foreground approval presenter. Registering a repo is then a one-shot approved operation bound to its canonical path and derived repo id; `kk init` never turns bootstrap Admin into ambient CLI authority. The already-registered idempotent path is read-only and needs no new approval.
 
@@ -197,7 +197,9 @@ Destroy requires one-shot foreground approval even when revisions are preserved.
 
 ## `kk repair`
 
-`kk repair [<thread>]` is the human-directed recovery surface for a `ProjectionDiverged`, `CreateFailed`, `CloseFailed`, `DestroyFailed`, or other repairable lifecycle condition. The lifecycle and projection chapters own the states; this command owns their common interaction shape.
+`kk repair [<thread>]` is the human-directed recovery surface for a `ProjectionDiverged`, `CreateFailed`, `CloseFailed`, `DestroyFailed`, exhausted-delivery, or other repairable lifecycle condition. The lifecycle and projection chapters own the states; this command owns their common interaction shape.
+
+An intent whose delivery attempts are exhausted (see [Cascade](07-cascade.md#delivery-protocol)) diagnoses to exactly two named plans. `retry-delivery` re-arms the intent in one journaled transaction — clearing `delivery_exhausted_at`, incrementing the intent's `delivery_epoch`, and resetting the soft-redelivery count — and permits one fresh bounded `RestartStartup` cycle whose attempts are stamped with and counted under the new epoch; the human runs it after changing what made delivery fail, such as upgrading the harness. `discard-delivery` acknowledges the intent without delivery proof under a one-shot approval bound to the plan, recording the human resolution on the intent; the payload is then never delivered to the agent, and the plan says so before it is approved.
 
 Without an apply flag it is read-only: it reports the observed projections, the durable kiki authority, and zero or more named repair plans. Each plan states which records, workspace paths, bookmarks, sessions, or revisions it would change. Kiki may repair provably idempotent projection drift automatically in the background, but it must never silently choose among multiple plausible heads, paths, or topologies.
 

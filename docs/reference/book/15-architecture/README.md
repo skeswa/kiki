@@ -92,17 +92,17 @@ flowchart LR
     subgraph Tools["External tools kk coordinates"]
         Jj["jj / git repo\nworkspaces, bookmarks, op log"]
         Tmux["tmux\nsessions and sidebar panes"]
-        Claude["Claude Code\nagent sessions + JSONL"]
+        Harnesses["Claude Code / Codex\nagent sessions + JSONL"]
         Gh["gh / GitHub\nPRs, CI, review comments"]
         Model["cheap model API\nauto metadata drafts"]
     end
 
     ThreadCtl --> Jj
     ThreadCtl --> Tmux
-    ThreadCtl --> Claude
+    ThreadCtl --> Harnesses
     Cascade --> Jj
     Watcher --> Jj
-    Transcript --> Claude
+    Transcript --> Harnesses
     Github --> Gh
     Metadata --> Model
 ```

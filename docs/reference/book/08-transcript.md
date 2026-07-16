@@ -47,7 +47,7 @@ Kiki-authored cascade, reopen catch-up, and hard-escalation messages are `author
 
 ## Capture
 
-The first capture adapter is Claude Code JSONL projection.
+The first capture adapters are Claude Code session-JSONL projection and Codex rollout-JSONL projection; a managed Codex thread's rollouts live under its launch-scoped `CODEX_HOME`, so discovery is deterministic.
 
 Captured:
 

@@ -68,7 +68,7 @@ The intended tables are `causal_chains` and `causal_chain_visits`, deferred unti
 
 Likely later swaps:
 
-- Codex and other harness adapters behind the existing `Harness` and `TranscriptAdapter` traits;
+- harness adapters beyond `claude-code` and `codex` behind the existing `Harness` and `TranscriptAdapter` traits;
 - direct GitHub REST or GraphQL behind `GitHubBackend`;
 - jj-lib behind `JjBackend`;
 - native GUI, web dashboard, or remote clients over the same gRPC service.

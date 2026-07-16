@@ -47,7 +47,7 @@ Map-like config values merge by key across layers. List-like values replace as a
 
 Acceptance-slice sections:
 
-- `[agent]` — default harness, harness-specific args.
+- `[agent]` — default harness (`default_harness = "claude-code" | "codex"`, initially `claude-code`) and harness-specific args, keyed per harness so one repo can default to Claude Code while a thread spawns with `--harness codex`.
 - `[notifications]` — per-event `loud | soft | silent` behavior for acceptance-slice attention events and `os_provider` (`auto | notify-rust | osascript | tmux | off`). Per-event keys hot-reload; `os_provider` resolves at the next dispatch. See [Observability](14-observability.md).
 - `[paths]` — overrides for state, socket, and workspace-root paths.
 
