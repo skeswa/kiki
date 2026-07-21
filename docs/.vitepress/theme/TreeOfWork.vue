@@ -19,10 +19,13 @@ const reduced = ref(false);
 let timer: ReturnType<typeof setInterval> | undefined;
 let resetTimers: number[] = [];
 
+// The clock runs below real time so the tree's growth is easy to follow.
+const SPEED = 0.8;
+
 function startClock() {
   const start = performance.now();
   timer = setInterval(() => {
-    const elapsed = (performance.now() - start) / 1000;
+    const elapsed = ((performance.now() - start) / 1000) * SPEED;
     if (elapsed >= DURATION) {
       t.value = DURATION;
       done.value = true;
@@ -87,12 +90,13 @@ const laneCommits = [
 
 // Each thread keeps one color across both panels: kiki green for auth,
 // sky for billing, lavender for search, and a lighter green for auth's
-// child so the lineage reads at a glance. `x` centers the label under
-// that job's cluster of commits on the lane.
+// child so the lineage reads at a glance. `x` left-aligns the label
+// under that job's first commit, and `at` is that commit's time — the
+// label appears with the dot it names.
 const jobs = [
-  { label: "auth", x: 98, color: "#48d597" },
-  { label: "billing", x: 198, color: "#64b6e0" },
-  { label: "search", x: 298, color: "#b48ee6" },
+  { label: "auth", x: 66, at: 1.0, color: "#48d597" },
+  { label: "billing", x: 166, at: 5.8, color: "#64b6e0" },
+  { label: "search", x: 266, at: 10.6, color: "#b48ee6" },
 ];
 
 const activeJob = computed(() => (t.value < 4 ? 0 : t.value < 8.8 ? 1 : 2));
@@ -206,12 +210,17 @@ function laneScale(lane: Lane): number {
   return (tipX(lane) - lane.start) / (LANE_END - lane.start);
 }
 
-// The first three sit exactly where the branch connectors leave the
-// trunk, so every curve springs from a visible revision.
-const trunkCommits: Array<{ x: number; at: number; merge?: boolean }> = [
+// The base commits sit exactly where the branch connectors leave the
+// trunk, so every curve springs from a visible revision. They ripple
+// with the branches (a rebase moves the branch points along main), so
+// they render inside a shifting group while the later commits stay put.
+const baseTrunkCommits = [
   { x: 60, at: 0.3 },
   { x: 80, at: 0.5 },
   { x: 100, at: 0.7 },
+];
+
+const trunkCommits: Array<{ x: number; at: number; merge?: boolean }> = [
   { x: 314, at: 9.8 },
   { x: 340, at: 13.2, merge: true },
 ];
@@ -255,7 +264,7 @@ const youLane = computed(() => {
 
 // Branch groups slide right on each ripple; the pointer, which lives
 // outside those groups, adds the same offset to stay glued to the tips.
-const rippleOffset = computed(() => (rippled2.value ? 26 : rippled.value ? 14 : 0));
+const rippleOffset = computed(() => (rippled2.value ? 40 : rippled.value ? 14 : 0));
 
 const youX = computed(() =>
   Math.min(tipX(laneById[youLane.value]) + rippleOffset.value, 384),
@@ -298,7 +307,8 @@ function dotState(branch: (typeof branches)[number]): string {
               :class="{ on: t >= c.at, stale: t >= 10.3 && c.job === 0 }" :cx="c.x" cy="56" r="4.5"
               :style="{ '--th': jobs[c.job]!.color }" />
             <text v-for="(job, i) in jobs" :key="job.label" class="job-label" :style="{ '--th': job.color }"
-              :class="{ active: activeJob === i && !switching }" :x="job.x" y="78">{{ job.label }}</text>
+              :class="{ on: t >= job.at, active: activeJob === i && !switching }" :x="job.x"
+              y="78">{{ job.label }}</text>
             <g class="agent" :class="{ paused: switching }"
               :style="{ transform: `translateX(${laneDotX}px)`, '--th': jobs[activeJob]!.color }">
               <circle cx="0" cy="56" r="5.5" />
@@ -320,6 +330,12 @@ function dotState(branch: (typeof branches)[number]): string {
             <line class="track trunk-line" x1="24" y1="196" x2="292" y2="196" :class="{ on: t >= 0.1 }" />
             <line class="track trunk-line seg2" x1="292" y1="196" x2="416" y2="196" :class="{ on: t >= 9.7 }" />
             <text class="lane-label trunk-label" x="24" y="216" :class="{ on: t >= 0.4 }">main</text>
+            <!-- Each base dot shifts on the same stagger as its branch, so the
+                 pair stays glued mid-transition, not just at rest. -->
+            <g v-for="(c, i) in baseTrunkCommits" :key="c.x" class="branch" :class="{ rippled, rippled2 }"
+              :style="{ transitionDelay: rippled ? `${i * 0.12}s` : '0s' }">
+              <circle class="commit trunk-commit" :class="{ on: t >= c.at }" :cx="c.x" cy="196" r="4.5" />
+            </g>
             <circle v-for="c in trunkCommits" :key="c.x" class="commit trunk-commit"
               :class="{ on: t >= c.at, merge: c.merge }" :cx="c.x" cy="196" r="4.5" />
             <circle class="merge-pulse" :class="{ on: mergeLanded }" cx="340" cy="196" r="9" />
@@ -415,16 +431,6 @@ function dotState(branch: (typeof branches)[number]): string {
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
-}
-
-/* A trailing hairline turns each head into an instrument label; it fades
-   out well before the replay control's corner. */
-.tow-head::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  margin-left: 8px;
-  background: linear-gradient(90deg, rgba(200, 214, 205, 0.14), transparent 70%);
 }
 
 .tow-tag {
@@ -680,8 +686,15 @@ function dotState(branch: (typeof branches)[number]): string {
 .job-label {
   font-size: 11px;
   fill: rgba(200, 214, 205, 0.35);
-  text-anchor: middle;
-  transition: fill 0.4s ease;
+  text-anchor: start;
+  opacity: 0;
+  transition:
+    fill 0.4s ease,
+    opacity 0.4s ease;
+}
+
+.job-label.on {
+  opacity: 1;
 }
 
 .job-label.active {
@@ -822,7 +835,7 @@ function dotState(branch: (typeof branches)[number]): string {
    becomes the new revision on main. The origin is the merge commit's
    position minus the branch group's final ripple offset. */
 .row {
-  transform-origin: 314px 58px;
+  transform-origin: 300px 58px;
   transition:
     transform 0.9s ease,
     opacity 0.9s ease;
@@ -867,8 +880,9 @@ function dotState(branch: (typeof branches)[number]): string {
   transform: translateX(14px);
 }
 
+/* The close pushes everything along again, further than the cascade. */
 .branch.rippled2 {
-  transform: translateX(26px);
+  transform: translateX(40px);
 }
 
 /* --- reduced motion: the finished scene appears, nothing moves --- */
