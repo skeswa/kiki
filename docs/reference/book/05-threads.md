@@ -13,6 +13,16 @@ Mutable projections include:
 - tmux session name
 - harness session id
 
+```mermaid
+flowchart TD
+    tid(["thread_id<br/>stable identity — never changes"])
+    subgraph projections ["mutable projections — each can move, break, or be recreated without changing which thread this is"]
+        direction LR
+        ws["jj workspace<br/>files, live @"] ~~~ bm["jj bookmark<br/>checkpoint"] ~~~ tm["tmux session<br/>terminal home"] ~~~ hs["harness session<br/>the agent"]
+    end
+    tid --> projections
+```
+
 The live head of an active thread is the managed workspace's exact `@` commit. Kiki persists the last observed value as `thread_head_commit_id`; it is a cache of that workspace-local fact, not a second source of truth. Every watcher or lifecycle transaction that observes a new `@` updates the cache with the exact jj operation view from which it was read.
 
 The thread bookmark has a different job. It is the durable checkpoint used for publication and for recreating a workspace after close; it is not an automatically advancing alias for `@` and it is never a follows synchronization target. Kiki moves it only at an explicit checkpoint:
@@ -22,6 +32,17 @@ The thread bookmark has a different job. It is the durable checkpoint used for p
 - close, before forgetting the workspace;
 - detach, so the newly independent thread has a reopenable checkpoint;
 - an explicit repair resolution that adopts the current live head.
+
+The two commits are easy to conflate and must not be:
+
+```mermaid
+flowchart LR
+    m1(("○")) --> m2(("○")) --> m3(("○"))
+    m3 --> r1(("●")) --> r2(("●")) --> r3(("●")) --> r4(("●"))
+    main(["main"]) -.- m3
+    bm(["bookmark — the checkpoint<br/>moved only at explicit moments,<br/>so it ordinarily trails the head"]) -.- r2
+    head(["@ — the live head<br/>(thread_head_commit_id)"]) -.- r4
+```
 
 At a checkpoint, kiki pins the operation view, reads the exact workspace `@`, stores it as both `thread_head_commit_id` and `checkpoint_commit_id`, and moves the bookmark to that exact commit in one journaled lifecycle action. The bookmark mutation runs from a repository context that cannot snapshot the managed working copy (for the CLI backend, `--ignore-working-copy` or an equivalent exact-op invocation is mandatory), then verifies the resulting bookmark target and operation. It never resolves `@` again inside the mutating command. Ordinary `jj new`, `split`, `squash`, `describe`, and snapshot operations may therefore leave the bookmark behind. Status must show that condition; kiki must not "helpfully" move the bookmark after each jj operation.
 
