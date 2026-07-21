@@ -265,11 +265,43 @@ html:has(.kiki-home-page) .VPNavBarMenuLink.active {
   border-top-color: transparent;
 }
 
-.VPSidebarItem.level-0 {
+/* The whole book nests under one level-0 root ("the reference"), so
+   part headers sit at level-1 and chapter links at level-2. The root
+   reads as the book's title — lowercase, bright, roomy — while part
+   headers keep the small-caps label treatment one step below it. */
+.VPSidebarItem.level-0 > .item > .link > .text,
+.VPSidebarItem.level-0 > .item > .text {
+  color: rgba(220, 232, 226, 0.92);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.VPSidebarItem.level-0 > .item > .link:hover > .text {
+  color: var(--kiki-green);
+}
+
+.VPSidebarItem.level-0.is-active > .item .text {
+  color: var(--kiki-green);
+}
+
+.VPSidebarItem.level-0 > .item {
+  padding-bottom: 18px;
+}
+
+/* Indent the book's parts one quiet step under the title. Exactly one
+   rail system draws the structure: the default theme's per-part rail
+   bracketing each part's chapters. No second outer spine. */
+.VPSidebarItem.level-0 > .items {
+  padding-left: 10px;
+}
+
+.VPSidebarItem.level-1 {
   padding-bottom: 19px;
 }
 
-.VPSidebarItem.level-0 > .item > .text {
+.VPSidebarItem.level-1 > .item > .text {
   color: rgba(200, 214, 205, 0.62);
   font-size: 9px;
   font-weight: 500;
@@ -277,22 +309,29 @@ html:has(.kiki-home-page) .VPNavBarMenuLink.active {
   text-transform: uppercase;
 }
 
-.VPSidebarItem.level-1 .text {
+/* Soften the per-part rail and tuck it under the part header's first
+   letter, so header, rail, and chapters share one left rhythm. */
+.VPSidebarItem.level-1 > .items {
+  margin-left: 1px;
+  border-left-color: rgba(200, 214, 205, 0.09);
+}
+
+.VPSidebarItem.level-2 .text {
   color: rgba(200, 214, 205, 0.56);
   font-size: 11px;
   font-weight: 400;
 }
 
-.VPSidebarItem.level-1 > .item {
-  margin: 0 -10px;
-  padding: 4px 10px;
+.VPSidebarItem.level-2 > .item {
+  margin: 0 -8px 0 0;
+  padding: 4px 8px 4px 12px;
 }
 
-.VPSidebarItem.level-1.is-active > .item {
+.VPSidebarItem.level-2.is-active > .item {
   background: rgba(72, 213, 151, 0.07);
 }
 
-.VPSidebarItem.level-1.is-active > .item .text {
+.VPSidebarItem.level-2.is-active > .item .text {
   color: var(--kiki-green);
 }
 
@@ -301,7 +340,7 @@ html:has(.kiki-home-page) .VPNavBarMenuLink.active {
   color: rgba(200, 214, 205, 0.32);
 }
 
-.VPSidebarItem.level-1.is-active > .item .text .ch-no {
+.VPSidebarItem.level-2.is-active > .item .text .ch-no {
   color: rgba(72, 213, 151, 0.55);
 }
 
