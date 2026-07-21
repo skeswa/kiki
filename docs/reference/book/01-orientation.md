@@ -74,23 +74,23 @@ The table names the mechanisms; whether each surface ships in the acceptance sli
 
 ## The tool
 
-kiki (`kk`) is an agentic coding workflow coordinator. It gives a developer a first-class unit for a themed line of work: a jj-backed revision stack, an isolated workspace, a tmux session, and an agent session that can be paused, resumed, archived, and composed with related work. Publishing and transcript-backed recall build on that unit after the coordination core is proven.
+kiki (`kk`) coordinates agentic coding work. It gives a developer one named unit for a line of work — the thread: a chain of jj revisions, its own workspace, its own tmux session, and its own agent. A thread can be paused, resumed, archived, and stacked on top of related work. Publishing to GitHub and transcript-backed recall build on that unit once the coordination core is proven.
 
-kiki exists to make parallel, recursive work patterns cheap enough that a developer can get the most out of agents and collaborate with them. Today, switching between agent-led lines of inquiry means stashes, branches, rebases, lost terminals, and reconstructed context. kiki makes the coordination machinery ambient: threads branch from other threads, follow live ancestor changes, and expose enough durable state that the human can see what needs attention.
+The point is to make parallel work cheap. Today, switching between agent-led lines of work means stashes, branches, rebases, lost terminals, and rebuilt context. kiki runs the coordination in the background instead: threads branch from threads, children follow their parents' live changes, and enough state survives on disk that you can always see what needs you.
 
 ## Principles
 
-- kiki coordinates ambiently. Developers may still use `jj`, `tmux`, and `gh` directly.
-- Threads provide cooperative isolation. v1 separates workspaces to prevent accidental interference; it does not sandbox same-UID processes.
-- Human-authored prose is preserved. kiki may draft names, descriptions, and PR text, but it must not silently overwrite deliberate human edits.
-- Transcript data, when transcript capture ships, is stored locally and never feeds publication. An explicitly requested reopen catch-up may send selected local rows to the configured model provider; that egress requires consent.
-- Cascade safety matters more than eagerness. jj may evolve descendant commits immediately in repository state; kiki materializes the resulting working-copy state at agent boundaries or quiescence, not mid-edit. Parent live-head advances that require an explicit rebase use the same boundary.
+- kiki coordinates in the background. You may always use `jj`, `tmux`, and `gh` directly; kiki watches and reacts rather than standing in the way.
+- Threads keep each other out of the way, not out. Separate workspaces prevent accidents between parallel agents; they are not a security sandbox against processes running as your user.
+- Your words are yours. kiki may draft names, descriptions, and PR text, but it must not silently overwrite something a human wrote.
+- Transcript data, when transcript capture ships, is stored locally and never feeds anything kiki publishes. The one exception is explicit: a reopen catch-up you ask for may send selected rows to the configured model provider, and only after you consent.
+- Safety beats eagerness. jj may rewrite a child thread's commits in the repository immediately, but kiki changes the child's files — and informs its agent — only at a safe moment: an agent tool boundary or a quiet period, never mid-edit. Explicit rebases for a parent's new commits wait for the same moment.
 
 ## v1 contract
 
-The acceptance slice is successful when kiki can create, switch, coordinate, archive, reopen, repair, and inspect agentic work threads safely. It deliberately tests the coordination primitive before adding publication, conversational memory, or a rich UI.
+v1 is done when kiki can create, switch, coordinate, archive, reopen, repair, and inspect threads safely. It deliberately proves the coordination core before adding publishing, conversational memory, or a rich UI. That proving set is called the **acceptance slice**.
 
-This chapter is the book's scope ledger. When another chapter needs to say whether a surface is acceptance slice or v1.x polish, it links here; no other chapter keeps a competing list. Promoting or demoting a surface is an edit to this chapter alone.
+This chapter is the book's single scope ledger. When another chapter needs to say whether a feature ships in the acceptance slice or as v1.x polish, it links here; no other chapter keeps a competing list. Promoting or demoting a feature is an edit to this chapter alone.
 
 The acceptance slice includes:
 
