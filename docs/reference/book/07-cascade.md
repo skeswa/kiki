@@ -7,6 +7,37 @@ Every cascade is a base transition from the last synchronized parent commit to a
 - **`NativeRewrite`** — jj has already evolved the child's repository history so the new parent base is an ancestor of the child's current repository commit. Kiki must not rebase it again; it reconciles the on-disk workspace to jj's current view at a safe boundary.
 - **`ParentAdvance`** — the new parent base is not already an ancestor of the child. jj cannot infer kiki's follows relationship from revision topology alone, so kiki explicitly rebases the child's owned stack onto that exact parent commit at a safe boundary.
 
+In pictures — parent thread A at base commits X, child thread B following it with owned commits f1 and f2. `NativeRewrite` first: jj has already evolved B's commits in repository state, and only B's on-disk files are stale.
+
+```mermaid
+flowchart LR
+    subgraph nb ["before"]
+        direction LR
+        X1("X1") --> nf1("f1") --> nf2("f2 = @")
+    end
+    subgraph na ["after — repository state; B's disk stays stale until the safe boundary"]
+        direction LR
+        X2("X2") --> nf1p("f1'") --> nf2p("f2' = @")
+    end
+    nb ==>|"A amends X1 into X2"| na
+```
+
+`ParentAdvance`: nothing in revision topology says B should follow A's new commit, so kiki rebases B's owned stack explicitly.
+
+```mermaid
+flowchart LR
+    subgraph pb ["before"]
+        direction LR
+        pX("X") --> pb1("b1 = A's @")
+        pX --> pf1("f1") --> pf2("f2 = B's @")
+    end
+    subgraph pa ["after — kiki's explicit rebase at a safe boundary"]
+        direction LR
+        qX("X") --> qb1("b1 = A's @") --> qf1("f1'") --> qf2("f2' = B's @")
+    end
+    pb ==>|"A's live head gains b1"| pa
+```
+
 The intent pins the base transition, not the child's working-copy commit. A child commit is a volatile outcome: agent edits and ordinary jj snapshots can change it without changing whether the follows base is synchronized.
 
 ## Invariant
@@ -131,6 +162,30 @@ At the child's safe boundary:
 The CLI PoC must evaluate jj's `--no-integrate-operation` plus `jj op integrate` as the preferred way to inspect a planned result before integration. Recovery must use exact operation ids, not rerun an ambiguous “rebase onto current parent” command.
 
 ## Delivery protocol
+
+The happy path, end to end — a parent change reaching a child agent without that agent ever seeing unexplained files:
+
+```mermaid
+sequenceDiagram
+    participant A as parent workspace
+    participant K as kkd
+    participant H as kk-hook (child)
+    participant M as child agent
+    A->>K: jj operation observed (parent head X1 → X2)
+    K->>K: classify follows edge, record sync_intent (Detected)
+    M->>H: tool call opens a batch (PreToolUse)
+    H->>K: safe boundary — first admitted call
+    K->>K: bind Block for the whole batch, probe workspace, reconcile, materialize
+    K-->>H: byte-stable payload ("your base changed: X1 → X2")
+    H-->>M: every call in the batch is blocked and carries the payload
+    M->>H: batch completes (PostToolBatch)
+    H->>K: record exact batch completion
+    M->>H: tool call from a later model turn (PreToolUse)
+    H->>K: later-turn proof
+    K->>K: intent Acknowledged, next intent may proceed
+```
+
+Everything below exists to keep that sequence honest when batches are concurrent, hooks crash, harnesses differ, or the workspace holds unsnapshotted edits.
 
 A harness may dispatch several tool calls from one assistant response and invoke their `PreToolUse` hooks concurrently — Claude Code does. A second hook invocation from that batch is not evidence that the model consumed the first hook's synthetic result. Kiki therefore treats the complete tool batch as the delivery boundary, not an individual hook process.
 
