@@ -138,7 +138,7 @@ const branches = [
     start: 128,
     labelX: 96,
     commits: [
-      { x: 158, at: 2.2 },
+      { x: 158, at: 2.2, you: true },
       { x: 194, at: 3.4 },
       { x: 230, at: 4.6 },
       { x: 266, at: 5.8 },
@@ -156,7 +156,7 @@ const branches = [
     labelX: 116,
     commits: [
       { x: 178, at: 2.7 },
-      { x: 214, at: 4.1 },
+      { x: 214, at: 4.1, you: true },
       { x: 250, at: 5.5 },
       { x: 286, at: 6.9 },
       { x: 322, at: 8.3 },
@@ -186,7 +186,7 @@ const child = {
   connector: "M266,58 C266,40 284,26 310,26",
   start: 310,
   commits: [
-    { x: 330, at: 8.6 },
+    { x: 330, at: 8.6, you: true },
     { x: 362, at: 9.4 },
   ],
 };
@@ -265,13 +265,33 @@ const youLane = computed(() => {
 const rippleOffset = computed(() => (rippled2.value ? 40 : rippled.value ? 14 : 0));
 
 const youX = computed(() =>
-  Math.min(tipX(laneById[youLane.value]) + rippleOffset.value, 384),
+  Math.min(tipX(laneById[youLane.value]) + rippleOffset.value, 378),
 );
 const youY = computed(() => laneById[youLane.value].y);
 const youVisible = computed(() => t.value >= 1.9);
 
+// What "you" are doing at the tip you're visiting. Agents make most of
+// the revisions; you drop one in occasionally (the pale-ringed commits,
+// timed to land while you're on that lane) and otherwise watch, answer,
+// or close.
+const youCommitWindows: Array<[keyof typeof laneById, number]> = [
+  ["auth", 2.2],
+  ["billing", 4.1],
+  ["authui", 8.6],
+];
+
+const youState = computed(() => {
+  const lane = youLane.value;
+  if (lane === "search" && searchBlocked.value) return "answering";
+  if (lane === "auth" && t.value >= 12.6 && t.value < 13.8) return "closing";
+  for (const [k, at] of youCommitWindows) {
+    if (k === lane && t.value >= at - 0.6 && t.value < at + 0.5) return "committing";
+  }
+  return "watching";
+});
+
 const rightCaption = computed(() => {
-  if (t.value < 5.2) return "three agents working · you hop where you're useful";
+  if (t.value < 5.2) return "agents drive · sometimes you commit, sometimes you watch";
   if (t.value < 7.2) return "search needs you · the rest keep working";
   if (t.value < 9.6) return "you branch auth-ui off auth, live";
   if (t.value < 12.5) return "one rebase onto main · the cascade does the rest";
@@ -293,7 +313,7 @@ function dotState(branch: (typeof branches)[number]): string {
 <template>
   <div class="tow" :class="{ reduced, resetting }">
     <figure class="tow-fig" role="img"
-      aria-label="Animation, played once, contrasting two ways of working. Without kiki: one lane where auth, billing, and search take turns, separated by costly context switches, with your attention pinned to the lane. With kiki: a revision tree where three threads and a child thread grow in parallel while a marker labeled you rides the tip of whichever thread it attends — answering the thread that needs a human, branching a child thread, and closing a finished thread. After one rebase onto the moving main, kiki's cascade carries every following thread forward, and closing the finished auth thread folds its work into main while its child thread auth-ui reroots onto main and keeps going.">
+      aria-label="Animation, played once, contrasting two ways of working. Without kiki: one lane where auth, billing, and search take turns, separated by costly context switches, with your attention pinned to the lane. With kiki: a revision tree where three threads and a child thread grow in parallel while agents make most of the revisions and a marker labeled you rides the tip of whichever thread it attends — mostly watching, sometimes dropping in a revision of its own (drawn as pale-ringed dots), answering the thread that needs a human, branching a child thread, and closing a finished thread. After one rebase onto the moving main, kiki's cascade carries every following thread forward, and closing the finished auth thread folds its work into main while its child thread auth-ui reroots onto main and keeps going.">
       <div class="tow-stack" aria-hidden="true">
         <div class="tow-panel">
           <div class="tow-head">
@@ -358,8 +378,8 @@ function dotState(branch: (typeof branches)[number]): string {
                   :x2="LANE_END" :y2="b.y" vector-effect="non-scaling-stroke"
                   :style="{ transform: `scaleX(${laneScale(b)})`, transformOrigin: `${b.start}px ${b.y}px` }" />
                 <text class="lane-label" :x="b.labelX" :y="b.y - 10" :class="{ on: t >= b.at + 0.9 }">{{ b.id }}</text>
-                <circle v-for="c in b.commits" :key="c.x" class="commit" :class="{ on: t >= c.at }" :cx="c.x"
-                  :cy="b.y" r="4.5" />
+                <circle v-for="c in b.commits" :key="c.x" class="commit" :class="{ on: t >= c.at, mine: c.you }"
+                  :cx="c.x" :cy="b.y" r="4.5" />
                 <g class="agent" :data-state="dotState(b)" :style="{ transform: `translateX(${tipX(b)}px)` }">
                   <circle cx="0" :cy="b.y" r="5.5" />
                   <circle class="halo" cx="0" :cy="b.y" r="10" />
@@ -379,8 +399,8 @@ function dotState(branch: (typeof branches)[number]): string {
                     :x2="LANE_END" :y2="child.y" vector-effect="non-scaling-stroke"
                     :style="{ transform: `scaleX(${laneScale(child)})`, transformOrigin: `${child.start}px ${child.y}px` }" />
                   <text class="lane-label" x="304" y="16" :class="{ on: t >= child.at + 0.9 }">auth-ui</text>
-                  <circle v-for="c in child.commits" :key="c.x" class="commit" :class="{ on: t >= c.at }" :cx="c.x"
-                    :cy="child.y" r="4.5" />
+                  <circle v-for="c in child.commits" :key="c.x" class="commit"
+                    :class="{ on: t >= c.at, mine: c.you }" :cx="c.x" :cy="child.y" r="4.5" />
                   <g class="agent" :data-state="t >= child.at + WIRE_DRAW ? 'working' : 'off'"
                     :style="{ transform: `translateX(${tipX(child)}px)` }">
                     <circle cx="0" :cy="child.y" r="5.5" />
@@ -395,6 +415,7 @@ function dotState(branch: (typeof branches)[number]): string {
               <path d="M12,0 L19,-4.5 L19,4.5 Z" />
               <rect x="21" y="-9" width="32" height="18" />
               <text x="37" y="4">you</text>
+              <text class="you-state" x="37" y="20">{{ youState }}</text>
             </g>
           </svg>
           <div class="tow-caption green">{{ rightCaption }}</div>
@@ -634,6 +655,13 @@ function dotState(branch: (typeof branches)[number]): string {
   transform: scale(1);
 }
 
+/* Revisions you made yourself, amid the agent's: a pale ring in the
+   same ivory as the "you" marker. */
+.commit.mine {
+  stroke: rgba(230, 240, 235, 0.85);
+  stroke-width: 1.5;
+}
+
 .trunk-commit {
   fill: transparent;
   stroke: rgba(200, 214, 205, 0.6);
@@ -829,6 +857,14 @@ function dotState(branch: (typeof branches)[number]): string {
 
 .you path {
   fill: rgba(220, 232, 226, 0.65);
+}
+
+/* The word under the roaming marker: what you're doing at this tip.
+   Scoped under .you to outrank the `.you text` base styling. */
+.you .you-state {
+  font-size: 8px;
+  fill: rgba(230, 240, 235, 0.55);
+  letter-spacing: 0.08em;
 }
 
 .you.roaming {
