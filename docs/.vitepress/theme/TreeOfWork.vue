@@ -87,11 +87,12 @@ const laneCommits = [
 
 // Each thread keeps one color across both panels: kiki green for auth,
 // sky for billing, lavender for search, and a lighter green for auth's
-// child so the lineage reads at a glance.
+// child so the lineage reads at a glance. `x` centers the label under
+// that job's cluster of commits on the lane.
 const jobs = [
-  { label: "auth", x: 24, color: "#48d597" },
-  { label: "billing", x: 96, color: "#64b6e0" },
-  { label: "search", x: 186, color: "#b48ee6" },
+  { label: "auth", x: 98, color: "#48d597" },
+  { label: "billing", x: 198, color: "#64b6e0" },
+  { label: "search", x: 298, color: "#b48ee6" },
 ];
 
 const activeJob = computed(() => (t.value < 4 ? 0 : t.value < 8.8 ? 1 : 2));
@@ -99,9 +100,15 @@ const switching = computed(
   () => (t.value >= 4 && t.value < 5.5) || (t.value >= 8.8 && t.value < 10.3),
 );
 
+// The agent sits where the next commit will land, so commits pop under
+// it and the dot-to-dot rhythm stays even.
 const laneDotX = computed(() => {
-  const done = laneCommits.filter((c) => c.at <= t.value);
-  return done.length === 0 ? 44 : done[done.length - 1]!.x + 22;
+  let last: number | undefined;
+  for (const c of laneCommits) {
+    if (c.at <= t.value) last = c.x;
+    else return c.x;
+  }
+  return last! + 28;
 });
 
 const leftCaption = computed(() => {
@@ -110,7 +117,7 @@ const leftCaption = computed(() => {
   if (t.value < 8.8) return "billing: working · search still waiting";
   if (t.value < 10.3) return "context switch: rebuild it all again";
   if (t.value < 14) return "search: working · auth going stale";
-  return "one lane. everything else waits.";
+  return "each job had to wait for the one before it";
 });
 
 // --- bottom panel: the tree -----------------------------------------------
@@ -184,26 +191,34 @@ const LANE_END = 392;
 
 type Lane = { at: number; start: number; commits: Array<{ x: number; at: number }> };
 
+// The agent rides one slot ahead: it sits where the next commit will
+// land, the commit pops beneath it, and it slides on to the next slot.
 function tipX(lane: Lane): number {
-  let tip = lane.start + 14;
-  for (const c of lane.commits) if (t.value >= c.at) tip = c.x + 22;
-  return tip;
+  let last: number | undefined;
+  for (const c of lane.commits) {
+    if (t.value >= c.at) last = c.x;
+    else return c.x;
+  }
+  return last === undefined ? lane.commits[0]!.x : last + 36;
 }
 
 function laneScale(lane: Lane): number {
   return (tipX(lane) - lane.start) / (LANE_END - lane.start);
 }
 
+// The first three sit exactly where the branch connectors leave the
+// trunk, so every curve springs from a visible revision.
 const trunkCommits: Array<{ x: number; at: number; merge?: boolean }> = [
-  { x: 40, at: 0.3 },
-  { x: 70, at: 0.5 },
+  { x: 60, at: 0.3 },
+  { x: 80, at: 0.5 },
+  { x: 100, at: 0.7 },
   { x: 314, at: 9.8 },
   { x: 340, at: 13.2, merge: true },
 ];
 
 const searchBlocked = computed(() => t.value >= 5.2 && t.value < 7.2);
 const rippled = computed(() => t.value >= 9.9);
-const rippled2 = computed(() => t.value >= 13.4);
+const rippled2 = computed(() => t.value >= 13.0);
 const glow = computed(() => t.value >= 9.9 && t.value < 11.2);
 const authClosed = computed(() => t.value >= 12.9);
 // Matches the merge trunk commit's `at` so the ring fires as the dot pops.
@@ -222,7 +237,7 @@ const laneById = {
 } as const;
 
 const youStops: Array<[number, keyof typeof laneById]> = [
-  [0.6, "auth"], // review auth
+  [1.9, "auth"], // review auth once its lane exists
   [3.2, "billing"], // peek at billing
   [5.4, "search"], // search flagged you: answer it
   [7.4, "auth"], // back to auth…
@@ -246,7 +261,7 @@ const youX = computed(() =>
   Math.min(tipX(laneById[youLane.value]) + rippleOffset.value, 384),
 );
 const youY = computed(() => laneById[youLane.value].y);
-const youVisible = computed(() => t.value >= 0.6);
+const youVisible = computed(() => t.value >= 1.9);
 
 const rightCaption = computed(() => {
   if (t.value < 5.2) return "three agents working · you hop where you're useful";
@@ -254,13 +269,17 @@ const rightCaption = computed(() => {
   if (t.value < 9.6) return "you branch auth-ui off auth, live";
   if (t.value < 12.5) return "one rebase onto main · the cascade does the rest";
   if (t.value < 14.6) return "kk close: auth folds into main · auth-ui reroots there";
-  return "same clock. the whole tree moved.";
+  return "every thread moved in the same sixteen seconds";
 });
+
+// Agents come alive only after their connector finishes drawing, so no
+// lane or dot floats in space before its curve reaches it.
+const WIRE_DRAW = 0.75;
 
 function dotState(branch: (typeof branches)[number]): string {
   if (branch.id === "search" && searchBlocked.value) return "blocked";
   if (branch.id === "auth" && t.value >= 12.5) return "done";
-  return t.value >= branch.at ? "working" : "off";
+  return t.value >= branch.at + WIRE_DRAW ? "working" : "off";
 }
 </script>
 
@@ -272,25 +291,21 @@ function dotState(branch: (typeof branches)[number]): string {
         <div class="tow-panel">
           <div class="tow-head">
             <span class="tow-tag">without kiki</span>
-            <span class="tow-title">one lane at a time</span>
           </div>
-          <svg viewBox="0 0 440 104">
-            <g v-for="(job, i) in jobs" :key="job.label" class="job" :style="{ '--th': job.color }"
-              :class="{ active: activeJob === i && !switching, past: activeJob > i, waiting: activeJob < i || (switching && activeJob === i) }">
-              <circle :cx="job.x" cy="18" r="3.5" />
-              <text :x="job.x + 11" y="22">{{ job.label }}</text>
-            </g>
-            <line class="track" x1="24" y1="84" x2="416" y2="84" />
+          <svg viewBox="0 0 440 84">
+            <line class="track" x1="24" y1="56" x2="416" y2="56" />
             <circle v-for="c in laneCommits" :key="c.x" class="commit lane-commit"
-              :class="{ on: t >= c.at, stale: t >= 10.3 && c.job === 0 }" :cx="c.x" cy="84" r="4.5"
+              :class="{ on: t >= c.at, stale: t >= 10.3 && c.job === 0 }" :cx="c.x" cy="56" r="4.5"
               :style="{ '--th': jobs[c.job]!.color }" />
+            <text v-for="(job, i) in jobs" :key="job.label" class="job-label" :style="{ '--th': job.color }"
+              :class="{ active: activeJob === i && !switching }" :x="job.x" y="78">{{ job.label }}</text>
             <g class="agent" :class="{ paused: switching }"
               :style="{ transform: `translateX(${laneDotX}px)`, '--th': jobs[activeJob]!.color }">
-              <circle cx="0" cy="84" r="5.5" />
+              <circle cx="0" cy="56" r="5.5" />
               <g class="you pinned">
-                <rect x="-18" y="44" width="36" height="18" rx="3" />
-                <text x="0" y="57">you</text>
-                <path d="M-4,64 L0,70 L4,64 Z" />
+                <rect x="-18" y="16" width="36" height="18" />
+                <text x="0" y="29">you</text>
+                <path d="M-4,36 L0,42 L4,36 Z" />
               </g>
             </g>
           </svg>
@@ -300,7 +315,6 @@ function dotState(branch: (typeof branches)[number]): string {
         <div class="tow-panel">
           <div class="tow-head">
             <span class="tow-tag green">with kiki</span>
-            <span class="tow-title">the whole tree, live</span>
           </div>
           <svg viewBox="0 0 440 230">
             <line class="track trunk-line" x1="24" y1="196" x2="292" y2="196" :class="{ on: t >= 0.1 }" />
@@ -309,15 +323,16 @@ function dotState(branch: (typeof branches)[number]): string {
             <circle v-for="c in trunkCommits" :key="c.x" class="commit trunk-commit"
               :class="{ on: t >= c.at, merge: c.merge }" :cx="c.x" cy="196" r="4.5" />
             <circle class="merge-pulse" :class="{ on: mergeLanded }" cx="340" cy="196" r="9" />
+            <text class="merged-label" :class="{ on: authFolded }" x="340" y="216">auth ✓</text>
 
             <g v-for="(b, i) in branches" :key="b.id" class="branch" :class="{ rippled, rippled2 }"
               :style="{ transitionDelay: rippled ? `${i * 0.12}s` : '0s', '--th': b.color }">
               <path class="wire" :class="{ on: t >= b.at, glow }" :d="b.connector" pathLength="100" />
               <g class="row" :class="{ folding: b.id === 'auth' && authClosed }">
-                <line class="lane" :class="{ on: t >= b.at, glow }" :x1="b.start" :y1="b.y" :x2="LANE_END" :y2="b.y"
-                  vector-effect="non-scaling-stroke"
+                <line class="lane" :class="{ on: t >= b.at + WIRE_DRAW, glow }" :x1="b.start" :y1="b.y"
+                  :x2="LANE_END" :y2="b.y" vector-effect="non-scaling-stroke"
                   :style="{ transform: `scaleX(${laneScale(b)})`, transformOrigin: `${b.start}px ${b.y}px` }" />
-                <text class="lane-label" :x="b.labelX" :y="b.y - 10" :class="{ on: t >= b.at + 0.5 }">{{ b.id }}</text>
+                <text class="lane-label" :x="b.labelX" :y="b.y - 10" :class="{ on: t >= b.at + 0.9 }">{{ b.id }}</text>
                 <circle v-for="c in b.commits" :key="c.x" class="commit" :class="{ on: t >= c.at }" :cx="c.x"
                   :cy="b.y" r="4.5" />
                 <g class="agent" :data-state="dotState(b)" :style="{ transform: `translateX(${tipX(b)}px)` }">
@@ -327,7 +342,7 @@ function dotState(branch: (typeof branches)[number]): string {
               </g>
               <g class="needs-you" v-if="b.id === 'search'" :class="{ on: searchBlocked }"
                 :style="{ transform: `translateX(${tipX(b)}px)` }">
-                <rect x="-96" :y="b.y - 34" width="76" height="20" rx="3" />
+                <rect x="-96" :y="b.y - 34" width="76" height="20" />
                 <text x="-58" :y="b.y - 20">needs you</text>
               </g>
 
@@ -335,21 +350,17 @@ function dotState(branch: (typeof branches)[number]): string {
                 <path class="wire child-wire" :class="{ on: t >= child.at, glow, gone: authClosed }"
                   :style="{ '--th': child.color }" :d="child.connector" pathLength="100" />
                 <g class="authui" :class="{ dropped: authClosed }" :style="{ '--th': child.color }">
-                  <line class="lane" :class="{ on: t >= child.at, glow }" :x1="child.start" :y1="child.y"
+                  <line class="lane" :class="{ on: t >= child.at + WIRE_DRAW, glow }" :x1="child.start" :y1="child.y"
                     :x2="LANE_END" :y2="child.y" vector-effect="non-scaling-stroke"
                     :style="{ transform: `scaleX(${laneScale(child)})`, transformOrigin: `${child.start}px ${child.y}px` }" />
-                  <text class="lane-label" x="304" y="16" :class="{ on: t >= child.at + 0.5 }">auth-ui</text>
+                  <text class="lane-label" x="304" y="16" :class="{ on: t >= child.at + 0.9 }">auth-ui</text>
                   <circle v-for="c in child.commits" :key="c.x" class="commit" :class="{ on: t >= c.at }" :cx="c.x"
                     :cy="child.y" r="4.5" />
-                  <g class="agent" :data-state="t >= child.at ? 'working' : 'off'"
+                  <g class="agent" :data-state="t >= child.at + WIRE_DRAW ? 'working' : 'off'"
                     :style="{ transform: `translateX(${tipX(child)}px)` }">
                     <circle cx="0" :cy="child.y" r="5.5" />
                     <circle class="halo" cx="0" :cy="child.y" r="10" />
                   </g>
-                </g>
-                <g class="closed-chip" :class="{ on: authFolded }">
-                  <rect x="296" y="8" width="112" height="18" rx="3" />
-                  <text x="352" y="21">✓ auth → main</text>
                 </g>
               </template>
             </g>
@@ -357,7 +368,7 @@ function dotState(branch: (typeof branches)[number]): string {
             <g class="you roaming" :class="{ on: youVisible }"
               :style="{ transform: `translate(${youX}px, ${youY}px)` }">
               <path d="M12,0 L19,-4.5 L19,4.5 Z" />
-              <rect x="21" y="-9" width="32" height="18" rx="3" />
+              <rect x="21" y="-9" width="32" height="18" />
               <text x="37" y="4">you</text>
             </g>
           </svg>
@@ -377,7 +388,7 @@ function dotState(branch: (typeof branches)[number]): string {
   position: relative;
   margin: 28px 0;
   border: 1px solid var(--kiki-line, rgba(200, 214, 205, 0.14));
-  border-radius: 6px;
+  border-radius: 0;
   background: linear-gradient(180deg, rgba(13, 21, 18, 0.75), rgba(8, 14, 12, 0.65));
   overflow: hidden;
 }
@@ -445,11 +456,6 @@ function dotState(branch: (typeof branches)[number]): string {
   background: currentColor;
 }
 
-.tow-title {
-  font-size: 12px;
-  color: rgba(200, 214, 205, 0.78);
-}
-
 .tow svg {
   display: block;
   width: 100%;
@@ -485,7 +491,7 @@ function dotState(branch: (typeof branches)[number]): string {
   color: var(--kiki-green, #48d597);
   background: transparent;
   border: 1px solid rgba(72, 213, 151, 0.35);
-  border-radius: 3px;
+  border-radius: 0;
   padding: 4px 10px;
   cursor: pointer;
   opacity: 0;
@@ -669,40 +675,17 @@ function dotState(branch: (typeof branches)[number]): string {
   fill: rgba(200, 214, 205, 0.4);
 }
 
-/* --- top panel: the job queue --- */
+/* --- top panel: job labels sit under their cluster of commits --- */
 
-.job circle {
-  fill: transparent;
-  stroke: rgba(200, 214, 205, 0.3);
-  stroke-width: 1.2;
-  transition:
-    fill 0.4s ease,
-    stroke 0.4s ease;
-}
-
-.job text {
+.job-label {
   font-size: 11px;
-  fill: rgba(200, 214, 205, 0.4);
+  fill: rgba(200, 214, 205, 0.35);
+  text-anchor: middle;
   transition: fill 0.4s ease;
 }
 
-.job.active circle {
+.job-label.active {
   fill: var(--th, var(--kiki-green, #48d597));
-  stroke: transparent;
-}
-
-.job.active text {
-  fill: var(--th, var(--kiki-green, #48d597));
-}
-
-.job.past circle {
-  fill: rgba(200, 214, 205, 0.28);
-  stroke: transparent;
-}
-
-.job.past text,
-.job.waiting text {
-  fill: rgba(200, 214, 205, 0.3);
 }
 
 /* --- agents --- */
@@ -834,16 +817,19 @@ function dotState(branch: (typeof branches)[number]): string {
 
 /* --- closing a thread: the fold into main --- */
 
-/* The finished row sinks onto the trunk and dissolves; the merge commit
-   popping on the trunk is what it dissolves into. */
+/* The finished row funnels into the merge commit: its dots converge on
+   the merge point while sinking onto the trunk, so the work visibly
+   becomes the new revision on main. The origin is the merge commit's
+   position minus the branch group's final ripple offset. */
 .row {
+  transform-origin: 314px 58px;
   transition:
     transform 0.9s ease,
     opacity 0.9s ease;
 }
 
 .row.folding {
-  transform: translateY(138px);
+  transform: translateY(138px) scaleX(0.08);
   opacity: 0;
 }
 
@@ -857,24 +843,18 @@ function dotState(branch: (typeof branches)[number]): string {
   transform: translate(-182px, 32px);
 }
 
-.closed-chip {
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.closed-chip.on {
-  opacity: 1;
-}
-
-.closed-chip rect {
-  fill: rgba(72, 213, 151, 0.08);
-  stroke: rgba(72, 213, 151, 0.4);
-}
-
-.closed-chip text {
+/* Once the fold lands, the merged work is named on the trunk itself,
+   right under its merge commit. */
+.merged-label {
   font-size: 10px;
-  fill: rgba(72, 213, 151, 0.85);
+  fill: rgba(72, 213, 151, 0.75);
   text-anchor: middle;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.merged-label.on {
+  opacity: 1;
 }
 
 /* --- cascade ripples: everything moves along --- */
