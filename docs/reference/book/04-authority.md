@@ -93,7 +93,7 @@ It contains no transcript text, diff content or paths, sync-intent payloads or i
 
 ## Command context and switch
 
-The CLI resolves a contextual thread as described in [Commands](11-commands.md#context-resolution) and loads only that thread's credential. Outside a thread context, repo-summary reads use a separate least-privilege registration capability; commands needing stronger authority start an interactive approval flow.
+The CLI resolves a contextual thread as described in [Commands](09-commands.md#context-resolution) and loads only that thread's credential. Outside a thread context, repo-summary reads use a separate least-privilege registration capability; commands needing stronger authority start an interactive approval flow.
 
 `kk switch <thread>` consists of a summary-class lookup of the target tmux session followed by `tmux switch-client`. It does not mutate daemon focus state, so selecting a thread does not require cross-thread mutation approval. Any audit emission records the invoker and lookup; it does not turn switch into an Admin operation.
 

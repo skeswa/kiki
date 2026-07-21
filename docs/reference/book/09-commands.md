@@ -2,7 +2,7 @@
 
 The CLI is porcelain over the thread model. It should make common kiki operations obvious without pretending to be a complete replacement for `jj`, `tmux`, or `gh`.
 
-`kk` does not automatically load reusable Admin authority. In a thread context it presents that thread's `ThreadScoped` credential; summary-only commands outside a thread use a least-privilege registration capability. Cross-thread mutations, destructive actions, sensitive reads, process termination, and externally visible actions enter the one-shot foreground approval flow defined by [Authority](06-authority.md). Command sections call out consequential cases, but that chapter is normative.
+`kk` does not automatically load reusable Admin authority. In a thread context it presents that thread's `ThreadScoped` credential; summary-only commands outside a thread use a least-privilege registration capability. Cross-thread mutations, destructive actions, sensitive reads, process termination, and externally visible actions enter the one-shot foreground approval flow defined by [Authority](04-authority.md). Command sections call out consequential cases, but that chapter is normative.
 
 ## Context resolution
 
@@ -37,7 +37,7 @@ It verifies prerequisites:
 
 `kk init` does not require `gh`, network access, or GitHub authentication. Those checks occur lazily at `kk publish`; `kk doctor --github` is the explicit non-mutating preflight once publishing ships.
 
-`kk init` does **not** verify that any specific harness binary is installed. The harness contract is pluggable (see [Harness adapter](15-architecture/harness-adapter.md)); v1 ships the `claude-code` and `codex` adapters, but kiki does not refuse registration on a host that has not installed a harness yet. The check happens at `kk new` time instead: spawning a thread with the configured default harness errors if that harness's binary is missing.
+`kk init` does **not** verify that any specific harness binary is installed. The harness contract is pluggable (see [Harness adapter](13-architecture/harness-adapter.md)); v1 ships the `claude-code` and `codex` adapters, but kiki does not refuse registration on a host that has not installed a harness yet. The check happens at `kk new` time instead: spawning a thread with the configured default harness errors if that harness's binary is missing.
 
 The first installation may explicitly use Admin bootstrap to enroll the foreground approval presenter. Registering a repo is then a one-shot approved operation bound to its canonical path and derived repo id; `kk init` never turns bootstrap Admin into ambient CLI authority. The already-registered idempotent path is read-only and needs no new approval.
 
@@ -47,11 +47,11 @@ The first installation may explicitly use Admin bootstrap to enroll the foregrou
 
 ## `kk`
 
-Bare `kk` opens the overlay TUI in `NAVIGATE` mode (see [Interface](12-interface/spec.md)) when the TUI ships. Before the TUI ships, it prints a concise command summary and points to `kk ls`. Outside a registered repo, even after the TUI ships, `kk` falls back to the command summary plus `kk ls`.
+Bare `kk` opens the overlay TUI in `NAVIGATE` mode (see [Interface](10-interface/spec.md)) when the TUI ships. Before the TUI ships, it prints a concise command summary and points to `kk ls`. Outside a registered repo, even after the TUI ships, `kk` falls back to the command summary plus `kk ls`.
 
 ## `kk new`
 
-`kk new` creates a thread as specified in [Threads](05-threads.md).
+`kk new` creates a thread as specified in [Threads](03-threads.md).
 
 Thread creation requires one-shot foreground approval bound to the resolved base/head, follows choice, workspace path, harness, and initial-input digest. This keeps agent-driven spawning out of v1 without granting the CLI reusable Admin authority.
 
@@ -70,7 +70,7 @@ When v1.x transcript capture is enabled, the first-turn prompt is projected as `
 
 ## `kk switch`
 
-`kk switch <thread>` switches the tmux client to the target thread's tmux session. It does not mutate daemon focus state; see [Authority](06-authority.md).
+`kk switch <thread>` switches the tmux client to the target thread's tmux session. It does not mutate daemon focus state; see [Authority](04-authority.md).
 
 ## `kk ls`
 
@@ -122,7 +122,7 @@ The header identifies the exact live `thread_head_commit_id`, the checkpoint boo
 
 ## `kk publish`
 
-`kk publish` is a v1.x command that publishes the resolved thread to GitHub through `gh`; see [Publishing](09-publishing.md). It is not part of the coordination acceptance slice. It validates `gh` installation, authentication, repository identity, and remote state when invoked, then requires one-shot human approval for the exact publish plan.
+`kk publish` is a v1.x command that publishes the resolved thread to GitHub through `gh`; see [Publishing](07-publishing.md). It is not part of the coordination acceptance slice. It validates `gh` installation, authentication, repository identity, and remote state when invoked, then requires one-shot human approval for the exact publish plan.
 
 Important flags:
 
@@ -137,7 +137,7 @@ The first publishing release generates a deterministic template from explicit in
 
 ## `kk close`
 
-`kk close [<thread>]` archives a thread without deleting tracked jj work; see [Threads](05-threads.md#close).
+`kk close [<thread>]` archives a thread without deleting tracked jj work; see [Threads](03-threads.md#close).
 
 Closing terminates a live process and requires one-shot human approval. The approval is bound to the final preflight and becomes invalid if the close plan changes before commit. Non-interactive close is unavailable in v1.
 
@@ -147,11 +147,11 @@ Important flags:
 
 ## `kk reopen`
 
-`kk reopen <thread>` restores a closed thread; see [Threads](05-threads.md#reopen). Acceptance-slice reopen restores lifecycle state without reading or sending transcript text.
+`kk reopen <thread>` restores a closed thread; see [Threads](03-threads.md#reopen). Acceptance-slice reopen restores lifecycle state without reading or sending transcript text.
 
 Because the closed thread has no live thread credential and reopen starts a new process incarnation, it requires one-shot foreground approval bound to the target, restored head, workspace path, and harness.
 
-`--catch-up` ships with the v1.x transcript feature. It requests transcript-backed context and triggers the provider-egress consent flow described in [Transcript](08-transcript.md#reopen-catch-up). Because the closed credential is revoked, the daemon releases the preview only to the foreground presenter after the reopen approval is claimed and before the harness starts. Declining catch-up continues cold unless the user cancels reopen. Without the flag, reopen never reads transcript rows for harness input.
+`--catch-up` ships with the v1.x transcript feature. It requests transcript-backed context and triggers the provider-egress consent flow described in [Transcript](06-transcript.md#reopen-catch-up). Because the closed credential is revoked, the daemon releases the preview only to the foreground presenter after the reopen approval is claimed and before the harness starts. Declining catch-up continues cold unless the user cancels reopen. Without the flag, reopen never reads transcript rows for harness input.
 
 ## `kk thread transcript`
 
@@ -180,13 +180,13 @@ Interrupt is process-destructive and requires one-shot foreground approval, incl
 
 ## `kk thread detach`
 
-`kk thread detach <thread>` removes the thread's live follows edge; see [Cascade](07-cascade.md#detach-and-graph-surgery) for what detach does and does not touch. Before deciding that no reconciliation is pending, it synchronously runs `RefreshToFrontier`, refreshes the parent and child live heads from that pinned view, and creates any transition a lagging watcher had not recorded. The user must reconcile that exact transition or explicitly discard it; then detach checkpoints the child's exact live head before deleting the edge. `attach` and `reparent` are deferred beyond the acceptance slice.
+`kk thread detach <thread>` removes the thread's live follows edge; see [Cascade](05-cascade.md#detach-and-graph-surgery) for what detach does and does not touch. Before deciding that no reconciliation is pending, it synchronously runs `RefreshToFrontier`, refreshes the parent and child live heads from that pinned view, and creates any transition a lagging watcher had not recorded. The user must reconcile that exact transition or explicitly discard it; then detach checkpoints the child's exact live head before deleting the edge. `attach` and `reparent` are deferred beyond the acceptance slice.
 
 A same-thread detach with no pending reconciliation uses thread-scoped authority. Discarding a pending transition, rewriting revisions, or detaching an explicitly targeted different thread requires one-shot approval bound to that choice.
 
 ## `kk thread destroy`
 
-`kk thread destroy <thread>` is a v1.x management command that permanently removes kiki's thread projections and management state; see [Threads](05-threads.md#destroy). Tracked jj revisions are preserved by default.
+`kk thread destroy <thread>` is a v1.x management command that permanently removes kiki's thread projections and management state; see [Threads](03-threads.md#destroy). Tracked jj revisions are preserved by default.
 
 Important flags:
 
@@ -199,7 +199,7 @@ Destroy requires one-shot foreground approval even when revisions are preserved.
 
 `kk repair [<thread>]` is the human-directed recovery surface for a `ProjectionDiverged`, `CreateFailed`, `CloseFailed`, `DestroyFailed`, exhausted-delivery, or other repairable lifecycle condition. The lifecycle and projection chapters own the states; this command owns their common interaction shape.
 
-An intent whose delivery attempts are exhausted (see [Cascade](07-cascade.md#delivery-protocol)) diagnoses to exactly two named plans. `retry-delivery` re-arms the intent in one journaled transaction — clearing `delivery_exhausted_at`, incrementing the intent's `delivery_epoch`, and resetting the soft-redelivery count — and permits one fresh bounded `RestartStartup` cycle whose attempts are stamped with and counted under the new epoch; the human runs it after changing what made delivery fail, such as upgrading the harness. `discard-delivery` acknowledges the intent without delivery proof under a one-shot approval bound to the plan, recording the human resolution on the intent; the payload is then never delivered to the agent, and the plan says so before it is approved.
+An intent whose delivery attempts are exhausted (see [Cascade](05-cascade.md#delivery-protocol)) diagnoses to exactly two named plans. `retry-delivery` re-arms the intent in one journaled transaction — clearing `delivery_exhausted_at`, incrementing the intent's `delivery_epoch`, and resetting the soft-redelivery count — and permits one fresh bounded `RestartStartup` cycle whose attempts are stamped with and counted under the new epoch; the human runs it after changing what made delivery fail, such as upgrading the harness. `discard-delivery` acknowledges the intent without delivery proof under a one-shot approval bound to the plan, recording the human resolution on the intent; the payload is then never delivered to the agent, and the plan says so before it is approved.
 
 Without an apply flag it is read-only: it reports the observed projections, the durable kiki authority, and zero or more named repair plans. Each plan states which records, workspace paths, bookmarks, sessions, or revisions it would change. Kiki may repair provably idempotent projection drift automatically in the background, but it must never silently choose among multiple plausible heads, paths, or topologies.
 
@@ -235,7 +235,7 @@ Rows identify the authoritative SQLite source. Kiki does not read or merge an `a
 
 ## `kk config`
 
-The acceptance slice provides `kk config get|show` for the minimal supported configuration; see [Configuration](13-configuration.md). `set|unset|edit` and the full layering surface are v1.x additions.
+The acceptance slice provides `kk config get|show` for the minimal supported configuration; see [Configuration](11-configuration.md). `set|unset|edit` and the full layering surface are v1.x additions.
 
 `kk config get <key>` reports the effective value and the source layer. Unknown keys warn rather than error. Structural key changes must tell the user whether they hot-reload, take effect at the next lifecycle event, or require daemon restart.
 
@@ -247,7 +247,7 @@ The acceptance slice provides `kk config get|show` for the minimal supported con
 
 `kk repo unregister <path>` removes a repo from the per-user registry. It is the explicit counterpart to `kk init`.
 
-By default, `kk repo unregister` removes both the row from `~/.config/kiki/state.db`'s `repos` table and the centralized state directory at `~/.config/kiki/repos/<repo_id>/` (threads, optional transcript rows, SQLite audit rows, credentials, per-thread error logs, and any workspace-recovery bundles). The action is irreversible — there is no kiki-managed undo, mirroring `kk thread destroy`'s shape (see [Threads · destroy](05-threads.md#destroy)). It therefore requires a one-shot foreground approval bound to the canonical repo path, repo id, and whether state is retained. Non-interactive unregister is unavailable in v1. If recovery bundles exist, the command prints their paths in its preflight; `--keep-state` is required to retain them.
+By default, `kk repo unregister` removes both the row from `~/.config/kiki/state.db`'s `repos` table and the centralized state directory at `~/.config/kiki/repos/<repo_id>/` (threads, optional transcript rows, SQLite audit rows, credentials, per-thread error logs, and any workspace-recovery bundles). The action is irreversible — there is no kiki-managed undo, mirroring `kk thread destroy`'s shape (see [Threads · destroy](03-threads.md#destroy)). It therefore requires a one-shot foreground approval bound to the canonical repo path, repo id, and whether state is retained. Non-interactive unregister is unavailable in v1. If recovery bundles exist, the command prints their paths in its preflight; `--keep-state` is required to retain them.
 
 `--keep-state` preserves the centralized state directory on disk while still removing the registry row. The preserved directory becomes orphaned bytes, useful only for an operator who wants to inspect or copy the contents before deleting them by hand. It does **not** enable any kiki-managed recovery: a future `kk init` at the same canonical path mints a fresh `repo_id` and a fresh state directory; the preserved directory has no link to the new registration. The flag exists because losing transcripts and audit logs by mistyping a path is a high cost, and `--keep-state` is the careful-operator escape hatch — not a recovery contract.
 

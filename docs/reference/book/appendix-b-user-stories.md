@@ -1,4 +1,4 @@
-# User Stories
+# Appendix B: User Stories
 
 User stories are part of the book's contract with the implementer. They preserve the use cases that gave the normative chapters their shape: what the engineer is trying to do, what friction kiki is meant to remove, and where the v1 boundary was deliberately drawn.
 

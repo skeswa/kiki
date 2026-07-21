@@ -22,7 +22,7 @@ kiki is a Cargo workspace with four crates. The split exists so the gRPC service
 - `ProjectionReconciler` — compare stable identity with workspace, bookmark, path, and tmux projections; auto-normalize only unique identity-preserving drift; produce named `kk repair` plans otherwise.
 - `MetadataLedger` + `AICompose` (v1.x) — auto-describe / auto-rename ownership tracking and prompt assembly.
 - `GitHubBackend` (v1.x; default `GhCli` impl) — PR creation, status polling, comment surfacing.
-- `ConfigLoader` — the acceptance slice's minimal daemon/harness/path/notification keys; v1.x adds the full layered TOML and per-thread SQLite surface enumerated in [Configuration](../13-configuration.md).
+- `ConfigLoader` — the acceptance slice's minimal daemon/harness/path/notification keys; v1.x adds the full layered TOML and per-thread SQLite surface enumerated in [Configuration](../11-configuration.md).
 - `AuthEnforcer` + approval broker — `ThreadScoped` checks for ordinary work, persisted begin/display/confirm challenges and one-shot plan-bound `HumanApproval` for consequential operations, and Admin only for bootstrap or foreground-presenter enrollment.
 - `ThreadTranscriptStore` (v1.x) — JSONL tail, projection, FTS5 read API, and provider-egress consent state.
 - `JjBackend` — v1 `JjCli` implementation shells out to `jj` and parses structured template output. A later `JjLib` implementation can swap behind the same trait.

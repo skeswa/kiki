@@ -95,7 +95,7 @@ Catch-up source queries must exclude `synthesized=true` rows. This prevents reop
 
 ## Read API
 
-The v1.x human CLI reads transcripts through `kk thread transcript`. Query modes cover by-change reads, full-text search, change ranges, tail reads, and anchored/tombstoned/synthesized row filtering; the flag surface lives in [Commands](11-commands.md#kk-thread-transcript).
+The v1.x human CLI reads transcripts through `kk thread transcript`. Query modes cover by-change reads, full-text search, change ranges, tail reads, and anchored/tombstoned/synthesized row filtering; the flag surface lives in [Commands](09-commands.md#kk-thread-transcript).
 
 Agent MCP transcript reads are v1.x polish. When they ship, they are same-thread only.
 

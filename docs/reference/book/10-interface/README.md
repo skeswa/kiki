@@ -7,4 +7,4 @@ The TUI is v1.x polish, not acceptance slice (see [Orientation](../01-orientatio
 
 The specification is normative; the storyboard is illustrative. When they disagree, the specification wins, and the storyboard is the bug.
 
-The storyboard introduces no new commands, flags, output strings, glyphs, or screen elements. Every beat in it grounds out in [Threads](../05-threads.md), [Cascade](../07-cascade.md), [Publishing](../09-publishing.md), [Commands](../11-commands.md), [spec.md](spec.md), or [Invariants](../04-invariants.md). If a beat in the storyboard appears to require behavior the rest of the book does not authorize, that is a finding to surface, not a license to extend the surface here.
+The storyboard introduces no new commands, flags, output strings, glyphs, or screen elements. Every beat in it grounds out in [Threads](../03-threads.md), [Cascade](../05-cascade.md), [Publishing](../07-publishing.md), [Commands](../09-commands.md), [spec.md](spec.md), or [Invariants](../02-invariants.md). If a beat in the storyboard appears to require behavior the rest of the book does not authorize, that is a finding to surface, not a license to extend the surface here.

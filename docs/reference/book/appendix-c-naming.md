@@ -1,4 +1,4 @@
-# Naming
+# Appendix C: Naming
 
 The tool is named **kiki**. The command is `kk`.
 

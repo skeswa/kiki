@@ -8,39 +8,44 @@ New readers should start with the [Abstract](book/00-abstract.md) and [Orientati
 
 ## Reading order
 
+The chapters tell the story in order; the appendices hold reference material you dip into rather than read through.
+
 1. [Abstract](book/00-abstract.md)
 2. [Orientation](book/01-orientation.md)
-3. [Glossary](book/02-glossary.md)
-4. [User Stories](book/03-user-stories.md)
-5. [Invariants](book/04-invariants.md)
-6. [Threads](book/05-threads.md)
-7. [Authority](book/06-authority.md)
-8. [Cascade](book/07-cascade.md)
-9. [Transcript](book/08-transcript.md)
-10. [Publishing](book/09-publishing.md)
-11. [Metadata Evolution](book/10-metadata.md)
-12. [Commands](book/11-commands.md)
-13. [Interface](book/12-interface/)
-14. [Configuration](book/13-configuration.md)
-15. [Observability](book/14-observability.md)
-16. [Architecture](book/15-architecture/)
-17. [Testing](book/16-testing.md)
-18. [Build Sequencing](book/17-build-sequencing.md)
-19. [Roadmap](book/18-roadmap.md)
-20. [Naming](book/19-naming.md)
-21. [Decisions](book/20-decisions/)
+3. [Invariants](book/02-invariants.md)
+4. [Threads](book/03-threads.md)
+5. [Authority](book/04-authority.md)
+6. [Cascade](book/05-cascade.md)
+7. [Transcript](book/06-transcript.md)
+8. [Publishing](book/07-publishing.md)
+9. [Metadata Evolution](book/08-metadata.md)
+10. [Commands](book/09-commands.md)
+11. [Interface](book/10-interface/)
+12. [Configuration](book/11-configuration.md)
+13. [Observability](book/12-observability.md)
+14. [Architecture](book/13-architecture/)
+15. [Testing](book/14-testing.md)
+16. [Build Sequencing](book/15-build-sequencing.md)
+17. [Roadmap](book/16-roadmap.md)
+18. [Decisions](book/17-decisions/)
+
+Appendices:
+
+- [Appendix A: Glossary](book/appendix-a-glossary.md)
+- [Appendix B: User Stories](book/appendix-b-user-stories.md)
+- [Appendix C: Naming](book/appendix-c-naming.md)
 
 ## Authority
 
-The numbered chapters are the live contract. The Decisions chapter explains why parts of the contract look the way they do, but the behavioral chapters remain authoritative.
+The numbered chapters and appendices are the live contract. The Decisions chapter explains why parts of the contract look the way they do, but the behavioral chapters remain authoritative.
 
 When two live chapters appear to conflict, use this order:
 
-1. [Invariants](book/04-invariants.md)
-2. Behavioral chapters: [Threads](book/05-threads.md), [Authority](book/06-authority.md), [Cascade](book/07-cascade.md), [Transcript](book/08-transcript.md), [Publishing](book/09-publishing.md), [Metadata Evolution](book/10-metadata.md), [Commands](book/11-commands.md), [Interface](book/12-interface/), [Configuration](book/13-configuration.md), and [Observability](book/14-observability.md)
-3. [User Stories](book/03-user-stories.md), as product intent that the stricter chapters must satisfy
-4. [Architecture](book/15-architecture/)
-5. [Testing](book/16-testing.md), [Build Sequencing](book/17-build-sequencing.md), [Roadmap](book/18-roadmap.md), [Naming](book/19-naming.md), and [Decisions](book/20-decisions/)
+1. [Invariants](book/02-invariants.md)
+2. Behavioral chapters: [Threads](book/03-threads.md), [Authority](book/04-authority.md), [Cascade](book/05-cascade.md), [Transcript](book/06-transcript.md), [Publishing](book/07-publishing.md), [Metadata Evolution](book/08-metadata.md), [Commands](book/09-commands.md), [Interface](book/10-interface/), [Configuration](book/11-configuration.md), and [Observability](book/12-observability.md)
+3. [User Stories](book/appendix-b-user-stories.md), as product intent that the stricter chapters must satisfy
+4. [Architecture](book/13-architecture/)
+5. [Testing](book/14-testing.md), [Build Sequencing](book/15-build-sequencing.md), [Roadmap](book/16-roadmap.md), [Decisions](book/17-decisions/), and the remaining appendices
 
 ## Language
 

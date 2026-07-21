@@ -279,7 +279,7 @@ for (const file of files) {
     },
   ];
 
-  if (displayFile === "docs/reference/book/02-glossary.md") {
+  if (displayFile === "docs/reference/book/appendix-a-glossary.md") {
     staleContracts.push({
       pattern: /\bLocal-only\b[^\n]*(?:transcript|state\.db)/gi,
       message: "privacy shorthand must distinguish local storage from consented provider egress",

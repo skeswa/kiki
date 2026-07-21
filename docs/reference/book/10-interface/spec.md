@@ -4,17 +4,17 @@ The TUI is v1.x polish, not acceptance slice (see [Orientation](../01-orientatio
 
 ## Vocabulary
 
-- **Overlay** — the full-screen TUI invoked by bare `kk` (inside a registered repo) or tmux `prefix+k`. Transient. Dismissed on switch, on `q` or `esc`, or on completing a verb. Outside a registered repo, bare `kk` falls back to the command summary plus `kk ls` (see [Commands](../11-commands.md)).
+- **Overlay** — the full-screen TUI invoked by bare `kk` (inside a registered repo) or tmux `prefix+k`. Transient. Dismissed on switch, on `q` or `esc`, or on completing a verb. Outside a registered repo, bare `kk` falls back to the command summary plus `kk ls` (see [Commands](../09-commands.md)).
 - **Persistent sidebar** — an opt-in tmux pane spawned at thread birth. Always-on, navigation-only. Lives next to the agent pane until the user kills it.
 - **Shell pane** — an opt-out tmux pane spawned at thread birth, running the user's `$SHELL` at the workspace cwd, laid out alongside the agent pane in the same tmux window (default position: below; configurable to the right). The pane kiki manages — singular — so direct `jj` / `gh` / test invocations live alongside the agent without leaving the thread. Detailed semantics in [Shell pane](#shell-pane).
 - **Stack section** — the threads in the current repo, rendered as a follows-aware tree in `kk log` order. Cursor moves here for navigation.
 - **Activity section** — the same threads, flat-listed by most-recent agent event (descending). Cursor moves here for triage.
 - **Preview pane** — the right two-thirds of the overlay. Renders one of: transcript tail, working-copy diff, PR comments. Toggled by `t` / `d` / `c`.
 - **Chord ribbon** — a one-line keybinding hint at the bottom edge of the overlay. Toggled by `?`. Adapts to current selection (e.g. hides `c` for a thread without a PR).
-- **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](../11-commands.md)). Single source of truth.
+- **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](../09-commands.md)). Single source of truth.
 - **Checkpoint lag** — a normal active-thread condition in which the bookmark checkpoint trails the workspace's persisted live head. Detailed status labels it `checkpoint behind head`; compact TUI surfaces append `↑` to the bookmark. This is not dirty state or cascade conflict.
 - **Context strip** — the bottom-most line of the overlay or the persistent sidebar pane. One compressed sentence with TUI-specific content. Two forms by context: the overlay form carries repo + bookmark + cascade glyph + agent model + ctx % + last op age; the persistent-sidebar form is shorter (bookmark + cascade glyph + agent glyph) because the agent pane next to it already surfaces model and ctx. This is a TUI footer, separate from the `StatusRenderer`-backed inlined status.
-- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms, overriding the default — see [Publishing](../09-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens an approval card.
+- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms, overriding the default — see [Publishing](../07-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens an approval card.
 - **Card** — a centered modal panel with title, body, and one or two action buttons. Used for spawn input and foreground approval.
 
 The overlay authenticates ordinary current-thread reads with the contextual thread credential and consumes the repo-summary stream for every other row. It never treats cursor position as authority. Opening transcript, diff, PR-comment, or detailed-audit content for a non-current thread enters the foreground approval flow before fetching content. The approved response is one immutable snapshot bound to the method, target, query, and repository observation; refreshing it, changing tabs, expanding its range, or opening the full reader requires a new challenge. No sensitive bytes are fetched speculatively behind an approval card.
@@ -40,7 +40,7 @@ Two glyphs per row, max. PR appears inline as `#NNNN` only if set.
 
 The cascade indicator uses the same three-valued state model as `kk status` (`in sync`, `pending`, `conflicted`). For `Creating | ClosePreflight | CloseCommit | DestroyCommit`, lifecycle `…` replaces the agent glyph; for `CreateFailed | CloseFailed | ProjectionDiverged | DestroyFailed`, `!` replaces it and the literal lifecycle label appears in detail; `□` identifies a closed row when closed rows are requested. `Destroyed` rows are hidden unless an explicit future destroyed-thread view requests them. Active rows use the normal agent display states. This replacement rule preserves the two-state-glyph limit.
 
-Every state in this table must be distinguishable by glyph alone, not by color. Color is an accelerator: it makes scanning faster, but `NO_COLOR=1` and color-blind palettes must still convey the state. The `LogRenderer` and `StatusRenderer` projections strip color when `NO_COLOR=1` is set in the environment and rely on glyph + label to carry the signal. See [Invariants](../04-invariants.md).
+Every state in this table must be distinguishable by glyph alone, not by color. Color is an accelerator: it makes scanning faster, but `NO_COLOR=1` and color-blind palettes must still convey the state. The `LogRenderer` and `StatusRenderer` projections strip color when `NO_COLOR=1` is set in the environment and rely on glyph + label to carry the signal. See [Invariants](../02-invariants.md).
 
 ## Overlay
 
@@ -335,7 +335,7 @@ The sidebar pane (left) is the persistent navigation surface; the agent pane (to
 - **`kk new`**: spawns the shell pane if `[ui] shell_pane = true` and the terminal is at least `[ui] shell_pane_min_rows` tall, with cwd set to the workspace path and the shell process taken from `$SHELL` (fallback `/bin/sh`). No environment variables are injected; the shell inherits the parent env unchanged.
 - **`kk switch <thread>`**: re-ensures the shell pane idempotently. If the pane is present, no-op. If absent (the session was just attached, or the pane was killed before the previous detach), kiki recreates it fresh at the workspace cwd.
 - **`kk reopen <thread>`**: as `kk new` — the pane is spawned fresh. Shell history, scrollback, and any processes that were running before close are not preserved; the user's shell starts cold.
-- **`kk close`**: the tmux session is killed, and the shell pane goes with it. Any process running in the shell pane is killed alongside the agent. See [Threads · close](../05-threads.md#close).
+- **`kk close`**: the tmux session is killed, and the shell pane goes with it. Any process running in the shell pane is killed alongside the agent. See [Threads · close](../03-threads.md#close).
 - **User kills the pane mid-session**: kiki does not auto-respawn it within the same continuous attach. The next `kk switch` or `kk reopen` re-ensures it.
 
 The pane is transparent to kkd after spawn in v1. The daemon does not track which process is running in it, does not surface its state in the TUI or sidebar, and does not log audit rows for activity in it. Anything kiki cares about that the user does in the shell pane — direct jj operations, gh interactions — routes through the existing op-log watcher and GitHub polling paths as if the user had run it anywhere else. This is the ambient-coordinator stance applied to the shell pane: kiki sets it up, then gets out of the way. Future versions may promote the shell pane to a tracked surface; v1 commits only to spawn, re-ensure, and degrade.
@@ -346,7 +346,7 @@ If the terminal has fewer rows than `[ui] shell_pane_min_rows` (default `24`) at
 
 ### Authority
 
-The shell pane runs the user's shell process at the user's UID; kiki injects no credential into it. When the user invokes `kk`, context discovery resolves the thread and the CLI loads only that thread's credential. Consequential operations enter the foreground one-shot approval flow; the CLI never auto-loads reusable Admin authority. See [Authority](../06-authority.md).
+The shell pane runs the user's shell process at the user's UID; kiki injects no credential into it. When the user invokes `kk`, context discovery resolves the thread and the CLI loads only that thread's credential. Consequential operations enter the foreground one-shot approval flow; the CLI never auto-loads reusable Admin authority. See [Authority](../04-authority.md).
 
 ## Toasts
 
@@ -355,11 +355,11 @@ Toasts are non-modal pills in the overlay's top-right corner, stacking downward.
 Two subtypes share the surface:
 
 - **Notification toast** — no interactive action. The body may include hint text naming an overlay verb (e.g., "tap T to read transcript"); the verb is fielded by the overlay's normal keymap, the toast does not intercept it.
-- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge — see [Publishing](../09-publishing.md)). Toasts never open an approval card.
+- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge — see [Publishing](../07-publishing.md)). Toasts never open an approval card.
 
 Dismissal rules (apply to both subtypes):
 
-- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms; specific triggers may override, e.g., auto-archive undo grace = 5000ms — see [Publishing](../09-publishing.md))
+- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms; specific triggers may override, e.g., auto-archive undo grace = 5000ms — see [Publishing](../07-publishing.md))
 - click anywhere on the toast pill (excluding the action label, which runs the action) dismisses it
 - moving the keyboard cursor onto the row that issued the toast, or clicking that row, dismisses the toast (treated as "user acknowledged")
 - invoking the toast's action (actionable toasts only) dismisses the toast on completion
@@ -371,9 +371,9 @@ Toast triggers (v1):
 - cascade conflict on a non-current thread (`◐`) — notification
 - cascade materialized for a child thread (`──`, only when ≥ 2 child reconciliations coalesce) — notification
 - config-set warning that won't take effect until next `kk new` / `kk reopen` — notification
-- auto-archive on PR-merge (`✓`) with `undo` action (v1.x polish; 5s grace — see [Publishing](../09-publishing.md)) — actionable
+- auto-archive on PR-merge (`✓`) with `undo` action (v1.x polish; 5s grace — see [Publishing](../07-publishing.md)) — actionable
 
-Toasts are overlay-only. The persistent sidebar is navigation-only, and stacking toast UI beside the live agent pane would be ambiguous. When the overlay is closed, OS-native notifications (configured via `[notifications]` — see [Configuration](../13-configuration.md)) carry the same events.
+Toasts are overlay-only. The persistent sidebar is navigation-only, and stacking toast UI beside the live agent pane would be ambiguous. When the overlay is closed, OS-native notifications (configured via `[notifications]` — see [Configuration](../11-configuration.md)) carry the same events.
 
 ### Wireframe — conflicted-thread toast in overlay
 
@@ -501,7 +501,7 @@ If `[ui] mouse_enabled = false`, kiki does not request mouse capture from the te
 
 `[ui]` keys introduced or referenced by this spec:
 
-- `persistent_sidebar` (bool, default `false`) — covered in [Configuration](../13-configuration.md)
+- `persistent_sidebar` (bool, default `false`) — covered in [Configuration](../11-configuration.md)
 - `sidebar_width` (int, default `32`)
 - `sidebar_min_terminal_cols` (int, default `100`)
 - `shell_pane` (bool, default `true`)
@@ -513,7 +513,7 @@ If `[ui] mouse_enabled = false`, kiki does not request mouse capture from the te
 - `toast_ttl_ms` (int, default `4000`)
 - `theme` (string, default `"soft-dark"`)
 
-All `[ui]` keys are personal preference: valid in user and per-thread config, invalid in repo-shared config (warned-and-ignored). Hot-reload semantics (matching [Configuration](../13-configuration.md)):
+All `[ui]` keys are personal preference: valid in user and per-thread config, invalid in repo-shared config (warned-and-ignored). Hot-reload semantics (matching [Configuration](../11-configuration.md)):
 
 - `mouse_enabled`, `toast_ttl_ms`, and `theme` are cosmetic and hot-reload.
 - `persistent_sidebar`, `sidebar_width`, `sidebar_min_terminal_cols`, `shell_pane`, `shell_pane_position`, `shell_pane_size_pct`, `shell_pane_min_rows`, and `overlay_min_cols` take effect on the next lifecycle event (`kk new`, `kk reopen`, `kk switch`, or next overlay open, depending on the key) — they do not retroactively reshape live sessions.

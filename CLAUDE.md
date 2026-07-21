@@ -6,12 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The canonical contract for what this repo is building lives in the reference book under `docs/reference/book/`. Start at `docs/reference/README.md` for navigation, then read in this order based on what you're doing:
 
-- For behavior questions (what does `kk x` do?): `docs/reference/book/04-invariants.md` first, then the relevant chapter in `docs/reference/book/`.
-- For structure questions (which crate, which sqlite table, which gRPC method?): `docs/reference/book/15-architecture/`.
-- For "why is it this way?": `docs/reference/book/20-decisions/` for ADR-style rationale.
-- For deferred surfaces (v2 MCP substrate, etc.): `docs/reference/book/18-roadmap.md`.
-- For terminology: `docs/reference/book/02-glossary.md`.
-- For product intent and v1 scope: `docs/reference/book/00-abstract.md`, `docs/reference/book/01-orientation.md`, and `docs/reference/book/03-user-stories.md`.
+- For behavior questions (what does `kk x` do?): `docs/reference/book/02-invariants.md` first, then the relevant chapter in `docs/reference/book/`.
+- For structure questions (which crate, which sqlite table, which gRPC method?): `docs/reference/book/13-architecture/`.
+- For "why is it this way?": `docs/reference/book/17-decisions/` for ADR-style rationale.
+- For deferred surfaces (v2 MCP substrate, etc.): `docs/reference/book/16-roadmap.md`.
+- For terminology: `docs/reference/book/appendix-a-glossary.md`.
+- For product intent and v1 scope: `docs/reference/book/00-abstract.md`, `docs/reference/book/01-orientation.md`, and `docs/reference/book/appendix-b-user-stories.md`.
 
 The original PRD has been folded into the reference book. Treat the book as the contract.
 
@@ -25,7 +25,7 @@ The planned cargo workspace has four crates: `kiki-core` (library — shared typ
 
 ## Implementation-stack tension to be aware of
 
-The architecture decision is **Rust** for `kkd` and friends (`docs/reference/book/15-architecture/crates.md`). The repo is currently bootstrapped as a **Bun + TypeScript** project (`package.json`, `tsconfig.json`, `index.ts` placeholder). This is a real divergence pending the first real `kkd` commit. If you are about to write or modify implementation code, surface this to the user before picking a language — do not silently default to either side.
+The architecture decision is **Rust** for `kkd` and friends (`docs/reference/book/13-architecture/crates.md`). The repo is currently bootstrapped as a **Bun + TypeScript** project (`package.json`, `tsconfig.json`, `index.ts` placeholder). This is a real divergence pending the first real `kkd` commit. If you are about to write or modify implementation code, surface this to the user before picking a language — do not silently default to either side.
 
 ## Common commands
 
@@ -94,4 +94,4 @@ A stop-time Codex review gate is enabled for this repo (set up via `/codex-jj:se
 
 ## PRD and spec review precedent
 
-Spec changes in this repo are expected to survive a Codex review pass. The first PRD's review found three v1-scope contradictions (config layering, Codex harness, `kk reopen`), all resolved before the PRD was folded into the book. When editing the reference book, cross-check against `docs/reference/book/04-invariants.md` and neighboring chapters before publishing.
+Spec changes in this repo are expected to survive a Codex review pass. The first PRD's review found three v1-scope contradictions (config layering, Codex harness, `kk reopen`), all resolved before the PRD was folded into the book. When editing the reference book, cross-check against `docs/reference/book/02-invariants.md` and neighboring chapters before publishing.

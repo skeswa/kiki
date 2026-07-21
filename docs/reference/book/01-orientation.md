@@ -46,14 +46,14 @@ kiki's move is to register the hand-maintained tuple — workspace, tmux session
 
 | Friction | What kiki does | Where |
 | --- | --- | --- |
-| Where is that work? | Threads are named and listed from anywhere. `kk ls` works across every registered repo; the TUI shows the same tree interactively. | [Commands](11-commands.md), [Interface](12-interface/) |
-| Who needs me right now? | Every thread's agent projects a display state — `idle`, `working`, `finished`, `blocked` — surfaced in listings, the sidebar's Activity section, the tmux status line, and OS notifications. | [Interface](12-interface/), [Observability](14-observability.md) |
-| What is in flight? | `kk log` renders your thread and its follows-ancestors in full and collapses everything else to one line each; `--wide` adds PR, CI, and agent state for a one-screen bird's-eye view. | [Commands](11-commands.md#kk-log) |
-| Another one is a ritual | `kk new <name>` runs the whole ritual — workspace, initial change, bookmark checkpoint, tmux session, hooks, agent — as one durable, crash-recoverable saga. Inside a thread, branching off the current thread is the default. | [Threads](05-threads.md) |
-| Staleness is homework | A thread can follow another thread. kiki classifies every parent change, rebases or materializes the child at a safe agent boundary, and interrupts the human only for genuine ambiguity — textual conflicts or topology it refuses to guess through. A root thread does not follow the moving trunk in v1: catching it up to `main` remains a direct `jj rebase`, which kiki then cascades through every following descendant. When a parent lands, the v1.x GitHub integration moves each child onto the exact merged trunk commit. | [Cascade](07-cascade.md) |
-| `jj log` stops scaling | Stack-aware collapse. The chain you are working on renders revision by revision; sibling and unrelated threads compress to one summary line apiece. | [Commands](11-commands.md#kk-log) |
-| Naming work that keeps changing shape | `kk new` without a name derives a placeholder, and v1.x metadata evolution lets kiki rename threads and describe revisions as the work reveals its shape — never overwriting prose a human wrote. | [Metadata Evolution](10-metadata.md) |
-| A second machine | Deferred, deliberately. Every client is already a pure gRPC client of the daemon, so remote clients and daemon-to-daemon coordination are additive transports, not redesigns. | [Architecture](15-architecture/), [Roadmap](18-roadmap.md) |
+| Where is that work? | Threads are named and listed from anywhere. `kk ls` works across every registered repo; the TUI shows the same tree interactively. | [Commands](09-commands.md), [Interface](10-interface/) |
+| Who needs me right now? | Every thread's agent projects a display state — `idle`, `working`, `finished`, `blocked` — surfaced in listings, the sidebar's Activity section, the tmux status line, and OS notifications. | [Interface](10-interface/), [Observability](12-observability.md) |
+| What is in flight? | `kk log` renders your thread and its follows-ancestors in full and collapses everything else to one line each; `--wide` adds PR, CI, and agent state for a one-screen bird's-eye view. | [Commands](09-commands.md#kk-log) |
+| Another one is a ritual | `kk new <name>` runs the whole ritual — workspace, initial change, bookmark checkpoint, tmux session, hooks, agent — as one durable, crash-recoverable saga. Inside a thread, branching off the current thread is the default. | [Threads](03-threads.md) |
+| Staleness is homework | A thread can follow another thread. kiki classifies every parent change, rebases or materializes the child at a safe agent boundary, and interrupts the human only for genuine ambiguity — textual conflicts or topology it refuses to guess through. A root thread does not follow the moving trunk in v1: catching it up to `main` remains a direct `jj rebase`, which kiki then cascades through every following descendant. When a parent lands, the v1.x GitHub integration moves each child onto the exact merged trunk commit. | [Cascade](05-cascade.md) |
+| `jj log` stops scaling | Stack-aware collapse. The chain you are working on renders revision by revision; sibling and unrelated threads compress to one summary line apiece. | [Commands](09-commands.md#kk-log) |
+| Naming work that keeps changing shape | `kk new` without a name derives a placeholder, and v1.x metadata evolution lets kiki rename threads and describe revisions as the work reveals its shape — never overwriting prose a human wrote. | [Metadata Evolution](08-metadata.md) |
+| A second machine | Deferred, deliberately. Every client is already a pure gRPC client of the daemon, so remote clients and daemon-to-daemon coordination are additive transports, not redesigns. | [Architecture](13-architecture/), [Roadmap](16-roadmap.md) |
 
 Because a thread can follow another thread, the flat sibling picture above generalizes to the shape work actually takes — a tree:
 
@@ -70,7 +70,7 @@ flowchart BT
     authe2e -- "follows auth-ui —<br/>stacks go as deep as the work does" --> authui
 ```
 
-The table names the mechanisms; whether each surface ships in the acceptance slice or as v1.x polish is recorded once, in the scope ledger below. For a scene-by-scene dramatization of the whole workflow, see the [storyboard](12-interface/storyboard.md).
+The table names the mechanisms; whether each surface ships in the acceptance slice or as v1.x polish is recorded once, in the scope ledger below. For a scene-by-scene dramatization of the whole workflow, see the [storyboard](10-interface/storyboard.md).
 
 ## The tool
 

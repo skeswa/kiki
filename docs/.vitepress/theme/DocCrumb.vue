@@ -30,11 +30,14 @@ const crumb = computed(() => {
 
   const root = segments[0];
   const chapter = path.match(/^reference\/book\/(\d+)-/);
+  const appendix = path.match(/^reference\/book\/appendix-([a-z])-/);
   const leaf = chapter
     ? `chapter ${chapter[1]}`
-    : segments.length > 1
-      ? segments[segments.length - 1].replace(/-/g, " ")
-      : "overview";
+    : appendix
+      ? `appendix ${appendix[1]}`
+      : segments.length > 1
+        ? segments[segments.length - 1].replace(/-/g, " ")
+        : "overview";
   return { root, leaf };
 });
 </script>

@@ -97,7 +97,7 @@ The cascade tests must cover:
 - process restart with a reused harness session id retires the old runtime incarnation without acknowledgement, re-proves exclusive hook control, and injects the saved payload before any replacement-process tool is allowed to run; a crash before its first boundary redelivers to another replacement
 - `--no-integrate-operation` plus `jj op integrate` feasibility for planned `ParentAdvance`, including concurrent external operations
 
-They must also cover the worked scenarios in [Cascade](07-cascade.md): native ancestor rewrite, parent live-head advance, conflict exposure, direct human materialization, parallel tool batch, and agent crash after delivery. These are scenario tests over observable state, not assertions about private function boundaries.
+They must also cover the worked scenarios in [Cascade](05-cascade.md): native ancestor rewrite, parent live-head advance, conflict exposure, direct human materialization, parallel tool batch, and agent crash after delivery. These are scenario tests over observable state, not assertions about private function boundaries.
 
 ## Module-specific obligations
 

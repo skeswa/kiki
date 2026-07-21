@@ -104,7 +104,7 @@ Users may spawn any number of sibling threads. v1 does not rate-limit human-crea
 
 Each thread's jj workspace is materialized as a sibling of the registered repo. The default path is `<parent>/<repo>-kiki-<slug>/`, where `<parent>` is the directory containing the repo, `<repo>` is the repo's directory name, and `<slug>` is the thread's bookmark slug. So a thread `cascade-recovery` in `~/code/kiki` materializes at `~/code/kiki-kiki-cascade-recovery/`.
 
-This default is overridable via `[paths] workspaces_root` (see [Configuration](13-configuration.md)). When set, kiki uses `<workspaces_root>/<repo>-kiki-<slug>/`.
+This default is overridable via `[paths] workspaces_root` (see [Configuration](11-configuration.md)). When set, kiki uses `<workspaces_root>/<repo>-kiki-<slug>/`.
 
 Sibling-of-repo is the default for two reasons: it matches jj's natural `jj workspace add ../<name>` ergonomics, and it leaves the workspace discoverable next to the repo without nesting another working copy inside the parent's working copy.
 
@@ -114,7 +114,7 @@ The per-thread hook credential lives at `~/.config/kiki/repos/<repo_id>/credenti
 
 Per-thread workspaces prevent accidental file interference during normal cooperative use. They do not prevent a same-UID process from reading or writing sibling workspaces, `~/.config/kiki`, or shared jj repository state.
 
-Because all workspaces share jj repository state, an ancestor rewrite in one workspace may evolve another thread's recorded working-copy commit immediately while leaving that other workspace's files stale. This is expected. Kiki surfaces the thread as cascade-pending and, after probing for unsnapshotted edits, materializes its current evolved jj state at the managed agent's next safe boundary; see [Cascade](07-cascade.md).
+Because all workspaces share jj repository state, an ancestor rewrite in one workspace may evolve another thread's recorded working-copy commit immediately while leaving that other workspace's files stale. This is expected. Kiki surfaces the thread as cascade-pending and, after probing for unsnapshotted edits, materializes its current evolved jj state at the managed agent's next safe boundary; see [Cascade](05-cascade.md).
 
 ## Detach checkpoint
 

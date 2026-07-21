@@ -32,7 +32,7 @@ These defaults are configurable under `[notifications]`.
 
 ## Notification transport
 
-In the acceptance slice, OS-native or tmux notification is the attention channel. Once UI surfaces ship, transient in-UI toasts render in the overlay only (see [Interface](12-interface/spec.md)). The persistent sidebar remains a passive state renderer: it reflects lifecycle/cascade glyph changes but never hosts toasts or toast actions. If only the sidebar is visible, an attention event still uses the configured OS/tmux transport.
+In the acceptance slice, OS-native or tmux notification is the attention channel. Once UI surfaces ship, transient in-UI toasts render in the overlay only (see [Interface](10-interface/spec.md)). The persistent sidebar remains a passive state renderer: it reflects lifecycle/cascade glyph changes but never hosts toasts or toast actions. If only the sidebar is visible, an attention event still uses the configured OS/tmux transport.
 
 The cross-platform default is the `notify-rust` crate. On macOS, where `notify-rust` requires a signed application bundle, kiki falls back to shelling out to `osascript -e 'display notification ...'`. The transport is configurable under `[notifications]`:
 
@@ -73,4 +73,4 @@ After a valid target repo is resolved, the authoritative row belongs to that rep
 
 The table is append-only through the daemon API, but kiki does not claim it is tamper-proof against a same-UID process. Same-thread non-sensitive slices use thread-scoped authority; repo-wide, cross-thread, or detailed-argument reads require method-bound one-shot human approval. Audit entries are operational records, not transcript entries. A future export command may produce JSONL, but an exported file is never a second authority.
 
-`kk thread audit` renders the redacted current-thread slice. `kk audit log` queries a repo or the user-level unscoped sink and is approval-gated because it crosses threads or exposes detailed arguments. [Commands](11-commands.md#kk-audit) owns exact flags and output.
+`kk thread audit` renders the redacted current-thread slice. `kk audit log` queries a repo or the user-level unscoped sink and is approval-gated because it crosses threads or exposes detailed arguments. [Commands](09-commands.md#kk-audit) owns exact flags and output.

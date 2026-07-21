@@ -60,7 +60,7 @@ A single external op may logically evolve multiple workspaces in A→B→C. The 
 
 The watcher detects repository transitions, not every file materialization. In particular, a direct `jj workspace update-stale` can change a workspace's files without producing a new op-log head. `WorkspaceProbe` at the next managed boundary is therefore the authority on current freshness.
 
-Kiki-initiated explicit advances are `op_attribution`-skipped by the watcher, but their reconciliation handler compares the starting and resulting operation views before completing the intent. Any other workspace jj evolved receives a `NativeRewrite` intent in the same durable result-recording step. See [Cascade](../07-cascade.md) and [Native evolution](../20-decisions/native-evolution.md).
+Kiki-initiated explicit advances are `op_attribution`-skipped by the watcher, but their reconciliation handler compares the starting and resulting operation views before completing the intent. Any other workspace jj evolved receives a `NativeRewrite` intent in the same durable result-recording step. See [Cascade](../05-cascade.md) and [Native evolution](../17-decisions/native-evolution.md).
 
 ## Projection audit: detect broadly, repair narrowly
 
@@ -106,4 +106,4 @@ Workspace-view rows are bounded by `op-log-size × workspace-count`; normalized 
 
 ## Tests
 
-The watcher itself is tested via integration; the _logic_ of op-event interpretation is covered by `AncestryQuery` + `OpAttribution` deep-module tests (see [Testing](../16-testing.md)).
+The watcher itself is tested via integration; the _logic_ of op-event interpretation is covered by `AncestryQuery` + `OpAttribution` deep-module tests (see [Testing](../14-testing.md)).

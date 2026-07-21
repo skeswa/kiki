@@ -1,6 +1,6 @@
 # Publishing
 
-`kk publish` publishes a thread to GitHub through `gh`. The flag surface lives in [Commands](11-commands.md#kk-publish); this chapter owns the behavior.
+`kk publish` publishes a thread to GitHub through `gh`. The flag surface lives in [Commands](09-commands.md#kk-publish); this chapter owns the behavior.
 
 Publishing is the point where local work becomes reviewer-facing. That boundary is why PR prose is human territory and why the transcript is not input to template generation or later AI drafting.
 

@@ -36,9 +36,9 @@ Provider-egress consent is durable privacy policy, not reusable operational Admi
 
 There is **no** mutating `Switch` RPC. `kkd` does not own focus. The CLI decomposes switch into a summary-class lookup of the target tmux session and `tmux switch-client`; selecting a session consumes no human approval.
 
-`RepoThreadSummaries` returns exactly the non-sensitive fields enumerated in [Authority](../06-authority.md#sensitive-reads). Its proto message is shared by `kk ls`, `kk log`, switch lookup, overlay, and sidebar; renderers cannot add fields by querying a more privileged endpoint.
+`RepoThreadSummaries` returns exactly the non-sensitive fields enumerated in [Authority](../04-authority.md#sensitive-reads). Its proto message is shared by `kk ls`, `kk log`, switch lookup, overlay, and sidebar; renderers cannot add fields by querying a more privileged endpoint.
 
-(The MCP transcript surface, when it ships, lives on a separate socket — see [Roadmap](../18-roadmap.md).)
+(The MCP transcript surface, when it ships, lives on a separate socket — see [Roadmap](../16-roadmap.md).)
 
 ## Streaming events
 
