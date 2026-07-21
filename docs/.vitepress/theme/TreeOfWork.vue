@@ -206,6 +206,8 @@ const rippled = computed(() => t.value >= 9.9);
 const rippled2 = computed(() => t.value >= 13.4);
 const glow = computed(() => t.value >= 9.9 && t.value < 11.2);
 const authClosed = computed(() => t.value >= 12.9);
+// Matches the merge trunk commit's `at` so the ring fires as the dot pops.
+const mergeLanded = computed(() => t.value >= 13.2);
 const authFolded = computed(() => t.value >= 13.9);
 
 // Your attention, hopping between lanes while every agent keeps working.
@@ -306,6 +308,7 @@ function dotState(branch: (typeof branches)[number]): string {
             <text class="lane-label trunk-label" x="24" y="216" :class="{ on: t >= 0.4 }">main</text>
             <circle v-for="c in trunkCommits" :key="c.x" class="commit trunk-commit"
               :class="{ on: t >= c.at, merge: c.merge }" :cx="c.x" cy="196" r="4.5" />
+            <circle class="merge-pulse" :class="{ on: mergeLanded }" cx="340" cy="196" r="9" />
 
             <g v-for="(b, i) in branches" :key="b.id" class="branch" :class="{ rippled, rippled2 }"
               :style="{ transitionDelay: rippled ? `${i * 0.12}s` : '0s', '--th': b.color }">
@@ -330,7 +333,7 @@ function dotState(branch: (typeof branches)[number]): string {
 
               <template v-if="b.id === 'auth'">
                 <path class="wire child-wire" :class="{ on: t >= child.at, glow, gone: authClosed }"
-                  :d="child.connector" pathLength="100" />
+                  :style="{ '--th': child.color }" :d="child.connector" pathLength="100" />
                 <g class="authui" :class="{ dropped: authClosed }" :style="{ '--th': child.color }">
                   <line class="lane" :class="{ on: t >= child.at, glow }" :x1="child.start" :y1="child.y"
                     :x2="LANE_END" :y2="child.y" vector-effect="non-scaling-stroke"
@@ -375,7 +378,7 @@ function dotState(branch: (typeof branches)[number]): string {
   margin: 28px 0;
   border: 1px solid var(--kiki-line, rgba(200, 214, 205, 0.14));
   border-radius: 6px;
-  background: rgba(9, 16, 14, 0.6);
+  background: linear-gradient(180deg, rgba(13, 21, 18, 0.75), rgba(8, 14, 12, 0.65));
   overflow: hidden;
 }
 
@@ -383,9 +386,13 @@ function dotState(branch: (typeof branches)[number]): string {
   margin: 0;
 }
 
+/* Graph-paper dot grid: the instrument the tree is drawn on. */
 .tow-panel {
   padding: 16px 20px 12px;
   min-width: 0;
+  background-image: radial-gradient(rgba(200, 214, 205, 0.05) 1px, transparent 1px);
+  background-size: 18px 18px;
+  background-position: 2px 6px;
 }
 
 .tow-panel + .tow-panel {
@@ -394,9 +401,19 @@ function dotState(branch: (typeof branches)[number]): string {
 
 .tow-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   margin-bottom: 8px;
+}
+
+/* A trailing hairline turns each head into an instrument label; it fades
+   out well before the replay control's corner. */
+.tow-head::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  margin-left: 8px;
+  background: linear-gradient(90deg, rgba(200, 214, 205, 0.14), transparent 70%);
 }
 
 .tow-tag {
@@ -407,8 +424,25 @@ function dotState(branch: (typeof branches)[number]): string {
   color: rgba(200, 214, 205, 0.45);
 }
 
+/* Square status marker: hollow for the lane you left behind, filled for
+   the tree kiki keeps live. */
+.tow-tag::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  border: 1px solid currentColor;
+  vertical-align: 1px;
+  opacity: 0.8;
+}
+
 .tow-tag.green {
   color: var(--kiki-green, #48d597);
+}
+
+.tow-tag.green::before {
+  background: currentColor;
 }
 
 .tow-title {
@@ -470,11 +504,22 @@ function dotState(branch: (typeof branches)[number]): string {
   transition:
     opacity 0.4s ease,
     visibility 0s,
-    border-color 0.2s ease;
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .tow-replay:hover {
   border-color: rgba(72, 213, 151, 0.7);
+  background: rgba(72, 213, 151, 0.08);
+}
+
+.tow-replay:active {
+  transform: translateY(1px);
+}
+
+.tow-replay:focus-visible {
+  outline: 1px solid rgba(72, 213, 151, 0.8);
+  outline-offset: 2px;
 }
 
 /* Resetting fades the drawn content only — never the frame, heads, or
@@ -510,6 +555,7 @@ function dotState(branch: (typeof branches)[number]): string {
 .wire {
   fill: none;
   stroke: rgba(200, 214, 205, 0.28);
+  stroke: color-mix(in srgb, var(--th, #93a7a0) 30%, transparent);
   stroke-width: 1.5;
   stroke-dasharray: 100;
   stroke-dashoffset: 100;
@@ -533,6 +579,7 @@ function dotState(branch: (typeof branches)[number]): string {
 
 .lane {
   stroke: rgba(200, 214, 205, 0.28);
+  stroke: color-mix(in srgb, var(--th, #93a7a0) 38%, transparent);
   stroke-width: 1.5;
   opacity: 0;
   transition:
@@ -575,6 +622,31 @@ function dotState(branch: (typeof branches)[number]): string {
 .trunk-commit.merge {
   fill: var(--kiki-green, #48d597);
   stroke: none;
+}
+
+/* One-shot ring when the fold lands on main. */
+.merge-pulse {
+  fill: none;
+  stroke: rgba(72, 213, 151, 0.8);
+  stroke-width: 1.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.merge-pulse.on {
+  animation: tow-merge 1.1s ease-out 1 both;
+}
+
+@keyframes tow-merge {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
 }
 
 .lane-commit.stale {
@@ -657,6 +729,8 @@ function dotState(branch: (typeof branches)[number]): string {
 
 .agent[data-state="working"] > circle:first-child {
   animation: tow-pulse 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(72, 213, 151, 0.55));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--th, #48d597) 60%, transparent));
 }
 
 .agent[data-state="blocked"] circle {
@@ -726,8 +800,12 @@ function dotState(branch: (typeof branches)[number]): string {
 
 /* --- your attention --- */
 
+.you {
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+
 .you rect {
-  fill: rgba(220, 232, 226, 0.08);
+  fill: rgba(24, 34, 30, 0.92);
   stroke: rgba(220, 232, 226, 0.65);
   stroke-width: 1;
 }
