@@ -8,6 +8,7 @@ import DocCrumb from "./DocCrumb.vue";
 import KikiHome from "./KikiHome.vue";
 import Mermaid from "./Mermaid.vue";
 import SlotCycle from "./SlotCycle.vue";
+import TreeOfWork from "./TreeOfWork.vue";
 import "./theme.css";
 
 export default {
@@ -21,5 +22,6 @@ export default {
     app.component("KikiHome", KikiHome);
     app.component("Mermaid", Mermaid);
     app.component("SlotCycle", SlotCycle);
+    app.component("TreeOfWork", TreeOfWork);
   },
 };
