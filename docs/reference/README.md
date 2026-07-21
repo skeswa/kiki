@@ -4,6 +4,8 @@ This directory is the implementation reference for kiki (`kk`).
 
 Read it as a small spec book: first the reason for the tool, then the model, then the safety rules, then the user surfaces and machinery. The book is normative. It defines kiki's permitted behavior, prohibited behavior, and v1 boundaries. Ambiguity should be treated as a documentation bug to fix.
 
+New readers should start with the [Abstract](book/00-abstract.md) and [Orientation](book/01-orientation.md). Together they carry the narrative — the hand-built workspace-per-line-of-work workflow kiki automates, its frictions, and the mechanism that answers each one — before the contract chapters tighten the screws.
+
 ## Reading order
 
 1. [Abstract](book/00-abstract.md)

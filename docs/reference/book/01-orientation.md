@@ -2,6 +2,76 @@
 
 This chapter defines what kiki is. Later chapters define how it behaves.
 
+## The workflow kiki automates
+
+kiki did not invent a workflow. It formalizes one that engineers who push agents hard converge on by hand:
+
+- one jj repo, colocated with git;
+- a jj workspace per line of work, so parallel edits never collide;
+- a tmux session per workspace, so every line of work keeps its own terminal;
+- an agent — Claude Code or Codex — alive in a pane of each session;
+- at most one chain of revisions in flight per workspace, named by a single bookmark.
+
+```mermaid
+flowchart LR
+    repo["~/code/app/<br/>the repo — shared jj repository state"]
+    subgraph auth ["bookmark: auth"]
+        direction LR
+        wsA["jj workspace<br/>~/code/app-auth/"] --- sA["tmux session"] --- pA["agent pane"]
+    end
+    subgraph billing ["bookmark: billing"]
+        direction LR
+        wsB["jj workspace<br/>~/code/app-billing/"] --- sB["tmux session"] --- pB["agent pane"]
+    end
+    subgraph search ["bookmark: search"]
+        direction LR
+        wsC["jj workspace<br/>~/code/app-search/"] --- sC["tmux session"] --- pC["agent pane"]
+    end
+    repo --- wsA
+    repo --- wsB
+    repo --- wsC
+```
+
+Every column of that picture pulls its weight: isolation from jj workspaces, persistence from tmux, initiative from the agents. The trouble is the glue. Which workspace pairs with which session, which bookmark names which chain, which agent is waiting on what — all of it lives in the engineer's head, and the tax compounds with every added line of work:
+
+- **Where is that work?** Nothing maps a half-remembered change to the workspace that holds it.
+- **Who needs me right now?** An agent blocked on a permission prompt in session three looks exactly like an agent making progress.
+- **What is in flight?** There is no single view of the tree of work; assembling one means visiting every session.
+- **Another one is a ritual.** New workspace, `cd`, new session, name it, create the bookmark, launch the agent — every time, by hand.
+- **Staleness is homework.** Keeping N workspaces current against a moving trunk — and against each other — is a rebase-and-conflict chore that grows with N.
+- **`jj log` stops scaling.** Every workspace's revisions interleave in one log; finding your own chain means scrolling past everyone else's.
+- **A second machine multiplies all of it.** The state lives in one machine's tmux server and filesystem, so moving between machines means rebuilding the picture by hand.
+
+kiki's move is to register the hand-maintained tuple — workspace, tmux session, agent, bookmark — as one durable object with a name: the **thread**. Once the tuple is a first-class thing a daemon watches, each friction has an owner:
+
+| Friction | What kiki does | Where |
+| --- | --- | --- |
+| Where is that work? | Threads are named and listed from anywhere. `kk ls` works across every registered repo; the TUI shows the same tree interactively. | [Commands](11-commands.md), [Interface](12-interface/) |
+| Who needs me right now? | Every thread's agent projects a display state — `idle`, `working`, `finished`, `blocked` — surfaced in listings, the sidebar's Activity section, the tmux status line, and OS notifications. | [Interface](12-interface/), [Observability](14-observability.md) |
+| What is in flight? | `kk log` renders your thread and its follows-ancestors in full and collapses everything else to one line each; `--wide` adds PR, CI, and agent state for a one-screen bird's-eye view. | [Commands](11-commands.md#kk-log) |
+| Another one is a ritual | `kk new <name>` runs the whole ritual — workspace, initial change, bookmark checkpoint, tmux session, hooks, agent — as one durable, crash-recoverable saga. Inside a thread, branching off the current thread is the default. | [Threads](05-threads.md) |
+| Staleness is homework | A thread can follow another thread. kiki classifies every parent change, rebases or materializes the child at a safe agent boundary, and interrupts the human only for genuine ambiguity — textual conflicts or topology it refuses to guess through. A root thread does not follow the moving trunk in v1: catching it up to `main` remains a direct `jj rebase`, which kiki then cascades through every following descendant. When a parent lands, the v1.x GitHub integration moves each child onto the exact merged trunk commit. | [Cascade](07-cascade.md) |
+| `jj log` stops scaling | Stack-aware collapse. The chain you are working on renders revision by revision; sibling and unrelated threads compress to one summary line apiece. | [Commands](11-commands.md#kk-log) |
+| Naming work that keeps changing shape | `kk new` without a name derives a placeholder, and v1.x metadata evolution lets kiki rename threads and describe revisions as the work reveals its shape — never overwriting prose a human wrote. | [Metadata Evolution](10-metadata.md) |
+| A second machine | Deferred, deliberately. Every client is already a pure gRPC client of the daemon, so remote clients and daemon-to-daemon coordination are additive transports, not redesigns. | [Architecture](15-architecture/), [Roadmap](18-roadmap.md) |
+
+Because a thread can follow another thread, the flat sibling picture above generalizes to the shape work actually takes — a tree:
+
+```mermaid
+flowchart BT
+    main["main — the trunk, and it keeps moving"]
+    auth["thread auth<br/>workspace + session + agent + bookmark"]
+    authui["thread auth-ui"]
+    authe2e["thread auth-e2e"]
+    billing["thread billing<br/>an unrelated thread: same repo, same daemon"]
+    auth -- "based on" --> main
+    billing -- "based on" --> main
+    authui -- "follows auth —<br/>kept converged on its live head" --> auth
+    authe2e -- "follows auth-ui —<br/>stacks go as deep as the work does" --> authui
+```
+
+The table names the mechanisms; whether each surface ships in the acceptance slice or as v1.x polish is recorded once, in the scope ledger below. For a scene-by-scene dramatization of the whole workflow, see the [storyboard](12-interface/storyboard.md).
+
 ## The tool
 
 kiki (`kk`) is an agentic coding workflow coordinator. It gives a developer a first-class unit for a themed line of work: a jj-backed revision stack, an isolated workspace, a tmux session, and an agent session that can be paused, resumed, archived, and composed with related work. Publishing and transcript-backed recall build on that unit after the coordination core is proven.
