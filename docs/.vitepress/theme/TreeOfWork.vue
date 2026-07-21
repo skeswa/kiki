@@ -212,25 +212,23 @@ function laneScale(lane: Lane): number {
 
 // The base commits sit exactly where the branch connectors leave the
 // trunk, so every curve springs from a visible revision. They ripple
-// with the branches (a rebase moves the branch points along main), so
-// they render inside a shifting group while the later commits stay put.
+// with the branches (a rebase moves the branch points along main).
+// auth's base is special-cased in the template: on close it becomes the
+// merge commit itself and stops shifting, so the landed work sits
+// leftmost on main while the surviving branch points move past it.
 const baseTrunkCommits = [
-  { x: 60, at: 0.3 },
   { x: 80, at: 0.5 },
   { x: 100, at: 0.7 },
 ];
 
-const trunkCommits: Array<{ x: number; at: number; merge?: boolean }> = [
-  { x: 314, at: 9.8 },
-  { x: 340, at: 13.2, merge: true },
-];
+const trunkCommits: Array<{ x: number; at: number }> = [{ x: 314, at: 9.8 }];
 
 const searchBlocked = computed(() => t.value >= 5.2 && t.value < 7.2);
 const rippled = computed(() => t.value >= 9.9);
 const rippled2 = computed(() => t.value >= 13.0);
 const glow = computed(() => t.value >= 9.9 && t.value < 11.2);
 const authClosed = computed(() => t.value >= 12.9);
-// Matches the merge trunk commit's `at` so the ring fires as the dot pops.
+// When auth's base dot fills into the merge commit, partway into the fold.
 const mergeLanded = computed(() => t.value >= 13.2);
 const authFolded = computed(() => t.value >= 13.9);
 
@@ -330,18 +328,29 @@ function dotState(branch: (typeof branches)[number]): string {
             <line class="track trunk-line" x1="24" y1="196" x2="292" y2="196" :class="{ on: t >= 0.1 }" />
             <line class="track trunk-line seg2" x1="292" y1="196" x2="416" y2="196" :class="{ on: t >= 9.7 }" />
             <text class="lane-label trunk-label" x="24" y="216" :class="{ on: t >= 0.4 }">main</text>
+            <!-- auth's base dot rides the cascade but sits out the close
+                 shift: it fills into the merge commit and stays leftmost on
+                 main while the surviving branch points move past it. -->
+            <g class="branch" :class="{ rippled }">
+              <circle class="commit trunk-commit" :class="{ on: t >= 0.3, merge: mergeLanded }" cx="60" cy="196"
+                r="4.5" />
+              <circle class="merge-pulse" :class="{ on: mergeLanded }" cx="60" cy="196" r="9" />
+              <text class="merged-label" :class="{ on: authFolded }" x="60" y="182">auth ✓</text>
+            </g>
             <!-- Each base dot shifts on the same stagger as its branch, so the
                  pair stays glued mid-transition, not just at rest. -->
             <g v-for="(c, i) in baseTrunkCommits" :key="c.x" class="branch" :class="{ rippled, rippled2 }"
-              :style="{ transitionDelay: rippled ? `${i * 0.12}s` : '0s' }">
+              :style="{ transitionDelay: rippled ? `${(i + 1) * 0.12}s` : '0s' }">
               <circle class="commit trunk-commit" :class="{ on: t >= c.at }" :cx="c.x" cy="196" r="4.5" />
             </g>
-            <circle v-for="c in trunkCommits" :key="c.x" class="commit trunk-commit"
-              :class="{ on: t >= c.at, merge: c.merge }" :cx="c.x" cy="196" r="4.5" />
-            <circle class="merge-pulse" :class="{ on: mergeLanded }" cx="340" cy="196" r="9" />
-            <text class="merged-label" :class="{ on: authFolded }" x="340" y="216">auth ✓</text>
+            <circle v-for="c in trunkCommits" :key="c.x" class="commit trunk-commit" :class="{ on: t >= c.at }"
+              :cx="c.x" cy="196" r="4.5" />
 
-            <g v-for="(b, i) in branches" :key="b.id" class="branch" :class="{ rippled, rippled2 }"
+            <!-- auth's group sits out the close-time shift with its base dot:
+                 its connector must stay glued to the merge commit it now
+                 springs from, and auth-ui repositions within the group. -->
+            <g v-for="(b, i) in branches" :key="b.id" class="branch"
+              :class="{ rippled, rippled2: rippled2 && b.id !== 'auth' }"
               :style="{ transitionDelay: rippled ? `${i * 0.12}s` : '0s', '--th': b.color }">
               <path class="wire" :class="{ on: t >= b.at, glow }" :d="b.connector" pathLength="100" />
               <g class="row" :class="{ folding: b.id === 'auth' && authClosed }">
@@ -626,14 +635,19 @@ function dotState(branch: (typeof branches)[number]): string {
 }
 
 .trunk-commit {
-  fill: none;
+  fill: transparent;
   stroke: rgba(200, 214, 205, 0.6);
   stroke-width: 1.5;
+  transition:
+    opacity 0.3s ease,
+    transform 0.35s cubic-bezier(0.2, 1.6, 0.4, 1),
+    fill 0.6s ease,
+    stroke 0.6s ease;
 }
 
 .trunk-commit.merge {
   fill: var(--kiki-green, #48d597);
-  stroke: none;
+  stroke: transparent;
 }
 
 /* One-shot ring when the fold lands on main. */
@@ -831,18 +845,20 @@ function dotState(branch: (typeof branches)[number]): string {
 /* --- closing a thread: the fold into main --- */
 
 /* The finished row funnels into the merge commit: its dots converge on
-   the merge point while sinking onto the trunk, so the work visibly
-   becomes the new revision on main. The origin is the merge commit's
-   position minus the branch group's final ripple offset. */
+   auth's base dot (rendered at 74; auth's group keeps only the cascade
+   offset of 14 through the close, so that is local x = 60, with the
+   origin nudged left so the converged cluster centers on it) while
+   sinking onto the trunk — the work visibly becomes the revision on
+   main. */
 .row {
-  transform-origin: 300px 58px;
+  transform-origin: 50px 58px;
   transition:
     transform 0.9s ease,
     opacity 0.9s ease;
 }
 
 .row.folding {
-  transform: translateY(138px) scaleX(0.08);
+  transform: translateY(138px) scaleX(0.05);
   opacity: 0;
 }
 
