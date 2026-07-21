@@ -20,6 +20,20 @@ export default defineConfig({
   },
   lastUpdated: true,
   appearance: "force-dark",
+  markdown: {
+    config(md) {
+      // Render ```mermaid fences as client-side <Mermaid> components instead
+      // of highlighted code blocks.
+      const fence = md.renderer.rules.fence!;
+      md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+        const token = tokens[idx]!;
+        if (token.info.trim() === "mermaid") {
+          return `<Mermaid graph="${encodeURIComponent(token.content)}" />`;
+        }
+        return fence(tokens, idx, options, env, self);
+      };
+    },
+  },
   sitemap: { hostname: siteUrl },
   head: [
     ["meta", { name: "theme-color", content: "#0b1210" }],

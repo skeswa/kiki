@@ -12,6 +12,7 @@
   "devDependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@types/bun": "latest",
+    "mermaid": "^11.16.0",
     "oxfmt": "^0.47.0",
     "vitepress": "^1.6.4"
   },

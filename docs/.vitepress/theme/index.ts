@@ -6,6 +6,7 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-600.css";
 import DocCrumb from "./DocCrumb.vue";
 import KikiHome from "./KikiHome.vue";
+import Mermaid from "./Mermaid.vue";
 import SlotCycle from "./SlotCycle.vue";
 import "./theme.css";
 
@@ -18,6 +19,7 @@ export default {
   },
   enhanceApp({ app }) {
     app.component("KikiHome", KikiHome);
+    app.component("Mermaid", Mermaid);
     app.component("SlotCycle", SlotCycle);
   },
 };
