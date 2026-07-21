@@ -71,4 +71,5 @@ Likely later swaps:
 - harness adapters beyond `claude-code` and `codex` behind the existing `Harness` and `TranscriptAdapter` traits;
 - direct GitHub REST or GraphQL behind `GitHubBackend`;
 - jj-lib behind `JjBackend`;
-- native GUI, web dashboard, or remote clients over the same gRPC service.
+- native GUI, web dashboard, or remote clients over the same gRPC service;
+- daemon-to-daemon coordination, so one machine's `kk` can observe and eventually drive threads whose workspaces live on another machine's `kkd`. Working across machines is part of the product vision, not an accident of scope: the same-host boundary exists because peer daemons, like remote clients, wait on the future transport and authentication contract rather than inheriting unix-socket assumptions.
