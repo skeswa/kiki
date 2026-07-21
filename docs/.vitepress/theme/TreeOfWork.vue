@@ -2,33 +2,74 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 /**
- * A looping, deterministic animation contrasting serial work (one lane,
+ * A play-once, deterministic animation contrasting serial work (one lane,
  * context switches) with kiki's tree (parallel threads, follows, cascade,
- * close). One clock drives everything: `t` is seconds into a LOOP-second
- * cycle, and every element derives its state from thresholds on `t`. CSS
- * transitions do the easing; there is no per-element keyframe code.
+ * close-and-fold). One clock drives everything: `t` is seconds into a
+ * DURATION-second run, and every element derives its state from thresholds
+ * on `t`. CSS transitions do the easing; there is no per-element keyframe
+ * code. A replay button resets the clock; the reset fades only the drawn
+ * content, never the frame around it.
  */
-const LOOP = 16;
+const DURATION = 16;
 
 const t = ref(0);
+const done = ref(false);
+const resetting = ref(false);
 const reduced = ref(false);
 let timer: ReturnType<typeof setInterval> | undefined;
+let resetTimers: number[] = [];
+
+function startClock() {
+  const start = performance.now();
+  timer = setInterval(() => {
+    const elapsed = (performance.now() - start) / 1000;
+    if (elapsed >= DURATION) {
+      t.value = DURATION;
+      done.value = true;
+      if (timer) clearInterval(timer);
+      timer = undefined;
+      return;
+    }
+    t.value = elapsed;
+  }, 100);
+}
 
 onMounted(() => {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     reduced.value = true;
-    t.value = 14; // freeze on the fully-grown scene; CSS suppresses all motion
+    t.value = DURATION; // show the finished scene; CSS suppresses all motion
     return;
   }
-  const start = performance.now();
-  timer = setInterval(() => {
-    t.value = ((performance.now() - start) / 1000) % LOOP;
-  }, 100);
+  startClock();
 });
 
 onBeforeUnmount(() => {
   if (timer) clearInterval(timer);
+  // Cancel any in-flight reset so a replay can't restart the clock (and
+  // leak its interval) after the component is gone.
+  for (const id of resetTimers) window.clearTimeout(id);
+  resetTimers = [];
 });
+
+function replay() {
+  if (resetting.value || timer) return;
+  done.value = false;
+  resetting.value = true;
+  // Fade the drawing out, snap every element back to its t=0 state while
+  // hidden (transitions are suppressed under .resetting), then fade back
+  // in and restart the clock.
+  resetTimers = [
+    window.setTimeout(() => {
+      t.value = 0;
+      resetTimers.push(
+        window.setTimeout(() => {
+          resetting.value = false;
+          startClock();
+        }, 80),
+      );
+    }, 340),
+  ];
+}
 
 // --- top panel: one lane, three jobs, two context switches ----------------
 
@@ -44,10 +85,13 @@ const laneCommits = [
   { x: 326, at: 12.6, job: 2 },
 ];
 
-const chips = [
-  { label: "auth", x: 24, w: 56 },
-  { label: "billing", x: 92, w: 76 },
-  { label: "search", x: 180, w: 70 },
+// Each thread keeps one color across both panels: kiki green for auth,
+// sky for billing, lavender for search, and a lighter green for auth's
+// child so the lineage reads at a glance.
+const jobs = [
+  { label: "auth", x: 24, color: "#48d597" },
+  { label: "billing", x: 96, color: "#64b6e0" },
+  { label: "search", x: 186, color: "#b48ee6" },
 ];
 
 const activeJob = computed(() => (t.value < 4 ? 0 : t.value < 8.8 ? 1 : 2));
@@ -77,6 +121,7 @@ const branches = [
   {
     id: "auth",
     at: 1.0,
+    color: "#48d597",
     y: 58,
     connector: "M60,196 C60,120 84,58 128,58",
     start: 128,
@@ -93,6 +138,7 @@ const branches = [
   {
     id: "billing",
     at: 1.5,
+    color: "#64b6e0",
     y: 112,
     connector: "M80,196 C80,150 104,112 148,112",
     start: 148,
@@ -108,6 +154,7 @@ const branches = [
   {
     id: "search",
     at: 2.0,
+    color: "#b48ee6",
     y: 158,
     connector: "M100,196 C100,176 124,158 168,158",
     start: 168,
@@ -123,6 +170,7 @@ const branches = [
 
 const child = {
   at: 7.6,
+  color: "#8ee6bd",
   y: 26,
   connector: "M266,58 C266,40 284,26 310,26",
   start: 310,
@@ -146,36 +194,56 @@ function laneScale(lane: Lane): number {
   return (tipX(lane) - lane.start) / (LANE_END - lane.start);
 }
 
-const trunkCommits = [
+const trunkCommits: Array<{ x: number; at: number; merge?: boolean }> = [
   { x: 40, at: 0.3 },
   { x: 70, at: 0.5 },
   { x: 314, at: 9.8 },
+  { x: 340, at: 13.2, merge: true },
 ];
 
 const searchBlocked = computed(() => t.value >= 5.2 && t.value < 7.2);
 const rippled = computed(() => t.value >= 9.9);
+const rippled2 = computed(() => t.value >= 13.4);
 const glow = computed(() => t.value >= 9.9 && t.value < 11.2);
 const authClosed = computed(() => t.value >= 12.9);
+const authFolded = computed(() => t.value >= 13.9);
 
 // Your attention, hopping between lanes while every agent keeps working.
-// Each entry: [arrive-at-seconds, lane y].
-const youStops: Array<[number, number]> = [
-  [0.6, 58], // review auth
-  [3.2, 112], // peek at billing
-  [5.4, 158], // search flagged you: answer it
-  [7.4, 58], // back to auth…
-  [8.4, 26], // …and branch auth-ui off it
-  [10.6, 112], // billing again
-  [12.6, 58], // auth is done: close it
-  [13.8, 158], // on to the next thing
+// Each entry: [arrive-at-seconds, lane key]. The pointer rides just off
+// the tip of whichever lane it is attending, so it grows rightward with
+// the branch instead of parking at the panel's edge.
+const laneById = {
+  auth: branches[0]!,
+  billing: branches[1]!,
+  search: branches[2]!,
+  authui: child,
+} as const;
+
+const youStops: Array<[number, keyof typeof laneById]> = [
+  [0.6, "auth"], // review auth
+  [3.2, "billing"], // peek at billing
+  [5.4, "search"], // search flagged you: answer it
+  [7.4, "auth"], // back to auth…
+  [8.4, "authui"], // …and branch auth-ui off it
+  [10.6, "billing"], // billing again
+  [12.6, "auth"], // auth is done: close it
+  [13.8, "search"], // on to the next thing
 ];
 
-const youY = computed(() => {
-  let y = youStops[0]![1];
-  for (const [at, stopY] of youStops) if (t.value >= at) y = stopY;
-  return y;
+const youLane = computed(() => {
+  let key = youStops[0]![1];
+  for (const [at, k] of youStops) if (t.value >= at) key = k;
+  return key;
 });
 
+// Branch groups slide right on each ripple; the pointer, which lives
+// outside those groups, adds the same offset to stay glued to the tips.
+const rippleOffset = computed(() => (rippled2.value ? 26 : rippled.value ? 14 : 0));
+
+const youX = computed(() =>
+  Math.min(tipX(laneById[youLane.value]) + rippleOffset.value, 384),
+);
+const youY = computed(() => laneById[youLane.value].y);
 const youVisible = computed(() => t.value >= 0.6);
 
 const rightCaption = computed(() => {
@@ -183,135 +251,140 @@ const rightCaption = computed(() => {
   if (t.value < 7.2) return "search needs you · the rest keep working";
   if (t.value < 9.6) return "you branch auth-ui off auth, live";
   if (t.value < 12.5) return "one rebase onto main · the cascade does the rest";
-  if (t.value < 14.3) return "auth ships: kk close · auth-ui keeps going";
+  if (t.value < 14.6) return "kk close: auth folds into main · auth-ui reroots there";
   return "same clock. the whole tree moved.";
 });
 
-const fading = computed(() => !reduced.value && t.value >= 15.2);
-
 function dotState(branch: (typeof branches)[number]): string {
   if (branch.id === "search" && searchBlocked.value) return "blocked";
-  if (branch.id === "auth") {
-    if (authClosed.value) return "closed";
-    if (t.value >= 12.5) return "done";
-  }
+  if (branch.id === "auth" && t.value >= 12.5) return "done";
   return t.value >= branch.at ? "working" : "off";
 }
 </script>
 
 <template>
-  <figure class="tow" :class="{ fading, reduced }" role="img"
-    aria-label="Animation contrasting two ways of working. Without kiki: one lane where auth, billing, and search take turns, separated by costly context switches, with your attention pinned to the lane. With kiki: a revision tree where three threads and a child thread grow in parallel while a marker labeled you hops between them — answering the thread that needs a human, branching a child thread, and closing a finished thread — and after one rebase onto the moving main, kiki's cascade carries every following thread forward.">
-    <div class="tow-stack" aria-hidden="true">
-      <div class="tow-panel">
-        <div class="tow-head">
-          <span class="tow-tag">without kiki</span>
-          <span class="tow-title">one lane at a time</span>
-        </div>
-        <svg viewBox="0 0 440 230">
-          <g v-for="(chip, i) in chips" :key="chip.label" class="chip"
-            :class="{ active: activeJob === i && !switching, waiting: activeJob < i || (switching && activeJob === i) }">
-            <rect :x="chip.x" y="18" :width="chip.w" height="24" rx="3" />
-            <text :x="chip.x + chip.w / 2" y="34">{{ chip.label }}</text>
-          </g>
-          <text class="switch-flash" :class="{ on: switching }" x="220" y="96">⌛ context switch…</text>
-          <line class="track" x1="24" y1="140" x2="416" y2="140" />
-          <circle v-for="c in laneCommits" :key="c.x" class="commit lane-commit"
-            :class="{ on: t >= c.at, stale: t >= 10.3 && c.job === 0 }" :cx="c.x" cy="140" r="4.5" />
-          <g class="agent" :class="{ paused: switching }" :style="{ transform: `translateX(${laneDotX}px)` }">
-            <circle cx="0" cy="140" r="5.5" />
-            <g class="you pinned">
-              <rect x="-18" y="100" width="36" height="18" rx="3" />
-              <text x="0" y="113">you</text>
-              <path d="M-4,120 L0,126 L4,120 Z" />
+  <div class="tow" :class="{ reduced, resetting }">
+    <figure class="tow-fig" role="img"
+      aria-label="Animation, played once, contrasting two ways of working. Without kiki: one lane where auth, billing, and search take turns, separated by costly context switches, with your attention pinned to the lane. With kiki: a revision tree where three threads and a child thread grow in parallel while a marker labeled you rides the tip of whichever thread it attends — answering the thread that needs a human, branching a child thread, and closing a finished thread. After one rebase onto the moving main, kiki's cascade carries every following thread forward, and closing the finished auth thread folds its work into main while its child thread auth-ui reroots onto main and keeps going.">
+      <div class="tow-stack" aria-hidden="true">
+        <div class="tow-panel">
+          <div class="tow-head">
+            <span class="tow-tag">without kiki</span>
+            <span class="tow-title">one lane at a time</span>
+          </div>
+          <svg viewBox="0 0 440 104">
+            <g v-for="(job, i) in jobs" :key="job.label" class="job" :style="{ '--th': job.color }"
+              :class="{ active: activeJob === i && !switching, past: activeJob > i, waiting: activeJob < i || (switching && activeJob === i) }">
+              <circle :cx="job.x" cy="18" r="3.5" />
+              <text :x="job.x + 11" y="22">{{ job.label }}</text>
             </g>
-          </g>
-        </svg>
-        <div class="tow-caption">{{ leftCaption }}</div>
-      </div>
-
-      <div class="tow-panel">
-        <div class="tow-head">
-          <span class="tow-tag green">with kiki</span>
-          <span class="tow-title">the whole tree, live</span>
-        </div>
-        <svg viewBox="0 0 440 230">
-          <line class="track trunk-line" x1="24" y1="196" x2="292" y2="196" :class="{ on: t >= 0.1 }" />
-          <line class="track trunk-line seg2" x1="292" y1="196" x2="416" y2="196" :class="{ on: t >= 9.7 }" />
-          <text class="lane-label trunk-label" x="24" y="216" :class="{ on: t >= 0.4 }">main</text>
-          <circle v-for="c in trunkCommits" :key="c.x" class="commit trunk-commit" :class="{ on: t >= c.at }"
-            :cx="c.x" cy="196" r="4.5" />
-
-          <g v-for="(b, i) in branches" :key="b.id" class="branch" :class="{ rippled }"
-            :style="{ transitionDelay: rippled ? `${i * 0.12}s` : '0s' }">
-            <path class="wire" :class="{ on: t >= b.at, glow, closed: b.id === 'auth' && authClosed }"
-              :d="b.connector" pathLength="100" />
-            <line class="lane" :class="{ on: t >= b.at, glow, closed: b.id === 'auth' && authClosed }" :x1="b.start"
-              :y1="b.y" :x2="LANE_END" :y2="b.y" vector-effect="non-scaling-stroke"
-              :style="{ transform: `scaleX(${laneScale(b)})`, transformOrigin: `${b.start}px ${b.y}px` }" />
-            <text class="lane-label" :x="b.labelX" :y="b.y - 10"
-              :class="{ on: t >= b.at + 0.5, closed: b.id === 'auth' && authClosed }">{{ b.id }}</text>
-            <circle v-for="c in b.commits" :key="c.x" class="commit"
-              :class="{ on: t >= c.at, closed: b.id === 'auth' && authClosed }" :cx="c.x" :cy="b.y" r="4.5" />
-            <g class="agent" :data-state="dotState(b)" :style="{ transform: `translateX(${tipX(b)}px)` }">
-              <circle cx="0" :cy="b.y" r="5.5" />
-              <circle class="halo" cx="0" :cy="b.y" r="10" />
-            </g>
-            <g class="needs-you" v-if="b.id === 'search'" :class="{ on: searchBlocked }"
-              :style="{ transform: `translateX(${tipX(b)}px)` }">
-              <rect x="-96" :y="b.y - 34" width="76" height="20" rx="3" />
-              <text x="-58" :y="b.y - 20">needs you</text>
-            </g>
-
-            <template v-if="b.id === 'auth'">
-              <path class="wire child-wire" :class="{ on: t >= child.at, glow }" :d="child.connector"
-                pathLength="100" />
-              <line class="lane" :class="{ on: t >= child.at, glow }" :x1="child.start" :y1="child.y" :x2="LANE_END"
-                :y2="child.y" vector-effect="non-scaling-stroke"
-                :style="{ transform: `scaleX(${laneScale(child)})`, transformOrigin: `${child.start}px ${child.y}px` }" />
-              <text class="lane-label" x="304" y="16" :class="{ on: t >= child.at + 0.5 }">auth-ui</text>
-              <circle v-for="c in child.commits" :key="c.x" class="commit" :class="{ on: t >= c.at }" :cx="c.x"
-                :cy="child.y" r="4.5" />
-              <g class="agent" :data-state="t >= child.at ? 'working' : 'off'"
-                :style="{ transform: `translateX(${tipX(child)}px)` }">
-                <circle cx="0" :cy="child.y" r="5.5" />
-                <circle class="halo" cx="0" :cy="child.y" r="10" />
+            <line class="track" x1="24" y1="84" x2="416" y2="84" />
+            <circle v-for="c in laneCommits" :key="c.x" class="commit lane-commit"
+              :class="{ on: t >= c.at, stale: t >= 10.3 && c.job === 0 }" :cx="c.x" cy="84" r="4.5"
+              :style="{ '--th': jobs[c.job]!.color }" />
+            <g class="agent" :class="{ paused: switching }"
+              :style="{ transform: `translateX(${laneDotX}px)`, '--th': jobs[activeJob]!.color }">
+              <circle cx="0" cy="84" r="5.5" />
+              <g class="you pinned">
+                <rect x="-18" y="44" width="36" height="18" rx="3" />
+                <text x="0" y="57">you</text>
+                <path d="M-4,64 L0,70 L4,64 Z" />
               </g>
-              <g class="closed-chip" :class="{ on: authClosed }">
-                <rect x="322" y="68" width="72" height="18" rx="3" />
-                <text x="358" y="81">✓ closed</text>
-              </g>
-            </template>
-          </g>
+            </g>
+          </svg>
+          <div class="tow-caption">{{ leftCaption }}</div>
+        </div>
 
-          <g class="you roaming" :class="{ on: youVisible }" :style="{ transform: `translateY(${youY}px)` }">
-            <path d="M403,0 L396,4 L403,8 Z" transform="translate(0,-4)" />
-            <rect x="404" y="-9" width="32" height="18" rx="3" />
-            <text x="420" y="4">you</text>
-          </g>
-        </svg>
-        <div class="tow-caption green">{{ rightCaption }}</div>
+        <div class="tow-panel">
+          <div class="tow-head">
+            <span class="tow-tag green">with kiki</span>
+            <span class="tow-title">the whole tree, live</span>
+          </div>
+          <svg viewBox="0 0 440 230">
+            <line class="track trunk-line" x1="24" y1="196" x2="292" y2="196" :class="{ on: t >= 0.1 }" />
+            <line class="track trunk-line seg2" x1="292" y1="196" x2="416" y2="196" :class="{ on: t >= 9.7 }" />
+            <text class="lane-label trunk-label" x="24" y="216" :class="{ on: t >= 0.4 }">main</text>
+            <circle v-for="c in trunkCommits" :key="c.x" class="commit trunk-commit"
+              :class="{ on: t >= c.at, merge: c.merge }" :cx="c.x" cy="196" r="4.5" />
+
+            <g v-for="(b, i) in branches" :key="b.id" class="branch" :class="{ rippled, rippled2 }"
+              :style="{ transitionDelay: rippled ? `${i * 0.12}s` : '0s', '--th': b.color }">
+              <path class="wire" :class="{ on: t >= b.at, glow }" :d="b.connector" pathLength="100" />
+              <g class="row" :class="{ folding: b.id === 'auth' && authClosed }">
+                <line class="lane" :class="{ on: t >= b.at, glow }" :x1="b.start" :y1="b.y" :x2="LANE_END" :y2="b.y"
+                  vector-effect="non-scaling-stroke"
+                  :style="{ transform: `scaleX(${laneScale(b)})`, transformOrigin: `${b.start}px ${b.y}px` }" />
+                <text class="lane-label" :x="b.labelX" :y="b.y - 10" :class="{ on: t >= b.at + 0.5 }">{{ b.id }}</text>
+                <circle v-for="c in b.commits" :key="c.x" class="commit" :class="{ on: t >= c.at }" :cx="c.x"
+                  :cy="b.y" r="4.5" />
+                <g class="agent" :data-state="dotState(b)" :style="{ transform: `translateX(${tipX(b)}px)` }">
+                  <circle cx="0" :cy="b.y" r="5.5" />
+                  <circle class="halo" cx="0" :cy="b.y" r="10" />
+                </g>
+              </g>
+              <g class="needs-you" v-if="b.id === 'search'" :class="{ on: searchBlocked }"
+                :style="{ transform: `translateX(${tipX(b)}px)` }">
+                <rect x="-96" :y="b.y - 34" width="76" height="20" rx="3" />
+                <text x="-58" :y="b.y - 20">needs you</text>
+              </g>
+
+              <template v-if="b.id === 'auth'">
+                <path class="wire child-wire" :class="{ on: t >= child.at, glow, gone: authClosed }"
+                  :d="child.connector" pathLength="100" />
+                <g class="authui" :class="{ dropped: authClosed }" :style="{ '--th': child.color }">
+                  <line class="lane" :class="{ on: t >= child.at, glow }" :x1="child.start" :y1="child.y"
+                    :x2="LANE_END" :y2="child.y" vector-effect="non-scaling-stroke"
+                    :style="{ transform: `scaleX(${laneScale(child)})`, transformOrigin: `${child.start}px ${child.y}px` }" />
+                  <text class="lane-label" x="304" y="16" :class="{ on: t >= child.at + 0.5 }">auth-ui</text>
+                  <circle v-for="c in child.commits" :key="c.x" class="commit" :class="{ on: t >= c.at }" :cx="c.x"
+                    :cy="child.y" r="4.5" />
+                  <g class="agent" :data-state="t >= child.at ? 'working' : 'off'"
+                    :style="{ transform: `translateX(${tipX(child)}px)` }">
+                    <circle cx="0" :cy="child.y" r="5.5" />
+                    <circle class="halo" cx="0" :cy="child.y" r="10" />
+                  </g>
+                </g>
+                <g class="closed-chip" :class="{ on: authFolded }">
+                  <rect x="296" y="8" width="112" height="18" rx="3" />
+                  <text x="352" y="21">✓ auth → main</text>
+                </g>
+              </template>
+            </g>
+
+            <g class="you roaming" :class="{ on: youVisible }"
+              :style="{ transform: `translate(${youX}px, ${youY}px)` }">
+              <path d="M12,0 L19,-4.5 L19,4.5 Z" />
+              <rect x="21" y="-9" width="32" height="18" rx="3" />
+              <text x="37" y="4">you</text>
+            </g>
+          </svg>
+          <div class="tow-caption green">{{ rightCaption }}</div>
+        </div>
       </div>
-    </div>
-  </figure>
+    </figure>
+    <button v-if="!reduced" class="tow-replay" :class="{ on: done }" type="button"
+      aria-label="Replay the animation" @click="replay">
+      ↻ replay
+    </button>
+  </div>
 </template>
 
 <style scoped>
 .tow {
+  position: relative;
   margin: 28px 0;
   border: 1px solid var(--kiki-line, rgba(200, 214, 205, 0.14));
   border-radius: 6px;
   background: rgba(9, 16, 14, 0.6);
   overflow: hidden;
-  transition: opacity 0.7s ease;
 }
 
-.tow.fading {
-  opacity: 0;
+.tow-fig {
+  margin: 0;
 }
 
 .tow-panel {
-  padding: 20px 22px 16px;
+  padding: 16px 20px 12px;
   min-width: 0;
 }
 
@@ -346,9 +419,10 @@ function dotState(branch: (typeof branches)[number]): string {
 .tow svg {
   display: block;
   width: 100%;
-  max-width: 620px;
+  max-width: 580px;
   height: auto;
   margin: 0 auto;
+  transition: opacity 0.3s ease;
 }
 
 .tow-caption {
@@ -357,10 +431,63 @@ function dotState(branch: (typeof branches)[number]): string {
   font-size: 11px;
   text-align: center;
   color: rgba(200, 214, 205, 0.5);
+  transition: opacity 0.3s ease;
 }
 
 .tow-caption.green {
   color: rgba(72, 213, 151, 0.75);
+}
+
+/* --- replay: appears once the run finishes --- */
+
+.tow-replay {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--kiki-green, #48d597);
+  background: transparent;
+  border: 1px solid rgba(72, 213, 151, 0.35);
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+  opacity: 0;
+  /* visibility keeps the hidden button out of the keyboard tab order;
+     the delay lets the opacity fade finish before it disappears. */
+  visibility: hidden;
+  transition:
+    opacity 0.4s ease,
+    visibility 0s linear 0.4s,
+    border-color 0.2s ease;
+}
+
+.tow-replay.on {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.4s ease,
+    visibility 0s,
+    border-color 0.2s ease;
+}
+
+.tow-replay:hover {
+  border-color: rgba(72, 213, 151, 0.7);
+}
+
+/* Resetting fades the drawn content only — never the frame, heads, or
+   button — and suppresses inner transitions so every element snaps back
+   to its t=0 state while hidden. */
+.tow.resetting svg,
+.tow.resetting .tow-caption {
+  opacity: 0;
+}
+
+.tow.resetting :deep(svg *) {
+  transition: none !important;
+  animation: none !important;
 }
 
 /* --- shared drawing vocabulary --- */
@@ -388,7 +515,8 @@ function dotState(branch: (typeof branches)[number]): string {
   stroke-dashoffset: 100;
   transition:
     stroke-dashoffset 0.8s ease,
-    stroke 0.5s ease;
+    stroke 0.5s ease,
+    opacity 0.5s ease;
 }
 
 .wire.on {
@@ -397,6 +525,10 @@ function dotState(branch: (typeof branches)[number]): string {
 
 .wire.glow {
   stroke: rgba(72, 213, 151, 0.7);
+}
+
+.wire.gone {
+  opacity: 0;
 }
 
 .lane {
@@ -418,7 +550,7 @@ function dotState(branch: (typeof branches)[number]): string {
 }
 
 .commit {
-  fill: var(--kiki-green, #48d597);
+  fill: var(--th, var(--kiki-green, #48d597));
   opacity: 0;
   transform: scale(0.2);
   transform-box: fill-box;
@@ -440,6 +572,11 @@ function dotState(branch: (typeof branches)[number]): string {
   stroke-width: 1.5;
 }
 
+.trunk-commit.merge {
+  fill: var(--kiki-green, #48d597);
+  stroke: none;
+}
+
 .lane-commit.stale {
   fill: rgba(200, 214, 205, 0.3);
 }
@@ -447,59 +584,53 @@ function dotState(branch: (typeof branches)[number]): string {
 .lane-label {
   font-family: inherit;
   font-size: 11px;
-  fill: rgba(200, 214, 205, 0.55);
+  fill: var(--th, rgba(200, 214, 205, 0.55));
   opacity: 0;
   transition: opacity 0.5s ease;
 }
 
 .lane-label.on {
-  opacity: 1;
+  opacity: 0.85;
 }
 
 .trunk-label {
   fill: rgba(200, 214, 205, 0.4);
 }
 
-/* --- top panel --- */
+/* --- top panel: the job queue --- */
 
-.chip rect {
-  fill: rgba(200, 214, 205, 0.06);
-  stroke: rgba(200, 214, 205, 0.18);
+.job circle {
+  fill: transparent;
+  stroke: rgba(200, 214, 205, 0.3);
+  stroke-width: 1.2;
   transition:
     fill 0.4s ease,
     stroke 0.4s ease;
 }
 
-.chip text {
+.job text {
   font-size: 11px;
-  fill: rgba(200, 214, 205, 0.45);
-  text-anchor: middle;
+  fill: rgba(200, 214, 205, 0.4);
   transition: fill 0.4s ease;
 }
 
-.chip.active rect {
-  fill: rgba(72, 213, 151, 0.1);
-  stroke: rgba(72, 213, 151, 0.5);
+.job.active circle {
+  fill: var(--th, var(--kiki-green, #48d597));
+  stroke: transparent;
 }
 
-.chip.active text {
-  fill: var(--kiki-green, #48d597);
+.job.active text {
+  fill: var(--th, var(--kiki-green, #48d597));
 }
 
-.chip.waiting text {
+.job.past circle {
+  fill: rgba(200, 214, 205, 0.28);
+  stroke: transparent;
+}
+
+.job.past text,
+.job.waiting text {
   fill: rgba(200, 214, 205, 0.3);
-}
-
-.switch-flash {
-  font-size: 11px;
-  fill: #e8b268;
-  text-anchor: middle;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.switch-flash.on {
-  opacity: 1;
 }
 
 /* --- agents --- */
@@ -509,13 +640,13 @@ function dotState(branch: (typeof branches)[number]): string {
 }
 
 .agent circle {
-  fill: var(--kiki-green, #48d597);
+  fill: var(--th, var(--kiki-green, #48d597));
   transition: fill 0.4s ease;
 }
 
 .agent .halo {
   fill: none;
-  stroke: rgba(72, 213, 151, 0.5);
+  stroke: var(--th, rgba(72, 213, 151, 0.5));
   stroke-width: 1.5;
   opacity: 0;
 }
@@ -541,13 +672,7 @@ function dotState(branch: (typeof branches)[number]): string {
 }
 
 .agent[data-state="done"] circle {
-  fill: rgba(72, 213, 151, 0.55);
-}
-
-.agent[data-state="closed"] circle {
-  fill: transparent;
-  stroke: rgba(200, 214, 205, 0.35);
-  stroke-width: 1.5;
+  opacity: 0.55;
 }
 
 .agent.paused > circle {
@@ -629,20 +754,29 @@ function dotState(branch: (typeof branches)[number]): string {
   opacity: 1;
 }
 
-/* --- a thread closing --- */
+/* --- closing a thread: the fold into main --- */
 
-.wire.closed,
-.lane.closed {
-  stroke: rgba(200, 214, 205, 0.12);
+/* The finished row sinks onto the trunk and dissolves; the merge commit
+   popping on the trunk is what it dissolves into. */
+.row {
+  transition:
+    transform 0.9s ease,
+    opacity 0.9s ease;
 }
 
-.commit.closed {
-  fill: rgba(200, 214, 205, 0.25);
-  opacity: 0.5;
+.row.folding {
+  transform: translateY(138px);
+  opacity: 0;
 }
 
-.lane-label.closed {
-  opacity: 0.35;
+/* The child thread slides into the freed row and inherits the folded
+   thread's trunk connector: the row transforms from auth into auth-ui. */
+.authui {
+  transition: transform 0.9s ease 0.25s;
+}
+
+.authui.dropped {
+  transform: translate(-182px, 32px);
 }
 
 .closed-chip {
@@ -665,7 +799,7 @@ function dotState(branch: (typeof branches)[number]): string {
   text-anchor: middle;
 }
 
-/* --- cascade ripple --- */
+/* --- cascade ripples: everything moves along --- */
 
 .branch {
   transition: transform 0.7s cubic-bezier(0.3, 1.2, 0.4, 1);
@@ -675,7 +809,11 @@ function dotState(branch: (typeof branches)[number]): string {
   transform: translateX(14px);
 }
 
-/* --- reduced motion: the grown scene appears, nothing moves --- */
+.branch.rippled2 {
+  transform: translateX(26px);
+}
+
+/* --- reduced motion: the finished scene appears, nothing moves --- */
 
 /* The clock freezes after mount, which would otherwise fire every CSS
    transition once (wires drawing, lanes stretching, the "you" marker
