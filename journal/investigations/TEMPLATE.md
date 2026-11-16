@@ -1,9 +1,9 @@
 # State the question or finding in plain language
 
-Date: YYYY-MM-DD, with timezone when it matters  
-Type: Investigation / Outcome  
-Topic: Name the topic  
-Related plan or decision: Link, if any
+- Date: YYYY-MM-DD, with timezone when it matters
+- Type: Investigation / Outcome
+- Topic: Name the topic
+- Related plan or decision: Link, if any
 
 ## Summary
 

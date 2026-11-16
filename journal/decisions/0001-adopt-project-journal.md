@@ -1,10 +1,10 @@
 # D-0001: Separate current guidance, research history, and consequential decisions
 
-Recorded: 2026-11-16  
-Decided by: owner, 2026-11-16; source: “Please copy the journal and decision log concepts from swingset and replicate them here”; placement details adapted by the agent  
-Topic: Documentation  
-Supersedes: —  
-Superseded by: —
+- Recorded: 2026-11-16
+- Decided by: owner, 2026-11-16; source: “Please copy the journal and decision log concepts from swingset and replicate them here”; placement details adapted by the agent
+- Topic: Documentation
+- Supersedes: —
+- Superseded by: —
 
 ## Decision
 

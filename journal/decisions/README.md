@@ -40,9 +40,10 @@ owning chapter; do not use a journal entry to override it silently.
 
 ## Decision index
 
-| ID                                      | Choice                                                                   | Topic         |
-| --------------------------------------- | ------------------------------------------------------------------------ | ------------- |
-| [D-0001](0001-adopt-project-journal.md) | Separate current guidance, research history, and consequential decisions | Documentation |
+| ID                                                  | Choice                                                                   | Topic                |
+| --------------------------------------------------- | ------------------------------------------------------------------------ | -------------------- |
+| [D-0001](0001-adopt-project-journal.md)             | Separate current guidance, research history, and consequential decisions | Documentation        |
+| [D-0002](0002-use-mise-for-tasks-and-formatting.md) | Use pinned mise tooling for tasks and formatting                         | Development workflow |
 
 ## Earlier design rationale
 

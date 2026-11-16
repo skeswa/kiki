@@ -264,9 +264,7 @@ const youLane = computed(() => {
 // outside those groups, adds the same offset to stay glued to the tips.
 const rippleOffset = computed(() => (rippled2.value ? 40 : rippled.value ? 14 : 0));
 
-const youX = computed(() =>
-  Math.min(tipX(laneById[youLane.value]) + rippleOffset.value, 378),
-);
+const youX = computed(() => Math.min(tipX(laneById[youLane.value]) + rippleOffset.value, 378));
 const youY = computed(() => laneById[youLane.value].y);
 const youVisible = computed(() => t.value >= 1.9);
 
@@ -312,8 +310,11 @@ function dotState(branch: (typeof branches)[number]): string {
 
 <template>
   <div class="tow" :class="{ reduced, resetting }">
-    <figure class="tow-fig" role="img"
-      aria-label="Animation, played once, contrasting two ways of working. Without kiki: one lane where auth, billing, and search take turns, separated by costly context switches, with your attention pinned to the lane. With kiki: a revision tree where three threads and a child thread grow in parallel while agents make most of the revisions and a marker labeled you rides the tip of whichever thread it attends — mostly watching, sometimes dropping in a revision of its own (drawn as pale-ringed dots), answering the thread that needs a human, branching a child thread, and closing a finished thread. After one rebase onto the moving main, kiki's cascade carries every following thread forward, and closing the finished auth thread folds its work into main while its child thread auth-ui reroots onto main and keeps going.">
+    <figure
+      class="tow-fig"
+      role="img"
+      aria-label="Animation, played once, contrasting two ways of working. Without kiki: one lane where auth, billing, and search take turns, separated by costly context switches, with your attention pinned to the lane. With kiki: a revision tree where three threads and a child thread grow in parallel while agents make most of the revisions and a marker labeled you rides the tip of whichever thread it attends — mostly watching, sometimes dropping in a revision of its own (drawn as pale-ringed dots), answering the thread that needs a human, branching a child thread, and closing a finished thread. After one rebase onto the moving main, kiki's cascade carries every following thread forward, and closing the finished auth thread folds its work into main while its child thread auth-ui reroots onto main and keeps going."
+    >
       <div class="tow-stack" aria-hidden="true">
         <div class="tow-panel">
           <div class="tow-head">
@@ -321,14 +322,32 @@ function dotState(branch: (typeof branches)[number]): string {
           </div>
           <svg viewBox="0 0 440 84">
             <line class="track" x1="24" y1="56" x2="416" y2="56" />
-            <circle v-for="c in laneCommits" :key="c.x" class="commit lane-commit"
-              :class="{ on: t >= c.at, stale: t >= 10.3 && c.job === 0 }" :cx="c.x" cy="56" r="4.5"
-              :style="{ '--th': jobs[c.job]!.color }" />
-            <text v-for="(job, i) in jobs" :key="job.label" class="job-label" :style="{ '--th': job.color }"
-              :class="{ on: t >= job.at, active: activeJob === i && !switching }" :x="job.x"
-              y="78">{{ job.label }}</text>
-            <g class="agent" :class="{ paused: switching }"
-              :style="{ transform: `translateX(${laneDotX}px)`, '--th': jobs[activeJob]!.color }">
+            <circle
+              v-for="c in laneCommits"
+              :key="c.x"
+              class="commit lane-commit"
+              :class="{ on: t >= c.at, stale: t >= 10.3 && c.job === 0 }"
+              :cx="c.x"
+              cy="56"
+              r="4.5"
+              :style="{ '--th': jobs[c.job]!.color }"
+            />
+            <text
+              v-for="(job, i) in jobs"
+              :key="job.label"
+              class="job-label"
+              :style="{ '--th': job.color }"
+              :class="{ on: t >= job.at, active: activeJob === i && !switching }"
+              :x="job.x"
+              y="78"
+            >
+              {{ job.label }}
+            </text>
+            <g
+              class="agent"
+              :class="{ paused: switching }"
+              :style="{ transform: `translateX(${laneDotX}px)`, '--th': jobs[activeJob]!.color }"
+            >
               <circle cx="0" cy="56" r="5.5" />
               <g class="you pinned">
                 <rect x="-18" y="16" width="36" height="18" />
@@ -345,64 +364,171 @@ function dotState(branch: (typeof branches)[number]): string {
             <span class="tow-tag green">with kiki</span>
           </div>
           <svg viewBox="0 0 440 230">
-            <line class="track trunk-line" x1="24" y1="196" x2="292" y2="196" :class="{ on: t >= 0.1 }" />
-            <line class="track trunk-line seg2" x1="292" y1="196" x2="416" y2="196" :class="{ on: t >= 9.7 }" />
-            <text class="lane-label trunk-label" x="24" y="216" :class="{ on: t >= 0.4 }">main</text>
+            <line
+              class="track trunk-line"
+              x1="24"
+              y1="196"
+              x2="292"
+              y2="196"
+              :class="{ on: t >= 0.1 }"
+            />
+            <line
+              class="track trunk-line seg2"
+              x1="292"
+              y1="196"
+              x2="416"
+              y2="196"
+              :class="{ on: t >= 9.7 }"
+            />
+            <text class="lane-label trunk-label" x="24" y="216" :class="{ on: t >= 0.4 }">
+              main
+            </text>
             <!-- auth's base dot rides the cascade but sits out the close
                  shift: it fills into the merge commit and stays leftmost on
                  main while the surviving branch points move past it. -->
             <g class="branch" :class="{ rippled }">
-              <circle class="commit trunk-commit" :class="{ on: t >= 0.3, merge: mergeLanded }" cx="60" cy="196"
-                r="4.5" />
+              <circle
+                class="commit trunk-commit"
+                :class="{ on: t >= 0.3, merge: mergeLanded }"
+                cx="60"
+                cy="196"
+                r="4.5"
+              />
               <circle class="merge-pulse" :class="{ on: mergeLanded }" cx="60" cy="196" r="9" />
               <text class="merged-label" :class="{ on: authFolded }" x="60" y="182">auth ✓</text>
             </g>
             <!-- Each base dot shifts on the same stagger as its branch, so the
                  pair stays glued mid-transition, not just at rest. -->
-            <g v-for="(c, i) in baseTrunkCommits" :key="c.x" class="branch" :class="{ rippled, rippled2 }"
-              :style="{ transitionDelay: rippled ? `${(i + 1) * 0.12}s` : '0s' }">
-              <circle class="commit trunk-commit" :class="{ on: t >= c.at }" :cx="c.x" cy="196" r="4.5" />
+            <g
+              v-for="(c, i) in baseTrunkCommits"
+              :key="c.x"
+              class="branch"
+              :class="{ rippled, rippled2 }"
+              :style="{ transitionDelay: rippled ? `${(i + 1) * 0.12}s` : '0s' }"
+            >
+              <circle
+                class="commit trunk-commit"
+                :class="{ on: t >= c.at }"
+                :cx="c.x"
+                cy="196"
+                r="4.5"
+              />
             </g>
-            <circle v-for="c in trunkCommits" :key="c.x" class="commit trunk-commit" :class="{ on: t >= c.at }"
-              :cx="c.x" cy="196" r="4.5" />
+            <circle
+              v-for="c in trunkCommits"
+              :key="c.x"
+              class="commit trunk-commit"
+              :class="{ on: t >= c.at }"
+              :cx="c.x"
+              cy="196"
+              r="4.5"
+            />
 
             <!-- auth's group sits out the close-time shift with its base dot:
                  its connector must stay glued to the merge commit it now
                  springs from, and auth-ui repositions within the group. -->
-            <g v-for="(b, i) in branches" :key="b.id" class="branch"
+            <g
+              v-for="(b, i) in branches"
+              :key="b.id"
+              class="branch"
               :class="{ rippled, rippled2: rippled2 && b.id !== 'auth' }"
-              :style="{ transitionDelay: rippled ? `${i * 0.12}s` : '0s', '--th': b.color }">
-              <path class="wire" :class="{ on: t >= b.at, glow }" :d="b.connector" pathLength="100" />
+              :style="{ transitionDelay: rippled ? `${i * 0.12}s` : '0s', '--th': b.color }"
+            >
+              <path
+                class="wire"
+                :class="{ on: t >= b.at, glow }"
+                :d="b.connector"
+                pathLength="100"
+              />
               <g class="row" :class="{ folding: b.id === 'auth' && authClosed }">
-                <line class="lane" :class="{ on: t >= b.at + WIRE_DRAW, glow }" :x1="b.start" :y1="b.y"
-                  :x2="LANE_END" :y2="b.y" vector-effect="non-scaling-stroke"
-                  :style="{ transform: `scaleX(${laneScale(b)})`, transformOrigin: `${b.start}px ${b.y}px` }" />
-                <text class="lane-label" :x="b.labelX" :y="b.y - 10" :class="{ on: t >= b.at + 0.9 }">{{ b.id }}</text>
-                <circle v-for="c in b.commits" :key="c.x" class="commit" :class="{ on: t >= c.at, mine: c.you }"
-                  :cx="c.x" :cy="b.y" r="4.5" />
-                <g class="agent" :data-state="dotState(b)" :style="{ transform: `translateX(${tipX(b)}px)` }">
+                <line
+                  class="lane"
+                  :class="{ on: t >= b.at + WIRE_DRAW, glow }"
+                  :x1="b.start"
+                  :y1="b.y"
+                  :x2="LANE_END"
+                  :y2="b.y"
+                  vector-effect="non-scaling-stroke"
+                  :style="{
+                    transform: `scaleX(${laneScale(b)})`,
+                    transformOrigin: `${b.start}px ${b.y}px`,
+                  }"
+                />
+                <text
+                  class="lane-label"
+                  :x="b.labelX"
+                  :y="b.y - 10"
+                  :class="{ on: t >= b.at + 0.9 }"
+                >
+                  {{ b.id }}
+                </text>
+                <circle
+                  v-for="c in b.commits"
+                  :key="c.x"
+                  class="commit"
+                  :class="{ on: t >= c.at, mine: c.you }"
+                  :cx="c.x"
+                  :cy="b.y"
+                  r="4.5"
+                />
+                <g
+                  class="agent"
+                  :data-state="dotState(b)"
+                  :style="{ transform: `translateX(${tipX(b)}px)` }"
+                >
                   <circle cx="0" :cy="b.y" r="5.5" />
                   <circle class="halo" cx="0" :cy="b.y" r="10" />
                 </g>
               </g>
-              <g class="needs-you" v-if="b.id === 'search'" :class="{ on: searchBlocked }"
-                :style="{ transform: `translateX(${tipX(b)}px)` }">
+              <g
+                class="needs-you"
+                v-if="b.id === 'search'"
+                :class="{ on: searchBlocked }"
+                :style="{ transform: `translateX(${tipX(b)}px)` }"
+              >
                 <rect x="-96" :y="b.y - 34" width="76" height="20" />
                 <text x="-58" :y="b.y - 20">needs you</text>
               </g>
 
               <template v-if="b.id === 'auth'">
-                <path class="wire child-wire" :class="{ on: t >= child.at, glow, gone: authClosed }"
-                  :style="{ '--th': child.color }" :d="child.connector" pathLength="100" />
+                <path
+                  class="wire child-wire"
+                  :class="{ on: t >= child.at, glow, gone: authClosed }"
+                  :style="{ '--th': child.color }"
+                  :d="child.connector"
+                  pathLength="100"
+                />
                 <g class="authui" :class="{ dropped: authClosed }" :style="{ '--th': child.color }">
-                  <line class="lane" :class="{ on: t >= child.at + WIRE_DRAW, glow }" :x1="child.start" :y1="child.y"
-                    :x2="LANE_END" :y2="child.y" vector-effect="non-scaling-stroke"
-                    :style="{ transform: `scaleX(${laneScale(child)})`, transformOrigin: `${child.start}px ${child.y}px` }" />
-                  <text class="lane-label" x="304" y="16" :class="{ on: t >= child.at + 0.9 }">auth-ui</text>
-                  <circle v-for="c in child.commits" :key="c.x" class="commit"
-                    :class="{ on: t >= c.at, mine: c.you }" :cx="c.x" :cy="child.y" r="4.5" />
-                  <g class="agent" :data-state="t >= child.at + WIRE_DRAW ? 'working' : 'off'"
-                    :style="{ transform: `translateX(${tipX(child)}px)` }">
+                  <line
+                    class="lane"
+                    :class="{ on: t >= child.at + WIRE_DRAW, glow }"
+                    :x1="child.start"
+                    :y1="child.y"
+                    :x2="LANE_END"
+                    :y2="child.y"
+                    vector-effect="non-scaling-stroke"
+                    :style="{
+                      transform: `scaleX(${laneScale(child)})`,
+                      transformOrigin: `${child.start}px ${child.y}px`,
+                    }"
+                  />
+                  <text class="lane-label" x="304" y="16" :class="{ on: t >= child.at + 0.9 }">
+                    auth-ui
+                  </text>
+                  <circle
+                    v-for="c in child.commits"
+                    :key="c.x"
+                    class="commit"
+                    :class="{ on: t >= c.at, mine: c.you }"
+                    :cx="c.x"
+                    :cy="child.y"
+                    r="4.5"
+                  />
+                  <g
+                    class="agent"
+                    :data-state="t >= child.at + WIRE_DRAW ? 'working' : 'off'"
+                    :style="{ transform: `translateX(${tipX(child)}px)` }"
+                  >
                     <circle cx="0" :cy="child.y" r="5.5" />
                     <circle class="halo" cx="0" :cy="child.y" r="10" />
                   </g>
@@ -410,8 +536,11 @@ function dotState(branch: (typeof branches)[number]): string {
               </template>
             </g>
 
-            <g class="you roaming" :class="{ on: youVisible }"
-              :style="{ transform: `translate(${youX}px, ${youY}px)` }">
+            <g
+              class="you roaming"
+              :class="{ on: youVisible }"
+              :style="{ transform: `translate(${youX}px, ${youY}px)` }"
+            >
               <path d="M12,0 L19,-4.5 L19,4.5 Z" />
               <rect x="21" y="-9" width="32" height="18" />
               <text x="37" y="4">you</text>
@@ -422,8 +551,14 @@ function dotState(branch: (typeof branches)[number]): string {
         </div>
       </div>
     </figure>
-    <button v-if="!reduced" class="tow-replay" :class="{ on: done }" type="button"
-      aria-label="Replay the animation" @click="replay">
+    <button
+      v-if="!reduced"
+      class="tow-replay"
+      :class="{ on: done }"
+      type="button"
+      aria-label="Replay the animation"
+      @click="replay"
+    >
       ↻ replay
     </button>
   </div>

@@ -2,11 +2,11 @@
 
 kiki is a Cargo workspace with four crates. The split exists so the gRPC service surface is a real seam: `kkd` is the only privileged process, and every UI is a client of the same protocol.
 
-| Crate       | Kind    | Responsibility                                                                  |
-| ----------- | ------- | ------------------------------------------------------------------------------- |
-| `kiki-core` | library | shared types, traits, generated proto types, sqlite migrations. No I/O.         |
-| `kkd`       | binary  | the daemon. Owns all state and behavior. gRPC server.                           |
-| `kk`        | binary  | the CLI. Hosts the TUI as a subcommand. Pure client of the gRPC service.        |
+| Crate       | Kind    | Responsibility                                                                                                        |
+| ----------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| `kiki-core` | library | shared types, traits, generated proto types, sqlite migrations. No I/O.                                               |
+| `kkd`       | binary  | the daemon. Owns all state and behavior. gRPC server.                                                                 |
+| `kk`        | binary  | the CLI. Hosts the TUI as a subcommand. Pure client of the gRPC service.                                              |
 | `kk-hook`   | binary  | the pre-tool sidecar invoked by the managed harness's hooks (Claude Code and Codex). Pure client of the gRPC service. |
 
 ## Why four crates

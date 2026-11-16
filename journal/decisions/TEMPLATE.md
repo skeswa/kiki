@@ -1,10 +1,10 @@
 # D-NNNN: State the choice in plain language
 
-Recorded: YYYY-MM-DD  
-Decided by: owner or agent, YYYY-MM-DD; source: the instruction or reasoning that decided it  
-Topic: Name the topic  
-Supersedes: —  
-Superseded by: —
+- Recorded: YYYY-MM-DD
+- Decided by: owner or agent, YYYY-MM-DD; source: the instruction or reasoning that decided it
+- Topic: Name the topic
+- Supersedes: —
+- Superseded by: —
 
 ## Decision
 

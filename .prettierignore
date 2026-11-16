@@ -1,0 +1,10 @@
+# Oxfmt reads this alongside .gitignore. Retained captures keep their bytes.
+bun.lock
+mise.lock
+**/fixtures/**
+docs/public/research/**
+docs/research/**
+journal/evidence/**
+
+# Taplo owns TOML; running two formatters over it produces competing styles.
+**/*.toml

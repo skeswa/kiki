@@ -47,12 +47,21 @@ Read the spec and [open an issue](https://github.com/skeswa/kiki/issues) if a de
 The reference book is also a VitePress site. The site deploys to GitHub Pages from `main`, while pull requests run the same strict docs and production-build checks without deploying.
 
 ```sh
-bun run docs:dev      # local development server
-bun run docs:check    # links, contract terms, and production build
-bun run docs:preview  # preview the last production build
+mise install         # install the pinned tooling
+mise run setup       # install locked documentation dependencies
+mise run dev         # local documentation server
+mise run fmt         # format handwritten code and docs
+mise run check       # formatting, links, contract terms, and production build
+mise run preview     # preview the last production build
 ```
 
 GitHub Pages must use **GitHub Actions** as its publishing source. The project-pages base path defaults to `/kiki/`; set `VITEPRESS_BASE` and `VITEPRESS_SITE_URL` when moving to a custom domain.
+
+Tasks live in [mise.toml](mise.toml); `mise tasks` lists them. The existing Bun
+scripts delegate to those tasks. Formatting uses pinned Oxfmt and Taplo and
+works before installing the site's dependencies. Captured evidence and the
+dated research reports are excluded from automatic formatting. See
+[AGENTS.md](AGENTS.md) for the contributor workflow.
 
 ## License
 

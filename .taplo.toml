@@ -1,0 +1,12 @@
+include = ["**/*.toml"]
+exclude = [
+  ".git/**",
+  ".jj/**",
+  "node_modules/**",
+  "docs/.vitepress/cache/**",
+  "docs/.vitepress/dist/**",
+  "docs/public/research/**",
+  "docs/research/**",
+  "journal/evidence/**",
+  "**/fixtures/**",
+]

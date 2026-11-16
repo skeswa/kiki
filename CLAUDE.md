@@ -31,14 +31,19 @@ The architecture decision is **Rust** for `kkd` and friends (`docs/reference/boo
 ## Common commands
 
 ```bash
-mise install         # provision Bun (only tool pinned today)
-bun install          # install deps
-bun run index.ts     # run the placeholder entrypoint
-bun run fmt          # format with oxfmt (per package.json's "fmt" script)
-bun run check:docs   # validate local Markdown links, anchors, and stale contract terms
+mise install         # install pinned tools
+mise run setup       # install locked documentation dependencies
+mise run dev         # serve the documentation site
+mise run fmt         # format handwritten files with pinned Oxfmt and Taplo
+mise run fmt:check   # check formatting without writes
+mise run docs:links  # validate local Markdown links, anchors, and contract terms
+mise run check       # all current checks, including the production docs build
 ```
 
-There is no implementation test runner, linter, or build step configured yet; the project is pre-skeleton. Do not invent commands that aren't in `package.json`.
+`mise.toml` is the authority for scripts and tasks; `package.json` contains
+compatibility aliases. Follow the formatting and evidence-preservation rules
+in [AGENTS.md](AGENTS.md#formatting). There is no application test runner,
+linter, or application build yet; add those tasks when implementation starts.
 
 ## VCS
 

@@ -1,4 +1,1 @@
-{
-  "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["docs/public/research/**", "journal/evidence/**"]
-}
+{}
