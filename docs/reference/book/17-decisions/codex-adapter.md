@@ -85,6 +85,8 @@ Three supporting properties are version proofs:
 - the generated config pins the hook timeout above the slow path's bound; and
 - the session record durably contains deny results, so receipts exist to be read.
 
+Note added 2026-11-16: the first property is now worded differently. There is no separate "hook launcher" process. [`kk-hook`](../appendix-a-glossary.md#kk-hook) is a stateless one-call client, and `kkd` owns the cache of batch decisions. Once `kkd` has admitted a call into a reconciliation, a timeout or an owner crash is answered with a generic blocking deny, never with continue. The generated config pins the harness-side hook timeout above `[timeouts] slow_path` plus a margin. See [Harness adapter](../13-architecture/harness-adapter.md).
+
 ### Identity
 
 Identity needed the same care. Codex's `turn_id` scopes the whole agentic loop for one user input, and many sequential model steps share it. So it cannot serve as the protocol's `model_turn_id`. Two consecutive tool calls with one `turn_id` are separated by a model step that consumed the first call's result. Keying acknowledgement on `turn_id` would postpone it until the next user prompt.

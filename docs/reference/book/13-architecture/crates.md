@@ -6,10 +6,10 @@ The split exists so the [gRPC](https://grpc.io/) service surface is a real seam.
 
 | Crate       | Kind    | Responsibility                                                                                                                                                                                                                                                         |
 | ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `kiki-core` | library | Shared types, traits, generated proto types, and sqlite migrations. No I/O (it reads and writes nothing itself).                                                                                                                                                       |
+| `kiki-core` | library | Shared types, traits, generated proto types, the sqlite migration SQL, and a migration runner that works on a connection passed in. It opens no file, socket, or process itself.                                                                                       |
 | `kkd`       | binary  | The [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>), kiki's background program. Owns all state and behavior. gRPC server.                                                                                                                                 |
 | `kk`        | binary  | The CLI (command-line program). Hosts the TUI and the [pane launcher](../appendix-a-glossary.md#pane-launcher) as subcommands. Pure client of the gRPC service. Also a Herdr client for [caller-local focus](../appendix-a-glossary.md#caller-local-focus) and attach. |
-| `kk-hook`   | binary  | The pre-tool sidecar that the managed [harness](../appendix-a-glossary.md#harness)'s hooks invoke (Claude Code and Codex), and its per-thread [hook launcher](../appendix-a-glossary.md#hook-launcher). Pure client of the gRPC service.                               |
+| `kk-hook`   | binary  | The hook sidecar that the managed [harness](../appendix-a-glossary.md#harness)'s hooks invoke (Claude Code and Codex). A stateless client of the gRPC service: each run makes one call and exits.                                                                      |
 
 Some terms from the table:
 
@@ -22,14 +22,22 @@ Some terms from the table:
 
 ## Why four crates
 
-**`kiki-core`** is a pure library with no I/O. This lets `kkd` and the clients share types and [traits](https://doc.rust-lang.org/book/ch10-02-traits.html) without dragging in tokio/tonic runtime concerns. (tokio and [tonic](https://github.com/hyperium/tonic) are the Rust libraries that run the networking.)
+**`kiki-core`** is a library that opens nothing itself: no file, no socket, no database, and no other program. This lets `kkd` and the clients share types and [traits](https://doc.rust-lang.org/book/ch10-02-traits.html) without dragging in tokio/tonic runtime concerns. (tokio and [tonic](https://github.com/hyperium/tonic) are the Rust libraries that run the networking.)
+
+- `kiki-core` holds the migration SQL and a migration runner. The runner works on a database connection that the caller passes in.
+- `kkd` opens the database and hands the connection to the runner. `kiki-core` never opens it.
 
 **`kkd`** is the only crate that does any of these:
 
 - opens sqlite;
-- shells out to `jj` or `gh` (runs them as separate programs);
+- shells out to `jj` or `gh` (runs them as separate programs), with the two exceptions listed below;
 - starts the [dedicated Herdr server](../appendix-a-glossary.md#dedicated-herdr-server) with the `herdr` executable;
 - drives that server's JSON socket to provision (set up), observe, and close [terminal groups](../appendix-a-glossary.md#terminal-group).
+
+**The exceptions, both in `kk`.** These are the only places outside `kkd` that start another program or read a kiki secret from disk:
+
+- **The `kk status` passthrough.** When a human runs `kk status`, `kk` runs `jj` itself in the caller's terminal and passes its output through. An agent or `kkd` never takes this path.
+- **The pane launcher.** It spawns the harness, or replaces itself with the user's shell or the kiki UI process. It also reads the thread's credential file. It runs only what `kkd` computed.
 
 **`kk` and `kk-hook`** are both clients of the same gRPC contract. There is no privileged internal API.
 
@@ -62,17 +70,16 @@ The `shell` and `ui` launchers are released by their role-claim transaction. The
 
 The pane launcher never signals a harness. Termination goes through `ProcessSupervisor` by recorded identity. See [Terminal runtime](terminal-runtime.md#provisioning).
 
-### The hook launcher
+### `kk-hook` keeps no state
 
-The hook launcher is a different process and ships in the `kk-hook` crate. It is the per-thread, hook-side process described in [Harness adapter](harness-adapter.md#hook). It does two things:
+`kk-hook` is a stateless one-call client. The harness starts it for one hook event. It makes one gRPC call, prints the answer, and exits. See [Harness adapter](harness-adapter.md#hook).
 
-- It caches each [tool batch](../appendix-a-glossary.md#tool-batch)'s first admission decision.
-- It answers with a blocking deny for a dead sidecar under an active barrier.
+- There is no separate hook-side process that stays running between calls.
+- The one file it reads besides its credential is the thread's [barrier marker](../appendix-a-glossary.md#barrier-marker). It checks whether that file exists only when it cannot connect to `kkd` and be admitted in time. It never writes it.
+- `kkd` owns the cache of each [tool batch](../appendix-a-glossary.md#tool-batch)'s first admission decision. The cache lives in `kkd`'s memory, keyed by incarnation and batch.
+- `kkd`, not the hook, performs a [hard pause](../appendix-a-glossary.md#hard-pause) and starts a replacement incarnation.
 
-A note on names in this book:
-
-- "The launcher" without a qualifier, in a terminal context, means the pane launcher.
-- The hook-side process is always written "hook launcher".
+So "the launcher" in this book always means the pane launcher.
 
 ### Future clients
 
@@ -87,10 +94,17 @@ A future native or web UI joins as a fifth client of the same surface.
 
 The components:
 
+- **`ThreadLifecycleSaga`** runs one lifecycle operation for a thread: creation, close, reopen, terminal restart, or a repair plan.
+  - It journals each step before it acts, so it can recover after a crash. See [saga](../appendix-a-glossary.md#saga).
+  - It holds the thread's [lifecycle lock](../appendix-a-glossary.md#lifecycle-lock) for the length of the operation.
+  - A `ThreadController` supervises it.
 - **`OpLogWatcher`** watches jj's [operation log](https://docs.jj-vcs.dev/latest/operation-log/), its record of every change to the repository.
-  - It watches the resolved main-repo `op_heads/heads/` store through [`OpFrontierSampler`](../appendix-a-glossary.md#frontier-sampler), plus periodic sampling.
+  - It watches the resolved main-repo `op_heads/heads/` store through `OpFrontierSampler`, plus periodic sampling.
   - It populates normalized operation nodes, parent edges, workspace projections, and the observed frontier.
   - See [`op-log-watcher.md`](op-log-watcher.md).
+- **`OpFrontierSampler`** reads the current set of operation heads from jj's operation store. See [frontier sampler](../appendix-a-glossary.md#frontier-sampler). It is a trait with a real adapter and a fake.
+- **`OpAttribution`** records which jj operations kiki itself wrote, and answers "did kiki make this operation?". See [Op attribution](daemon.md#op-attribution).
+- **`AncestryQuery`** answers ancestry questions about commits at one exact operation. One example: "is this commit on the thread's owned chain?". It reads through `JjBackend` and does no writing.
 - **`CascadeOrchestrator`** runs the [cascade](../appendix-a-glossary.md#cascade-reconciliation).
   - It holds a per-thread [reconciliation lock](../appendix-a-glossary.md#reconciliation-lock).
   - It classifies native rewrite versus parent advance.
@@ -119,11 +133,41 @@ The components:
 - **`AuthEnforcer` + approval broker** check who may do what.
   - `ThreadScoped` checks cover ordinary work.
   - Consequential operations use persisted begin/display/confirm challenges and a one-shot plan-bound `HumanApproval`. (See [human approval](../appendix-a-glossary.md#human-approval).)
-  - Admin is used only for bootstrap or foreground-presenter enrollment.
+  - Admin is used only for bootstrap, for foreground-presenter enrollment, and to begin the approvals for `kk init` and first run. It also diagnoses and begins the approval of the user-scoped `replace-terminal-server` plan.
 - **`ThreadTranscriptStore`** (v1.x) covers the JSONL tail, projection, FTS5 read API, and [provider-egress consent](../appendix-a-glossary.md#provider-egress-consent) state. ([JSONL](https://jsonlines.org/) is one JSON record per line. [FTS5](https://www.sqlite.org/fts5.html) is SQLite's full-text search.)
-- **`JjBackend`** is how `kkd` talks to jj.
+- **`JjBackend`** is how `kkd` talks to jj. It is the one module that runs `jj` for `kkd`.
   - The v1 `JjCli` implementation shells out to `jj` and parses structured template output.
   - A later `JjLib` implementation can swap in behind the same trait.
+  - Every unpinned working-copy command and every integration of operation heads runs under the per-repo [repo jj lock](../appendix-a-glossary.md#repo-jj-lock).
+
+### Where each named module lives
+
+Tests and build stages name these modules. Each has one home crate.
+
+| Module                                                       | Home crate                                     | What it is                                                                                                                                                                                                                              |
+| ------------------------------------------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AncestryQuery`                                              | `kkd`                                          | Answers ancestry questions about commits at one exact operation, such as owned-chain membership.                                                                                                                                        |
+| `OpAttribution`                                              | `kkd`                                          | Records and looks up the jj operations that kiki itself wrote.                                                                                                                                                                          |
+| `OpFrontierSampler`                                          | trait in `kiki-core`; real adapter in `kkd`    | Reads the current operation heads from jj's operation store.                                                                                                                                                                            |
+| `ThreadLifecycleSaga`                                        | `kkd`                                          | Runs one journaled lifecycle operation for a thread.                                                                                                                                                                                    |
+| `JjBackend`                                                  | trait in `kiki-core`; `JjCli` adapter in `kkd` | The only path by which `kkd` runs `jj`.                                                                                                                                                                                                 |
+| `PaneLifecycle`                                              | `kkd`                                          | Tracks the `shell` and `ui` [role panes](../appendix-a-glossary.md#role-pane): claim, absence, and the end of the claiming process (v1.x).                                                                                              |
+| `UiPaneController`                                           | `kk`                                           | Drives the Stack tree shown in the optional [`ui` role pane](../appendix-a-glossary.md#ui-role-pane) (v1.x).                                                                                                                            |
+| [`LogRenderer`](../appendix-a-glossary.md#logrenderer)       | `kiki-core`                                    | Turns thread summaries into the stack-aware `kk log` view. Pure: data in, text out.                                                                                                                                                     |
+| [`StatusRenderer`](../appendix-a-glossary.md#statusrenderer) | `kiki-core`                                    | Turns thread state into the `kk status` and status-line text. Pure: data in, text out.                                                                                                                                                  |
+| `RunningAgent`                                               | `kkd`                                          | The handle to one live harness incarnation. It is not a `kiki-core` type, because it needs the database and `ProcessSupervisor`.                                                                                                        |
+| `Harness`                                                    | trait in `kiki-core`; adapters in `kkd`        | Describes one harness. Besides the launch specification, it maps harness events to turn and batch identity, audits hook exclusivity, looks up delivery receipts, and supplies status inputs. See [Harness adapter](harness-adapter.md). |
+
+### Fakes
+
+Each trait below has an in-process fake as its second adapter. A [fake](../appendix-a-glossary.md#fake) is a stand-in that acts like the real dependency but runs inside the test.
+
+- `TerminalRuntime`, `TerminalClient`, and `ProcessSupervisor`
+- `JjBackend`
+- `OpFrontierSampler`
+- `Harness`
+
+[Testing](../14-testing.md#fakes) lists what each fake must be able to do.
 
 This split has two benefits:
 

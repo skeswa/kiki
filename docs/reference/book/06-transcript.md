@@ -169,7 +169,7 @@ An MCP transcript result travels over local IPC ([inter-process communication](h
 
 ## Provider-egress consent
 
-[Provider-egress consent](appendix-a-glossary.md#provider-egress-consent) is the human's recorded permission to send transcript text to one model provider for one purpose. This section says what each record contains and how narrowly it applies.
+[Provider-egress consent](appendix-a-glossary.md#provider-egress-consent) is the human's recorded permission to send one thread's transcript text to one model provider for one purpose. This section says what each record contains and how narrowly it applies.
 
 Provider-egress consent is a privacy policy record. It is not a `HumanApproval` (see [human approval](appendix-a-glossary.md#human-approval)) and not configuration. Each durable record binds:
 

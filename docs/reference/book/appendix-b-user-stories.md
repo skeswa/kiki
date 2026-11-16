@@ -32,7 +32,9 @@ Each story is one short sentence. The bullets under a story are part of that sto
    - The thread has its own [jj workspace](appendix-a-glossary.md#workspace) (its own copy of the files).
    - It has its own [terminal group](appendix-a-glossary.md#terminal-group) (its own set of terminal panes).
    - It has its own managed agent, which is [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) by default.
-9. As a developer, I want `kk new` (no name) to derive a placeholder name from my initial prompt, so that I do not have to commit to a name upfront.
+9. As a developer, I want `kk new` (no name) to derive a placeholder name from my initial prompt, so that I do not have to commit to a name upfront. (v1.x.)
+   - The name argument of `kk new [<name>]` is optional. In the acceptance slice, a thread created with a prompt and no name is called `unnamed-<short-hex>`.
+   - Deriving the name from the prompt is the v1.x part.
 10. As a developer, I want `kk new <name> --follows <parent>` to create a child thread coupled to a parent, so that I can stack work on top of a work-in-progress feature.
     - This coupling is the [follows](appendix-a-glossary.md#follows) link.
 11. As a developer, I want `kk new <name> --no-follow` to create a snapshot fork, so that I can branch off the current state without inheriting future changes.
@@ -73,10 +75,11 @@ Each story is one short sentence. The bullets under a story are part of that sto
     15c. As a developer, I want a `kk switch` that has no identifiable viewer to move no one and say so, so that automation cannot yank my view.
     - Examples: a `kk switch` run by an agent, a script, or a pane nobody is looking at.
 
-16. As a developer, I want a Herdr keybinding that opens the kk [overlay](appendix-a-glossary.md#overlay-tui) as a popup, so that I never have to leave my current view.
+16. As a developer, I want a Herdr keybinding that opens the kk [overlay](appendix-a-glossary.md#overlay-tui) as a popup, so that I never have to leave my current view. (v1.x, with the overlay.)
     - Kiki generates the keybinding in its own Herdr configuration.
     - The overlay is for fast switching and spawning.
-17. As a developer, I want `kk` with no arguments to open the interactive [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface) (text-based user interface), so that I can browse and act on threads visually.
+17. As a developer, I want `kk` with no arguments to open the interactive [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface) (text-based user interface), so that I can browse and act on threads visually. (v1.x.)
+    - Until the overlay ships, and whenever no overlay is available, bare `kk` prints the `kk ls` listing.
 18. As a developer, I want `kk ls` to list active and repair-relevant operational threads, so that creating, failed, closing, or projection-diverged work cannot disappear from the default view.
     - Each row carries a [lifecycle](appendix-a-glossary.md#thread-lifecycle-states) label.
     - The labels remain distinct without color.
@@ -119,6 +122,8 @@ A cascade is how a change in a parent [thread](appendix-a-glossary.md#thread) re
       2. surface any parent transition that watcher lag had not recorded yet;
       3. checkpoint my exact child head;
       4. only then break the live-follow link.
+    - `kk thread detach [<thread>]` acts on the contextual thread when no target is given.
+    - Pending parent work is discarded only with `--discard-pending`, which needs approval.
     - This is the v1 graph-surgery escape hatch. `kk thread attach` and `kk thread reparent` are out of v1.
 29. As a developer, I want `kk thread attach <child> --to <parent>` to re-establish a follows link, so that I can resume live coupling after a turbulent moment. (Out of v1.)
 30. As a developer, I want `kk thread reparent <child> --onto <new-parent>` to move a thread under a different parent, so that I can correct stack relationships when I realize the topology was wrong. (Out of v1.)
@@ -135,7 +140,8 @@ A cascade is how a change in a parent [thread](appendix-a-glossary.md#thread) re
       - ambiguous topology;
       - an unprovable [delivery barrier](appendix-a-glossary.md#delivery-barrier);
       - my explicit v1.x `kk thread interrupt`.
-34. As a developer, I want `kk thread interrupt <thread>` as the explicit human escape hatch to hard-stop and re-frame an agent, so that I can rescue a stuck or off-track thread. (v1.x.)
+34. As a developer, I want `kk thread interrupt [<thread>]` as the explicit human escape hatch to hard-stop and re-frame an agent, so that I can rescue a stuck or off-track thread. (v1.x.)
+    - Without a target, it acts on the contextual thread.
 
     34a. As a developer, I want kiki to block every tool call in a dispatched [tool batch](appendix-a-glossary.md#tool-batch) when one call triggers reconciliation, so that a sibling call from the same batch cannot observe new files before the agent receives the explanation.
     - Kiki acknowledges delivery only after that batch closes and a later [model turn](appendix-a-glossary.md#model-turn) begins.
@@ -153,7 +159,7 @@ Kiki is an [ambient coordinator](appendix-a-glossary.md#ambient-coordinator): it
     - An "op" is a jj [operation](https://docs.jj-vcs.dev/latest/operation-log/): one recorded change to the repository.
 36. As a developer, I want kk to detect when an agent invokes `jj` via Bash and react identically to a human invocation, so that the abstraction does not leak.
 37. As a developer, I want kk to tell two external events on a parent apart, so that neither event silently changes my follows base.
-    - Deletion or movement of a parent's checkpoint [bookmark](appendix-a-glossary.md#bookmark) is bookmark drift. It enters [projection](appendix-a-glossary.md#projection-divergence) repair.
+    - Deletion or movement of a parent's checkpoint [bookmark](appendix-a-glossary.md#bookmark) is bookmark drift. It enters [projection](appendix-a-glossary.md#projection-divergence) repair, where `kk repair` offers the bookmark plans named in story 40a.
     - External `jj abandon` of the parent's [live head](appendix-a-glossary.md#live-head) or owned revisions is ancestry destruction. It stops as [topology divergence](appendix-a-glossary.md#topologydiverged).
 38. As a developer, I want kk to never re-react to its own jj ops (op-attribution dedupe), so that the system cannot fall into self-triggered loops.
 39. As a developer, I want kk to follow jj's operation history in three specific ways, so that op storms stay quiet without losing a branch of the operation DAG.
@@ -172,15 +178,23 @@ Kiki is an [ambient coordinator](appendix-a-glossary.md#ambient-coordinator): it
       - missing [terminal groups](appendix-a-glossary.md#terminal-group) or agents;
       - orphaned processes.
     - It repairs only provably unambiguous cases automatically.
-    - Otherwise it guides me through `kk repair`.
+    - Otherwise it guides me through `kk repair`, which names one plan per problem.
+    - For a bookmark problem there are four plans:
+      - [`restore-bookmark`](appendix-a-glossary.md#restore-bookmark) puts the bookmark back on the target kiki expects. It needs no approval in the thread's own context, and it is offered only while that target is visible.
+      - [`adopt-bookmark`](appendix-a-glossary.md#adopt-bookmark) accepts where the bookmark was moved to, when that commit is my live head or on my thread's own chain.
+      - [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target) lets me pick the live head or a commit on my thread's own chain. It is the way out whenever the expected target is hidden.
+      - [`unhide-checkpoint`](appendix-a-glossary.md#unhide-checkpoint) makes an abandoned checkpoint commit visible again.
+    - The last three need a one-shot approval. Kiki never places the bookmark on a commit outside my thread's own chain.
+    - If jj's operation history itself was rewritten, the repo-level [`reanchor-history`](appendix-a-glossary.md#reanchor-history) plan (`kk repair --repo`) re-anchors every affected thread under one approval.
+    - For a workspace problem the plans are [`recreate-workspace`](appendix-a-glossary.md#recreate-workspace) (the directory is missing), [`reattach-workspace`](appendix-a-glossary.md#reattach-workspace) (jj's workspace record is missing), and [`repoint-workspace`](appendix-a-glossary.md#repoint-workspace) (the path does not match).
     - It continues safe live-head observation when the workspace itself is still uniquely identified.
 
     40b. As a developer, I want kiki to look for leftover processes before it starts a replacement agent, so that two writers never share a workspace.
     - It looks for processes it recorded that outlived their pane, terminal group, or terminal server.
     - It looks for tool processes that a dead harness left under its launcher.
-    - It blocks the replacement while one survives.
-    - It offers an approved terminate-and-verify of exactly those recorded processes, or it leaves the thread blocked.
-    - Such a process is an [orphan](appendix-a-glossary.md#orphan).
+    - Such a process is an [orphan](appendix-a-glossary.md#orphan), and the issue it raises is [`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess).
+    - While one survives, kiki blocks replacement, materialization, and deletion for that thread.
+    - It offers the [`terminate-orphans`](appendix-a-glossary.md#terminate-orphans) plan, which terminates exactly those processes with verified exit under a one-shot approval. Otherwise it leaves the thread blocked.
 
     40c. As a developer, I want a process kiki did not start that merely holds my workspace never to block my active thread, so that kiki never signals a stranger's process on a guess and never deletes under one unknowingly.
     - An editor is an example of such a [holder](appendix-a-glossary.md#holder).
@@ -264,9 +278,9 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
     - No thread is reported Active.
     - No restored container is ever reused.
     - Each affected thread shows [`TerminalMissing`](appendix-a-glossary.md#terminalmissing) until I run `kk repair`.
-    - `kk repair` does one of two things:
-      - it restarts the agent in a fresh terminal group with a fresh credential, launch settings, gate, and ready handshake; or
-      - it closes the thread without one.
+    - `kk repair` offers two plans:
+      - [`restart-terminal`](appendix-a-glossary.md#restart-terminal) restarts the agent in a fresh terminal group with a fresh credential, launch settings, gate, and ready handshake; or
+      - [`close-without-terminal`](appendix-a-glossary.md#close-without-terminal) closes the thread without one.
     - In both cases it lists and closes the restored shells itself under my approval. It does not ask me to clean them up first.
 
     65b. As a developer whose agent crashed while its pane is still there, I want the thread to stay Active with the agent shown as blocked, so that a harness crash is a small recovery and not a terminal repair.
@@ -274,7 +288,8 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
     - It does so once nothing the dead agent started is still running.
 
     65c. As a developer whose `kk new` or `kk reopen` failed after the agent could have run or the workspace changed, I want kiki to stop with everything in place, so that automatic rollback never deletes work.
-    - Kiki offers cleanup as an approved [repair plan](appendix-a-glossary.md#repair-plan) with the same safeguards as close.
+    - Kiki offers cleanup as an approved [repair plan](appendix-a-glossary.md#repair-plan) with the same safeguards as close: [`cleanup-failed-create`](appendix-a-glossary.md#cleanup-failed-create) after a failed `kk new`, and [`cleanup-failed-reopen`](appendix-a-glossary.md#cleanup-failed-reopen) after a failed `kk reopen`.
+    - A close or destroy that failed partway is finished with [`retry-close`](appendix-a-glossary.md#retry-close) or [`retry-destroy`](appendix-a-glossary.md#retry-destroy).
 
 66. As a developer, I want parent close to settle every child before the parent's terminal group closes, so that watcher lag or a failed detach cannot erase a parent advance or leave an unresumable parent.
     - The steps, in order:
@@ -295,11 +310,16 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
 
 ## Observability and notifications
 
-71. As a developer, I want [acceptance-slice](appendix-a-glossary.md#acceptance-slice) OS notifications for agent permission prompts, cascade conflicts, and local parent abandonment, so that unavailable remote polling is not implied by the core coordinator.
+71. As a developer, I want [acceptance-slice](appendix-a-glossary.md#acceptance-slice) attention notifications for the events the coordination core can raise by itself, so that unavailable remote polling is not implied by the core coordinator.
+    - The events are: a blocked or crashed agent, a conflicted cascade, an exhausted delivery, a followed parent abandoned, a failed lifecycle operation, and a [projection issue](appendix-a-glossary.md#projection-issue). This is the list in [Orientation](01-orientation.md).
+    - A permission prompt is one way an agent becomes blocked. Detecting it depends on the harness adapter's `attention_events` proof. For a harness without that proof, permission-prompt detection is v1.x; a crash still shows as blocked.
+    - An agent reporting its goal complete is also in the acceptance slice, and it is quieter: by default (`soft`) it is a status mark plus an overlay toast, with no OS notification.
     - Merge and PR-check notifications are added by the v1.x GitHub integration.
 72. As a developer, I want notifications to be configurable per-event-type, so that I can tune signal vs. noise.
+    - Each event has a level: `loud`, `soft`, or `silent`. [Configuration](11-configuration.md) lists the event keys and their defaults.
 73. As a developer, I want [CI](https://en.wikipedia.org/wiki/Continuous_integration) status changes on a PR to surface as notifications but NOT auto-trigger any fix action, so that kk does not make assumptions about what to do.
-74. As a developer, I want the TUI to show a tree of threads (parent-child via [follows](appendix-a-glossary.md#follows)), so that I can visualize my work structure.
+74. As a developer, I want the TUI to show a tree of threads (parent-child via [follows](appendix-a-glossary.md#follows)), so that I can visualize my work structure. (v1.x, with the overlay.)
+    - In the acceptance slice, `kk log` shows the same tree as text.
 75. As a developer, I want `kk status` to distinguish the live workspace head from its [bookmark](appendix-a-glossary.md#bookmark) checkpoint, so that ordinary bookmark lag is never mistaken for lost work.
     - It shows where kiki last [placed the checkpoint](appendix-a-glossary.md#checkpoint-placement).
     - It shows the [target it now expects](appendix-a-glossary.md#expected-bookmark-target) after jj's own rewrites.
@@ -310,11 +330,14 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
 ## Configuration
 
 76. As a developer, I want layered [TOML](https://toml.io/) configuration, so that team defaults can be committed while personal overrides stay personal.
-    - The layers are: defaults -> repo-shared-committed -> user-global -> repo-local-gitignored -> per-thread -> env -> CLI flags.
+    - The layers are: defaults -> repo-shared-committed -> user-global -> repo-local (kept outside the repository) -> per-thread -> env -> CLI flags.
+    - (The full set of layers is v1.x. The acceptance slice ships only the minimal configuration that [Orientation](01-orientation.md) lists.)
 77. As a developer, I want `kk config get|set|unset|edit|show` commands, so that I can manage config without hand-editing files.
+    - (`get` and `show` are in the acceptance slice. `set`, `unset`, and `edit` are v1.x.)
+    - `kk config show` prints the merged configuration with the layer each value came from.
 78. As a developer, I want `kk config get <key>` to show which layer the effective value came from, so that "why is my config not taking effect" is fast to debug.
 79. As a developer, I want unknown config keys to produce warnings (not errors), so that old configs survive kk upgrades.
-80. As a developer, I want an opt-in `Kk-Auto: true` description trailer for transparency, so that I can audit which descriptions were AI-written.
+80. As a developer, I want an opt-in `Kk-Auto: true` description trailer for transparency, so that I can audit which descriptions were AI-written. (v1.x, with auto-describe.)
 
 ## Pluggable UI architecture
 
@@ -427,6 +450,7 @@ The [thread transcript](appendix-a-glossary.md#thread-transcript) is kiki's stor
 118. As a developer, I want `kk status` to render a small kk-shaped header followed by literal `jj st` output for the working copy, so that I get the thread context plus the file listing I already know how to read.
      - No background process ever snapshots my files.
      - The header shows thread, PR, CI, agent state, and follows summary.
+     - (`kk status` is in the acceptance slice. Its PR and CI fields are v1.x; until those integrations ship, the header leaves them out.)
      - The `jj st` part is run by the `kk` CLI in my own contextual workspace, exactly as if I had typed it. It is never run by the daemon.
      - The header comes from [pinned reads](appendix-a-glossary.md#pinned-read) that do not touch the working copy.
 119. As a developer, I want `kk status --diff` (`-p`) to append the working-copy patch, so that I can review changes without dropping to `jj diff`.
@@ -441,58 +465,62 @@ The [thread transcript](appendix-a-glossary.md#thread-transcript) is kiki's stor
 
 ## Interactive overlay TUI (`kk` / overlay keybinding)
 
-The [overlay](appendix-a-glossary.md#overlay-tui) is kiki's interactive screen. [Interface](10-interface/spec.md#overlay) specifies it.
+The [overlay](appendix-a-glossary.md#overlay-tui) is kiki's interactive screen. [Interface](10-interface/spec.md#overlay) specifies it. Stories 123 to 129 are all v1.x: the overlay is [v1.x polish](appendix-a-glossary.md#v1-x-polish).
 
-123. As a developer, I want the overlay TUI to be a thread list on the left plus a preview pane on the right, so that one panel answers both "where am I in the work?" and "who needs me?" without me leaving navigation.
-     - The sidebar shows two sections.
+123. As a developer, I want the overlay TUI to be a thread list on the left plus a preview pane on the right, so that one panel answers both "where am I in the work?" and "who needs me?" without me leaving navigation. (v1.x.)
+     - The thread list shows two sections.
      - On top is a Stack section: the same stack-aware log as `kk log`, with the current thread's status inlined under its bookmark line.
      - Below it is an Activity section: the same threads, flat-listed by most-recent agent event.
-124. As a developer, I want the navigation cursor to move on log lines (j/k or arrows) and `enter` to switch to the cursored thread (dismissing the overlay), so that the most common action is the cheapest keystroke.
-125. As a developer, I want `space` to preview the cursored thread in the right pane without changing my active thread, so that I can peek before committing to a switch.
+124. As a developer, I want the navigation cursor to move on log lines (j/k or arrows) and `enter` to switch to the cursored thread (dismissing the overlay), so that the most common action is the cheapest keystroke. (v1.x.)
+125. As a developer, I want `space` to preview the cursored thread in the right pane without changing my active thread, so that I can peek before committing to a switch. (v1.x.)
      - The preview is the transcript tail, the diff, or the comments, toggleable via `t`/`d`/`c`.
-126. As a developer, I want destructive and creative verbs to be available only in the overlay TUI, so that a stray keypress or click in a passive surface can't take action.
-     - The verbs are `n` spawn, `N` spawn-as-child-of-cursored, `p` publish, `x` close, and `i` interrupt.
+126. As a developer, I want destructive and creative verbs to be available only in the overlay TUI, so that a stray keypress or click in a passive surface can't take action. (v1.x.)
+     - The verbs are `n` spawn, `N` spawn-as-child-of-cursored, `p` publish, `x` close, `i` interrupt, and `r` reopen.
+     - `n` follows the thread the overlay runs in by default, the same as `kk new` typed there.
+     - `a` shows or hides closed rows, so that `r` can reach a closed thread.
      - They are not available in the UI pane or Herdr's sidebar.
      - (`c` is reserved for the PR-comments preview in story 125; close binds to `x` to avoid the collision.)
-127. As a developer, I want consequential overlay verbs (`x`, `i`) to open a daemon-issued approval card rather than firing immediately, so that fat-fingering does not cost me work and the confirmation is bound to the exact plan.
+127. As a developer, I want consequential overlay verbs (`x`, `i`) to open a daemon-issued approval card rather than firing immediately, so that fat-fingering does not cost me work and the confirmation is bound to the exact plan. (v1.x.)
      - The card is drawn only by kiki's own foreground [presenter](appendix-a-glossary.md#approvalpresenter).
      - It is never drawn by a Herdr toast, plugin, keybinding, or sidebar row.
-128. As a developer, I want `t` and `T` to be two depths of the same transcript view, so that the cheap glance and the deep drill-down sit on the same letter at two different intensities.
+128. As a developer, I want `t` and `T` to be two depths of the same transcript view, so that the cheap glance and the deep drill-down sit on the same letter at two different intensities. (v1.x.)
      - Lowercase `t` in the overlay surfaces a transcript-tail preview in the right pane, alongside `d` diff and `c` PR comments.
      - Shift-`T` escalates to a full-screen `kk thread transcript` reader for the cursored thread.
-129. As a developer, I want `?` to toggle the [chord ribbon](appendix-a-glossary.md#chord-ribbon) listing the keys active for the current selection, so that the action set is discoverable rather than memorized.
+129. As a developer, I want `?` to toggle the [chord ribbon](appendix-a-glossary.md#chord-ribbon) listing the keys active for the current selection, so that the action set is discoverable rather than memorized. (v1.x.)
 
 ## Herdr sidebar and UI pane (opt-in)
 
-[Herdr](appendix-a-glossary.md#herdr) is the terminal multiplexer kiki uses; its sidebar lists every thread's [terminal group](appendix-a-glossary.md#terminal-group). The UI pane is kiki's own optional [`ui` role pane](appendix-a-glossary.md#ui-role-pane).
+[Herdr](appendix-a-glossary.md#herdr) is the terminal multiplexer kiki uses; its sidebar lists every thread's [terminal group](appendix-a-glossary.md#terminal-group). The UI pane is kiki's own optional [`ui` role pane](appendix-a-glossary.md#ui-role-pane). Stories 130 to 137 are all v1.x. The acceptance slice provisions the agent pane only, and it publishes only the thread's label to Herdr's sidebar.
 
-130. As a developer, I want to opt into a UI pane in every thread's terminal group via `[ui] ui_pane = true` in my user-global config, so that I have the Stack tree permanently visible without invoking the overlay, alongside the list Herdr's sidebar gives me.
+130. As a developer, I want to opt into a UI pane in every thread's terminal group via `[ui] ui_pane = true` in my user-global config, so that I have the Stack tree permanently visible without invoking the overlay, alongside the list Herdr's sidebar gives me. (v1.x.)
      - The UI pane sits left of the agent and is `[ui] ui_pane_width` columns wide.
-131. As a developer, I want `kk new <name> --ui-pane` / `--no-ui-pane` to override my UI-pane default per thread, so that one-off threads can opt in or out without changing global config.
-132. As a developer, I want each view to show one consistent thing, so that there is one mental model for each view regardless of where it lives and kiki does not rebuild what Herdr already draws.
+131. As a developer, I want `kk new <name> --ui-pane` / `--no-ui-pane` to override my UI-pane default per thread, so that one-off threads can opt in or out without changing global config. (v1.x.)
+132. As a developer, I want each view to show one consistent thing, so that there is one mental model for each view regardless of where it lives and kiki does not rebuild what Herdr already draws. (v1.x.)
      - The UI pane renders the same Stack tree and inlined status the overlay does.
      - Herdr's sidebar carries the cross-repo list and attention state.
-133. As a developer, I want the UI pane restricted to navigation-only keys, so that accidental focus on the UI pane cannot mutate state.
+133. As a developer, I want the UI pane restricted to navigation-only keys, so that accidental focus on the UI pane cannot mutate state. (v1.x.)
      - The keys are j/k/arrows/enter/?, plus mouse click-to-focus and scroll.
      - Destructive/creative verbs are not bound.
-134. As a developer, I want the [role panes](appendix-a-glossary.md#role-pane) — agent, shell, and UI — to be provisioned with the terminal group during `kk new`'s recoverable creation [saga](appendix-a-glossary.md#saga), so that the panes are reliably present.
+134. As a developer, I want the [role panes](appendix-a-glossary.md#role-pane) — agent, shell, and UI — to be provisioned with the terminal group during `kk new`'s recoverable creation [saga](appendix-a-glossary.md#saga), so that the panes are reliably present. (v1.x.)
      - This does not pretend that the terminal runtime participates in a database transaction.
      - Navigation does not mutate my layout.
      - Each pane is launched by direct argv with an explicit working directory and environment.
      - The panes are ensured again only at `kk reopen` and at a `kk repair` terminal restart.
      - They are never ensured at `kk switch`.
-135. As a developer, I want kk to NOT put back a shell or UI pane I deliberately closed until the thread is reopened or its terminal is restarted, so that my layout choices are honored.
+135. As a developer, I want kk to NOT put back a shell or UI pane I deliberately closed until the thread is reopened or its terminal is restarted, so that my layout choices are honored. (v1.x.)
      - If I want another shell, I split one natively in Herdr.
-136. As a developer, I want role panes provisioned whether or not any client is attached and whatever its size, so that thread creation never depends on which window I happened to run it from.
+136. As a developer, I want role panes provisioned whether or not any client is attached and whatever its size, so that thread creation never depends on which window I happened to run it from. (v1.x.)
      - Herdr's own resize and zoom handle a narrow terminal.
-137. As a developer, I want toggling `[ui] ui_pane` after threads exist to take effect the next time a terminal group is provisioned, so that I'm not surprised when an existing thread stays unchanged.
+137. As a developer, I want toggling `[ui] ui_pane` after threads exist to take effect the next time a terminal group is provisioned, so that I'm not surprised when an existing thread stays unchanged. (v1.x.)
      - A terminal group is provisioned at `kk new`, `kk reopen`, or a terminal restart.
      - The toggle does not retroactively reshape live terminal groups.
      - A config-set warning makes the lag visible.
 
 ## Shell pane (opt-out)
 
-137a. As a developer, I want every thread's terminal group to come up with a [shell pane](appendix-a-glossary.md#shell-pane) by default, so that direct `jj` / `gh` / test invocations live alongside the agent.
+Stories 137a and 137b are v1.x: the `shell` role pane is v1.x polish. In the acceptance slice, close already treats every pane in the terminal group the way story 137b describes.
+
+137a. As a developer, I want every thread's terminal group to come up with a [shell pane](appendix-a-glossary.md#shell-pane) by default, so that direct `jj` / `gh` / test invocations live alongside the agent. (v1.x.)
 
 - The shell pane sits alongside the agent pane in the same tab.
 - Without it, I would have to spawn a separate terminal and `cd` into the workspace each time.
@@ -503,7 +531,7 @@ The [overlay](appendix-a-glossary.md#overlay-tui) is kiki's interactive screen. 
 - The rest of its environment comes from my login baseline rather than from whichever terminal ran `kk new`.
 - The shell process is taken from my `$SHELL`.
 
-137b. As a developer, I want the shell pane to end with the terminal group at `kk close`, so that the close blast radius is unambiguous.
+137b. As a developer, I want the shell pane to end with the terminal group at `kk close`, so that the close blast radius is unambiguous. (v1.x.)
 
 - The agent ends with it, and so do any other panes or tabs I added.
 - The processes found in them are listed in the close plan, frozen, terminated by kiki, and verified gone.

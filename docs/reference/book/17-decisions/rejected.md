@@ -32,6 +32,8 @@ Rejected. The managed workspace's `@` is the [live thread head](../appendix-a-gl
 
 Rejected. V1 explicitly rebases only a provable single-parent chain from [synchronized base](../appendix-a-glossary.md#synchronized-base) to thread head (the [owned stack](../appendix-a-glossary.md#owned-stack)). Merge commits, foreign descendants, or multiple roots become [`TopologyDiverged`](../appendix-a-glossary.md#topologydiverged). Kiki does not infer a broader source [revset](https://docs.jj-vcs.dev/latest/revsets/).
 
+Note added 2026-11-16: the chain starts just after the synchronized base. The base itself is not on the owned chain. See [Checkpoint target and relationship](../13-architecture/op-log-watcher.md#checkpoint-target-and-relationship).
+
 ## Mirrored audit sinks and tamper-evident chaining
 
 Rejected for v1. Each parseable attempt has exactly one authoritative [SQLite](https://www.sqlite.org/) destination:

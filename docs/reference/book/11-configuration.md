@@ -24,7 +24,16 @@ Precedence is the order in which layers win. From lowest to highest:
 4. `KIKI_*` environment
 5. CLI flags
 
-"`KIKI_*` environment" means [environment variables](https://en.wikipedia.org/wiki/Environment_variable) whose names start with `KIKI_`.
+"`KIKI_*` environment" means [environment variables](https://en.wikipedia.org/wiki/Environment_variable) whose names start with `KIKI_`. The exact forms are:
+
+- **Environment variable:** `KIKI_<SECTION>_<KEY>`, in upper case. For example, `KIKI_AGENT_DEFAULT_HARNESS=codex` sets `[agent] default_harness`.
+- **CLI flag:** `--config section.key=value`. For example, `--config agent.default_harness=codex`.
+
+### Keys that only the user config file can set
+
+Some keys are structural to the daemon: every key in `[terminal]`, and `[paths] herdr_dir`. They shape the one terminal server that [`kkd`](appendix-a-glossary.md#kkd) runs for the user, and `kkd` does not run inside anyone's terminal.
+
+For these keys, only the user config file counts. The environment and the flags of the terminal that invoked `kk` are ignored for them, with a warning. Repo-local config is ignored for them too.
 
 Those five layers are the acceptance-slice precedence. v1.x ([later polish](appendix-a-glossary.md#v1-x-polish)) inserts two more layers:
 
@@ -42,6 +51,8 @@ The acceptance slice supports:
 
 `kk config get <key>` reports both the effective value and the layer it came from.
 
+`kk config show` prints the whole merged configuration. Beside each value it names the layer the value came from.
+
 `set`, `unset`, and `edit` ship with the v1.x full-layering surface. Until then, users edit the user or repo-local TOML file directly and use `show` to verify the result.
 
 Unknown keys warn, not error.
@@ -50,8 +61,11 @@ Unknown keys warn, not error.
 
 A changed setting does not always apply right away. This section says when each kind of key takes effect.
 
-- **Structural keys** require a daemon restart. Examples are the daemon socket, the state-database paths, and the `[terminal]` keys.
+- **Structural keys** require a daemon restart. Examples are the daemon socket and the state-database paths.
+- **Terminal-server keys** are structural too, but a daemon restart is not enough to apply them. They are `[terminal] session`, `[terminal] herdr_bin`, and `[paths] herdr_dir`. If one changes while a [server instance](appendix-a-glossary.md#server-instance) is open, `kkd` does not start a second server. It keeps the old one, reports that a change is pending, and requires the approved [`replace-terminal-server`](appendix-a-glossary.md#replace-terminal-server) plan (`kk repair --server`). See [Terminal keys](#terminal-keys).
 - **The default harness** takes effect at the next `kk new`. It does not restart live threads.
+- **`workspaces_root`** applies to the next `kk new`. Existing workspaces stay where they are.
+- **`[timeouts]` keys and `[cascade] delivery_attempts`** reload live. A new value applies to the next wait that starts.
 - **Cosmetic keys** may hot-reload — the change applies immediately.
 - **Some keys** take effect at the next thread-lifecycle event (`kk new` or `kk reopen`) rather than hot-reloading or requiring a daemon restart.
 - **Deferred UI keys** may instead take effect at the next overlay open.
@@ -81,9 +95,11 @@ Acceptance-slice sections:
 - `[notifications]` — per-event `loud | soft | silent` behavior for acceptance-slice [attention events](appendix-a-glossary.md#attention-event), plus `os_provider` (`auto | notify-rust | osascript | herdr | off`).
   - Per-event keys hot-reload.
   - `os_provider` resolves at the next dispatch.
-  - See [Observability](12-observability.md).
+  - See [Notification keys](#notification-keys) and [Observability](12-observability.md).
 - `[paths]` — overrides for state, socket, generated-Herdr-configuration, and workspace-root paths.
 - `[terminal]` — where the [Herdr](appendix-a-glossary.md#herdr) executable is and which named Herdr server kiki owns. Herdr is the [terminal multiplexer](https://en.wikipedia.org/wiki/Terminal_multiplexer) that hosts kiki's terminals. See [Terminal keys](#terminal-keys).
+- `[timeouts]` — how long kiki waits at each step that has a time limit. See [Timeout keys](#timeout-keys).
+- `[cascade]` — `delivery_attempts`, the limit on delivery retries. See [Timeout keys](#timeout-keys).
 
 Deferred v1.x sections:
 
@@ -100,20 +116,95 @@ Transcript-egress consent is your permission to send [transcript](appendix-a-glo
 - It is keyed in the registered repo's SQLite database by thread, normalized provider identity, purpose (`catch_up | transcript_mcp`), and disclosure version.
 - You can inspect it, grant it for MCP (the [Model Context Protocol](https://modelcontextprotocol.io/)), and revoke it through `kk privacy consent`.
 - It cannot be pre-approved by committed TOML, environment, CLI flags, MCP, or a generic operational approval.
-- A grant must come from the enrolled foreground presenter after the provider-specific disclosure. (The presenter is the [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter), the part of `kk` that asks a person at the keyboard.)
+- A grant must come from the enrolled foreground presenter after the provider-specific disclosure. (The presenter is the [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter): the enrolled local program that shows a plan to a person at the keyboard and collects the answer.)
+
+## Notification keys
+
+`[notifications]` holds one key per [attention event](appendix-a-glossary.md#attention-event). Each key takes a level: `loud`, `soft`, or `silent`. This chapter owns the key names and what each level does. [Observability](12-observability.md#attention-events) describes the events themselves.
+
+### What each level does
+
+kiki has four places to show an event. A level decides which of them it uses.
+
+| Level    | OS notification                               | Herdr toast                        | Overlay toast (v1.x) | Status mark |
+| -------- | --------------------------------------------- | ---------------------------------- | -------------------- | ----------- |
+| `loud`   | yes, unless `os_provider` is `herdr` or `off` | only when `os_provider` is `herdr` | yes                  | yes         |
+| `soft`   | no                                            | no                                 | yes                  | yes         |
+| `silent` | no                                            | no                                 | no                   | yes         |
+
+- **OS notification and Herdr toast** are the two forms of the configured transport, `os_provider`. Exactly one of them is used for a `loud` event: the OS notification by default, or the Herdr [toast](appendix-a-glossary.md#toast) when `os_provider = "herdr"`. With `os_provider = "off"`, neither is sent.
+- **Overlay toast** is kiki's own toast inside the [overlay](appendix-a-glossary.md#overlay-tui). It appears only while an overlay is open, and only after the overlay ships.
+- **Status mark** is the event's durable state, shown by `kk ls`, `kk status`, and the sidebar projection. No level turns it off. A level changes how hard kiki tries to get your attention; it never hides state.
+
+### Event keys
+
+| Key                   | Event                                                                                    | Default  | Tier             |
+| --------------------- | ---------------------------------------------------------------------------------------- | -------- | ---------------- |
+| `agent_blocked`       | the agent is waiting on a permission prompt                                              | `loud`   | acceptance slice |
+| `agent_crashed`       | the harness exited or crashed under a live launcher                                      | `loud`   | acceptance slice |
+| `cascade_conflicted`  | a cascade reconciliation exposed textual conflicts                                       | `loud`   | acceptance slice |
+| `lifecycle_failed`    | a lifecycle operation failed (`CreateFailed`, `CloseFailed`, a failed reopen or restart) | `loud`   | acceptance slice |
+| `projection_issue`    | a [projection issue](appendix-a-glossary.md#projection-issue) opened on an active thread | `loud`   | acceptance slice |
+| `delivery_exhausted`  | an intent's delivery attempts are [exhausted](appendix-a-glossary.md#exhausted-intent)   | `loud`   | acceptance slice |
+| `parent_abandoned`    | a follows parent's head or owned revisions were abandoned locally                        | `loud`   | acceptance slice |
+| `goal_complete`       | the agent reports its goal complete                                                      | `soft`   | acceptance slice |
+| `agent_silent`        | the agent has been silent past the silence threshold                                     | `silent` | v1.x             |
+| `parent_merged`       | a follows parent's pull request merged                                                   | `loud`   | v1.x             |
+| `pr_check_failed`     | a pull-request check failed                                                              | `loud`   | v1.x             |
+| `external_force_push` | an external force-push of the thread's branch was seen                                   | `loud`   | v1.x             |
+| `metadata_written`    | an auto-rename or auto-describe write completed                                          | `silent` | v1.x             |
+
+Notes:
+
+- `agent_blocked` depends on the harness adapter proving its permission-prompt signal. For a harness without that proof, permission-prompt detection is v1.x. A crashed agent still shows `blocked` through `agent_crashed`. See [Observability](12-observability.md#attention-events).
+- A closed thread's `CheckpointAbandoned` issue does not fire `projection_issue`. It is reported on `kk ls --all` and `kk repair` only.
+- `goal_complete` at `soft` is a status mark plus an overlay toast. Before the overlay ships, only the status mark shows.
+- The acceptance-slice events are the ones in the scope ledger in [Orientation](01-orientation.md): a blocked or crashed agent, a conflicted cascade, an exhausted delivery, a followed parent abandoned, a failed lifecycle operation, and a projection issue. `goal_complete` is also in the slice, as a `soft` status mark with an overlay toast.
+- v1.x keys are ignored with a warning until their feature ships. The state behind a v1.x event still shows in `kk ls` and `kk status` where the slice already tracks it.
+- The silence threshold for `agent_silent` is a separate deferred key.
+
+## Timeout keys
+
+Many steps in kiki wait for something, and each wait has a limit. `[timeouts]` names every one of those limits. When another chapter says a step is "bounded" or has a "deadline", it names one of these keys.
+
+| Key                | Default | Used for                                                                                                                        |
+| ------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `launcher_report`  | `10s`   | waiting for role launchers to report                                                                                            |
+| `ready_handshake`  | `60s`   | launch until the [ready handshake](appendix-a-glossary.md#ready-handshake); expiry is `CreateFailed` (or the restart's failure) |
+| `freeze_stabilize` | `5s`    | the [freeze](appendix-a-glossary.md#freeze) reaching a fixed point (two passes that find the same set of processes)             |
+| `frozen_step`      | `30s`   | any single step while processes are frozen                                                                                      |
+| `verified_exit`    | `10s`   | waiting for a terminated process to be gone                                                                                     |
+| `hook_connect`     | `1s`    | [`kk-hook`](appendix-a-glossary.md#kk-hook) connecting to `kkd` and being admitted                                              |
+| `slow_path`        | `30s`   | one reconciliation holding a tool batch (the [slow-path bound](appendix-a-glossary.md#slow-path-bound))                         |
+| `frontier_retry`   | `2s`    | [frontier sampler](appendix-a-glossary.md#frontier-sampler) retries                                                             |
+
+One more limit lives in its own section:
+
+| Key                           | Default | Used for                                                                                                         |
+| ----------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `[cascade] delivery_attempts` | `3`     | how many times kiki retries a delivery before the intent is [exhausted](appendix-a-glossary.md#exhausted-intent) |
+
+Rules for these keys:
+
+- All of them are user-config keys. They are ignored with a warning in repo-local config.
+- They reload live. A new value applies to the next wait that starts; a wait already running keeps the limit it started with.
+- Values are durations written as a number and a unit, such as `500ms`, `10s`, or `2m`.
+- A `frozen_step` expiry before termination begins takes [verified resume](appendix-a-glossary.md#verified-resume). Once termination has begun, a failure is `CloseFailed` (or the plan's failed state), never a resume.
+- On a `hook_connect` expiry, `kkd` never admitted the call, so the hook checks the thread's [barrier marker](appendix-a-glossary.md#barrier-marker). With the marker absent, the tool call goes through with the harness's non-blocking decision. With the marker present, the answer is a blocking deny. A `slow_path` expiry is different: `kkd` already admitted the call, so the answer is a blocking deny, never continue.
+- Each harness adapter pins the harness's own hook timeout above `slow_path` plus a margin. Raising `slow_path` therefore takes effect for a thread's harness at its next [incarnation](appendix-a-glossary.md#incarnation).
 
 ## Path keys
 
 `[paths]` is the central place to relocate kiki's filesystem footprint: the files and directories kiki uses. All keys are optional; defaults are listed below.
 
-| key               | type   | default                             | scope                       |
-| ----------------- | ------ | ----------------------------------- | --------------------------- |
-| `user_state_dir`  | string | `~/.config/kiki/`                   | structural — daemon restart |
-| `user_state_db`   | string | `<user_state_dir>/state.db`         | structural — daemon restart |
-| `kkd_socket`      | string | `<user_state_dir>/kkd.sock`         | structural — daemon restart |
-| `repo_state_dir`  | string | `<user_state_dir>/repos/<repo_id>/` | structural — daemon restart |
-| `herdr_dir`       | string | `<user_state_dir>/herdr/`           | structural — daemon restart |
-| `workspaces_root` | string | `<parent-of-repo>/`                 | structural — next `kk new`  |
+| key               | type   | default                             | scope                                                    |
+| ----------------- | ------ | ----------------------------------- | -------------------------------------------------------- |
+| `user_state_dir`  | string | `~/.config/kiki/`                   | structural — daemon restart                              |
+| `user_state_db`   | string | `<user_state_dir>/state.db`         | structural — daemon restart                              |
+| `kkd_socket`      | string | `<user_state_dir>/kkd.sock`         | structural — daemon restart                              |
+| `repo_state_dir`  | string | `<user_state_dir>/repos/<repo_id>/` | structural — daemon restart                              |
+| `herdr_dir`       | string | `<user_state_dir>/herdr/`           | structural — user config only; `replace-terminal-server` |
+| `workspaces_root` | string | `<parent-of-repo>/`                 | applies to the next `kk new`                             |
 
 ### The MCP socket and audit tables
 
@@ -161,12 +252,23 @@ What separates kiki's server from the user's default Herdr server is therefore a
 
 ## Terminal keys
 
-`[terminal]` selects the terminal runtime kiki drives. Both keys are valid in user config, `KIKI_*` environment, and CLI flags. They are per-user, so they are ignored with a warning in repo-local config.
+`[terminal]` selects the terminal runtime kiki drives. Both keys are structural to the daemon, so only the user config file counts for them. `KIKI_*` environment variables and `--config` flags from the terminal that invoked `kk` are ignored for them, with a warning. So is repo-local config. The same holds for `[paths] herdr_dir`. (See [Keys that only the user config file can set](#keys-that-only-the-user-config-file-can-set).)
 
-| key         | type   | default           | scope                       |
-| ----------- | ------ | ----------------- | --------------------------- |
-| `herdr_bin` | string | `herdr` on `PATH` | structural — daemon restart |
-| `session`   | string | `kiki`            | structural — daemon restart |
+| key         | type   | default           | scope                                                    |
+| ----------- | ------ | ----------------- | -------------------------------------------------------- |
+| `herdr_bin` | string | `herdr` on `PATH` | structural — user config only; `replace-terminal-server` |
+| `session`   | string | `kiki`            | structural — user config only; `replace-terminal-server` |
+
+"`herdr` on `PATH`" means the `PATH` of the constructed environment described under [Who starts the server](#who-starts-the-server), not the `PATH` of the terminal that invoked `kk`.
+
+### Changing a terminal key while a server is running
+
+A change to `session`, `herdr_bin`, or `[paths] herdr_dir` cannot simply be applied, because the server that is running was started with the old values.
+
+- If a [server instance](appendix-a-glossary.md#server-instance) is open, `kkd` does not start a second server. It keeps the old one and keeps using the old values for it.
+- `kkd` reports that a change is pending. `kk repair --server` shows it.
+- The change takes effect only through the approved [`replace-terminal-server`](appendix-a-glossary.md#replace-terminal-server) plan, applied with `kk repair --server`. That plan lists every thread and process the replacement stops, stops the old server with verified exit, and starts a new one with the new values.
+- If no server instance is open, the new values are used the next time `kkd` starts the server.
 
 ### What the two keys mean
 
@@ -180,14 +282,22 @@ What separates kiki's server from the user's default Herdr server is therefore a
 
 ### Who starts the server
 
-Only `kkd` starts the server. It does so from its own service context — a [launchd](https://en.wikipedia.org/wiki/Launchd) user agent on macOS, a [systemd](https://en.wikipedia.org/wiki/Systemd) user unit on Linux. These are the system services that keep background programs running.
+Only `kkd` starts the server. But the server must outlive `kkd`, so `kkd` does not run it as a child inside its own service unit. It asks the service manager to run the server as a unit of its own:
+
+- on macOS, a separate [launchd](https://en.wikipedia.org/wiki/Launchd) job;
+- on Linux, a separate transient [systemd](https://en.wikipedia.org/wiki/Systemd) user unit.
+
+launchd and systemd are the system services that keep background programs running. A "transient" unit is one created at run time by a command, with no unit file on disk.
+
+A `kkd` crash, restart, or upgrade must not stop the server, because stopping the server ends every thread's processes. This is a proof gate, not an assumption: the test kills `kkd` under each real service manager and checks that the server and the agents keep running (see [Testing](14-testing.md)).
 
 `kkd` starts the server with a constructed environment: the user's login baseline of `HOME`, `USER`, `SHELL`, `PATH`, and locale. It never uses the environment of the terminal that invoked `kk`.
 
 - Panes inherit that environment plus Herdr's own variables and each role pane's explicit ones.
 - `HERDR_CONFIG_PATH` is visible inside panes.
 - `kk attach` uses Herdr's connect-only client mode and never starts a server.
-- A running server `kkd` did not start is unverified, and threads bound to it read [`TerminalMissing`](appendix-a-glossary.md#terminalmissing).
+- `kkd` recognises a server it started by the peer identity on its `Open` `terminal_servers` row. A running server `kkd` did not start is unverified. That includes one left by Herdr's own handoff or upgrade. `kkd` ends the old row, which ends its bindings and raises [`TerminalMissing`](appendix-a-glossary.md#terminalmissing), and records the new peer as `Unverified`. It provisions nothing on an unverified server. The fix is the `replace-terminal-server` plan, and after it `restart-terminal` for each thread.
+- An instance change where `kkd` itself started the new server, for example after a server crash, needs only `restart-terminal`.
 
 ### Supported Herdr versions
 
@@ -201,7 +311,7 @@ An unsupported or missing Herdr fails terminal lifecycle commands with an error 
 
 [`client_targeted_focus`](appendix-a-glossary.md#client-targeted-focus) is the one required Herdr extension, and it must arrive as a new flag in that object. It lets kiki move one viewer's screen without moving anyone else's (see [caller-local focus](appendix-a-glossary.md#caller-local-focus)). Until the server advertises it, caller-local `kk switch` fails by naming the capability. It does not degrade to a focus change that moves every client.
 
-`kkd` never stops a running dedicated server to apply a changed key: stopping it ends every thread's processes.
+`kkd` never stops a running dedicated server on its own to apply a changed key: stopping it ends every thread's processes. Only the approved `replace-terminal-server` plan stops it (see [Changing a terminal key while a server is running](#changing-a-terminal-key-while-a-server-is-running)).
 
 ### The generated Herdr configuration file
 

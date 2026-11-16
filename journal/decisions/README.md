@@ -40,13 +40,14 @@ owning chapter; do not use a journal entry to override it silently.
 
 ## Decision index
 
-| ID                                                           | Choice                                                                   | Topic                                    |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------ | ---------------------------------------- |
-| [D-0001](0001-adopt-project-journal.md)                      | Separate current guidance, research history, and consequential decisions | Documentation                            |
-| [D-0002](0002-use-mise-for-tasks-and-formatting.md)          | Use pinned mise tooling for tasks and formatting                         | Development workflow                     |
-| [D-0003](0003-use-jj-and-shared-agent-guidance.md)           | Use colocated jj and one shared contributor guide                        | Version control and contributor workflow |
-| [D-0004](0004-use-herdr-as-terminal-runtime.md)              | Host threads in a dedicated Herdr server instead of tmux                 | Terminal runtime ownership and topology  |
-| [D-0005](0005-track-checkpoint-through-native-successors.md) | Track the checkpoint bookmark through jj's native successors             | Checkpoint bookmark and projection audit |
+| ID                                                           | Choice                                                                   | Topic                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------ | --------------------------------------------- |
+| [D-0001](0001-adopt-project-journal.md)                      | Separate current guidance, research history, and consequential decisions | Documentation                                 |
+| [D-0002](0002-use-mise-for-tasks-and-formatting.md)          | Use pinned mise tooling for tasks and formatting                         | Development workflow                          |
+| [D-0003](0003-use-jj-and-shared-agent-guidance.md)           | Use colocated jj and one shared contributor guide                        | Version control and contributor workflow      |
+| [D-0004](0004-use-herdr-as-terminal-runtime.md)              | Host threads in a dedicated Herdr server instead of tmux                 | Terminal runtime ownership and topology       |
+| [D-0005](0005-track-checkpoint-through-native-successors.md) | Track the checkpoint bookmark through jj's native successors             | Checkpoint bookmark and projection audit      |
+| [D-0006](0006-close-repair-and-proof-gaps.md)                | Close the repair, locking, and proof gaps found in the third review      | Repair plans, process safety, and proof gates |
 
 ## Earlier design rationale
 

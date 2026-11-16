@@ -19,10 +19,13 @@ Terminals live in a separate, [dedicated Herdr server](../appendix-a-glossary.md
   - On macOS the service is a [launchd](https://en.wikipedia.org/wiki/Launchd) user agent. On Linux it is a [systemd](https://en.wikipedia.org/wiki/Systemd) user unit.
   - `kk` never forks `kkd` from the invoking terminal. That is, `kk` never starts `kkd` as a child of that terminal.
   - So `kkd`, and the dedicated Herdr server it starts, run outside the terminal application's own job and process tree. Quitting the terminal application ends neither them nor any agent.
+  - The server is not a child inside `kkd`'s own service unit either. `kkd` asks the service manager to start it as a separate unit: a separate launchd job on macOS, and a separate transient systemd user unit on Linux. ("Transient" means created at run time, with no unit file on disk.)
+  - So a `kkd` crash, restart, or upgrade does not stop the server or any agent. This is a proof gate: the test kills `kkd` under each real service manager and checks that the server and the agents keep running. See [Terminal runtime](terminal-runtime.md#starting-and-addressing-the-server).
   - State files in `~/.config/kiki/` are created with mode `0700`. The [gRPC](https://grpc.io/) socket and credential files are mode `0600`. (These are [Unix file permissions](https://en.wikipedia.org/wiki/File-system_permissions). Both modes give access to the owning user only.)
 - **Reboot survival.** The service manager restarts `kkd` after a crash, logout, or reboot.
   - Recovery on restart reads sqlite ([SQLite](https://www.sqlite.org/), kiki's database). Threads survive crashes and reboots.
   - Agent processes do not survive a reboot. Their threads read [`TerminalMissing`](../appendix-a-glossary.md#terminalmissing) afterwards.
+  - After a reboot or a login, the service manager does not start the Herdr server unit by itself. `kkd` starts it on demand, the next time a command needs the server. See [Terminal runtime](terminal-runtime.md#starting-and-addressing-the-server).
 - **Components.** Each thread has its own `ThreadController` actor. (An actor is a small independent worker inside the daemon.)
   - A `ThreadController` supervises the thread's durable lifecycle [sagas](../appendix-a-glossary.md#saga). A saga is a multi-step operation that records each step so it can recover after a crash.
   - A `ThreadController` dies only after its thread is closed or destroyed coherently.
@@ -36,15 +39,25 @@ Terminals live in a separate, [dedicated Herdr server](../appendix-a-glossary.md
   - A consequential operation claims its `HumanApproval` atomically (in one indivisible step) while it creates the durable operation journal. That [approval](../appendix-a-glossary.md#human-approval) is bound to the method, the target, the argument, and the rendered plan.
   - The operation then consumes the approval when that exact plan completes.
   - Every parseable transport attempt produces exactly one SQLite audit row. The row goes in the target repo database when the repo resolves. Otherwise it goes in the user database.
-- **Durable sagas** for creation, checkpoint, close, reopen, and repair.
+- **Durable sagas** for creation, checkpoint, close, reopen, and repair. A terminal restart ([`restart-terminal`](../appendix-a-glossary.md#restart-terminal)) is one of these: a journaled lifecycle operation with its own step list.
   - The managed [workspace](../appendix-a-glossary.md#workspace)'s exact `@` is persisted (saved) as the live [thread head](../appendix-a-glossary.md#thread-head). (`@` is [jj](https://docs.jj-vcs.dev/latest/)'s name for a workspace's [working-copy commit](https://docs.jj-vcs.dev/latest/glossary/).)
   - [Bookmarks](../appendix-a-glossary.md#bookmark) are explicit checkpoints.
 - **The cascade [state machine](https://en.wikipedia.org/wiki/Finite-state_machine).** The [cascade](../appendix-a-glossary.md#cascade-reconciliation) carries a parent thread's changes to the threads that follow it. The state machine does these things:
   - It classifies observed jj transitions into [`NativeRewrite`](../appendix-a-glossary.md#nativerewrite), [`ParentAdvance`](../appendix-a-glossary.md#parentadvance), `AlreadyAligned`, or [`TopologyDiverged`](../appendix-a-glossary.md#topologydiverged).
   - It validates a strict linear [owned stack](../appendix-a-glossary.md#owned-stack).
   - It persists `sync_intents`, each pinned to an exact [base transition](../appendix-a-glossary.md#base-transition). (See [`sync_intent`](../appendix-a-glossary.md#sync-intent).)
-  - It binds a parallel-tool-batch barrier before mutation.
+  - It binds a parallel-tool-batch barrier before mutation, and writes the thread's [barrier marker](../appendix-a-glossary.md#barrier-marker) before that.
   - It owns the soft-batch or restart-startup delivery proof through acknowledgement.
+- **The `PassThrough` cache.** When `kkd` admits the first call of a [tool batch](../appendix-a-glossary.md#tool-batch) with no pending work, it remembers that [`PassThrough`](../appendix-a-glossary.md#batch-admission) decision so every other call in the batch gets the same answer.
+  - `kkd` keeps this cache in memory only, keyed by incarnation and batch.
+  - [`kk-hook`](../appendix-a-glossary.md#kk-hook) keeps nothing. It is a stateless client that makes one call and exits. There is no separate hook-side process.
+  - After a `kkd` restart the cache is gone. See [Failure model](#failure-model) for the rule that covers this.
+  - `kkd`, not the hook, performs any [hard pause](../appendix-a-glossary.md#hard-pause) and any replacement of an incarnation.
+- **Locks.** `kkd` holds two kinds of lock. [Invariants](../02-invariants.md#locks-and-their-order) defines them.
+  - The per-thread [reconciliation lock](../appendix-a-glossary.md#reconciliation-lock) guards one thread's reconciliation. The [lifecycle lock](../appendix-a-glossary.md#lifecycle-lock) is that same thread lock, held for the whole length of a lifecycle operation such as a close. It is not a second lock.
+  - The per-repo [repo jj lock](../appendix-a-glossary.md#repo-jj-lock) is held around every unpinned working-copy command and every operation-head integration, from the frontier sample that the step depends on until the re-sample. It is short and innermost. It is never held across a wait.
+  - The order is always the same: the parent thread's lock, then the child thread's lock, then the repo jj lock.
+  - The human-invoked passthroughs (the body of `kk status` and the overlay's diff for the caller's own thread) are run by `kk`, not by `kkd`. They take none of `kkd`'s locks. See [Invariants](../02-invariants.md#operation-history-is-a-dag).
 - **[Projection](../appendix-a-glossary.md#projection) reconciliation** for workspace records, paths, bookmarks, and terminal bindings. Reconciliation means comparing kiki's records with what really exists.
   - Only unique identity-preserving normalization is automatic.
   - Ambiguous changes become named `kk repair` plans.
@@ -125,15 +138,29 @@ When a command runs, kiki has to answer "Which thread am I in?". `ContextDiscove
   Two facts make the file fragile. Herdr's own client can rewrite it from its settings screen. And when the file fails to parse, Herdr silently loads defaults, which have agent resume on. So, immediately before every server start, `kkd` regenerates the file and validates it with its own parser. `kkd` refuses to start the server on any diagnostic.
 
 - **Start.** Only `kkd` starts the server. It runs `terminal.herdr_bin` with `--session <name>` and `HERDR_CONFIG_PATH=<herdr_dir>/config.toml`.
+  - `kkd` starts the server as its own service-manager unit, not as a child inside `kkd`'s unit. That is a separate launchd job on macOS and a separate transient systemd user unit on Linux. The server must outlive `kkd`.
+  - Before it spawns the server, `kkd` writes a `terminal_servers` row in state `Starting`. It moves the row to `Open` once it has read the server's peer identity. So a crash between the two is recoverable: on restart `kkd` finds the `Starting` row and either completes it from the peer it finds on the socket or marks the start as failed.
   - Kiki does not redirect `XDG_CONFIG_HOME` or `XDG_STATE_HOME`. (These [XDG base-directory](https://specifications.freedesktop.org/basedir-spec/latest/) variables tell programs where to keep configuration and state.) Panes inherit the server's whole environment. So a redirected value would make jj, git, gh, and every shell in every thread read configuration from the wrong place.
   - For the same reason, `kkd` starts the server with an environment it builds on purpose. That environment is the user's login baseline of `HOME`, `USER`, `SHELL`, `PATH`, and locale. It is never the environment of whichever terminal happened to invoke `kk`.
   - Role panes add their explicit variables on top.
   - `HERDR_CONFIG_PATH` is visible inside panes.
   - Starting the server creates no terminal group and starts no agent.
 - **Find.** `kkd` connects to the session's socket.
-  - A running server is unverified in two cases: this `kkd` installation did not start it, or its peer identity matches no open `terminal_servers` row.
-  - For an unverified server, `kkd` provisions nothing on it, threads bound to it read [`TerminalMissing`](../appendix-a-glossary.md#terminalmissing), and replacing it is an approved plan.
+  - A `terminal_servers` row is in one of four states: `Starting | Open | Unverified | Ended`. `kkd` recognises a server it started by the peer identity on its `Open` row.
+  - If the socket's peer is one `kkd` did not start, the server is unverified. That includes the new server process after Herdr's own handoff or upgrade.
+  - `kkd` then ends the old row, which ends its bindings and raises [`TerminalMissing`](../appendix-a-glossary.md#terminalmissing) for each affected thread. It records the new peer as `Unverified`.
+  - `kkd` provisions nothing on an unverified server. The fix is the approved [`replace-terminal-server`](../appendix-a-glossary.md#replace-terminal-server) plan, and after it [`restart-terminal`](../appendix-a-glossary.md#restart-terminal) for each thread.
+  - An instance change where `kkd` itself started the new server, for example after a server crash, gets an `Open` row. Each thread then needs only `restart-terminal`.
   - `kk attach` asks `kkd` to ensure the server through `EnsureTerminalServer`. Then it uses Herdr's connect-only client mode for the named session. It never uses a client entry point that would start a server itself.
+- **Replace.** [`replace-terminal-server`](../appendix-a-glossary.md#replace-terminal-server) is the one plan that stops a running dedicated server. It is user-scoped, not thread-scoped. It is applied with `kk repair --server`.
+  - The plan lists every thread and every process that the replacement stops.
+  - It needs a one-shot approval.
+  - It stops the old server with [verified exit](../appendix-a-glossary.md#verified-exit) and ends its row, whether that row was `Open` or `Unverified`. Then it starts a new one through the start path above.
+  - Afterwards the old instance's bindings have ended, and each affected thread reads `TerminalMissing`. The server replacement starts no agent. Each thread is brought back with `restart-terminal`.
+- **Changed settings.** `[terminal] session`, `[terminal] herdr_bin`, and `[paths] herdr_dir` decide which server `kkd` runs. If one of them changes while an instance is open, `kkd` does not start a second server.
+  - It keeps the old server.
+  - It reports that a change is pending.
+  - It requires `replace-terminal-server` before the new value takes effect.
 - **Verify.** On every connection `kkd` reads the ping reply. The reply returns Herdr's version, its protocol number, and an object of named boolean (true/false) capability flags. `kkd` checks them against the supported range it pins.
   - An unsupported server is not used. Terminal lifecycle operations fail with an actionable error, and existing threads keep their recorded state.
   - The adapter derives `RuntimeCapabilities` from the version and protocol plus those flags.
@@ -174,7 +201,7 @@ Nothing is reconstructed from Herdr's event history, labels, or tokens.
 
 ### Orphan scan
 
-A process can outlive its pane, its terminal group, and the terminal server. `kkd` asks `ProcessSupervisor` which recorded process identities are still alive. It asks at these times:
+A process can outlive its pane, its terminal group, and the terminal server. `kkd` asks `ProcessSupervisor` which recorded process identities are still alive, and whether a harness remnant is left under a live `agent` launcher. It asks at these times:
 
 - at daemon start, before any thread is reported `Active`;
 - whenever the `server_instance_id` changes;
@@ -183,14 +210,22 @@ A process can outlive its pane, its terminal group, and the terminal server. `kk
 
 [`OrphanedProcess`](../appendix-a-glossary.md#orphanedprocess) is a standing projection issue with exactly two causes:
 
-- a **recorded** process identity that is alive without a current binding;
-- a **[harness remnant](../appendix-a-glossary.md#harness-remnant)**. Before a replacement incarnation's gate is activated, kiki takes an inventory rooted at the `agent` launcher. That inventory **must** show no process other than the launcher itself in its descendant, session, and [process-group](https://en.wikipedia.org/wiki/Process_group) sets. A surviving tool child of the retired harness is a remnant.
+- a **survivor**: a recorded process identity that is alive with no current binding, and that is not a member of a container on the current server instance;
+- a **[harness remnant](../appendix-a-glossary.md#harness-remnant)**: any descendant of a live `agent` launcher, other than the launcher itself, while no incarnation is live. A remnant need not have been recorded before. Before a replacement incarnation's gate is activated, kiki takes an inventory rooted at the `agent` launcher. That inventory **must** show no process other than the launcher itself in its descendant, session, and [process-group](https://en.wikipedia.org/wiki/Process_group) sets. A surviving tool child of the retired harness is a remnant.
 
-While the issue is unresolved, `kkd` activates no gate and materializes nothing in that workspace. Recorded role processes that are pane members on the current instance are terminal members, not orphans.
+While the issue is unresolved, it blocks replacement, materialization, and deletion in that workspace. `kkd` activates no gate, provisions no replacement terminal group, materializes nothing, and deletes nothing.
+
+The plan that resolves the issue is [`terminate-orphans`](../appendix-a-glossary.md#terminate-orphans). It needs a one-shot approval.
+
+- For a remnant, it runs freeze discovery rooted at the launcher. For a survivor, it uses the recorded identities.
+- It records `FreezeDiscovery` rows under the approval.
+- It terminates those processes with verified exit.
+
+A process that is a pane member of a container on the current instance is a terminal member, not an orphan, except a harness remnant under a live `agent` launcher. That includes a member of an [unbound container](../appendix-a-glossary.md#unbound-container): a terminal container on the current instance with no current binding, such as a group whose `agent` launcher died while the group itself survived. The `restart-terminal` and `close-without-terminal` plans dispose of those containers and their processes.
 
 **Unrecorded holders.** An **unrecorded** same-UID process that holds the workspace is not a standing issue. ("Same-UID" means running as the same user.) It never blocks an `Active` thread's boundaries.
 
-- It matters only to an operation that deletes the workspace: close, destroy, [`close-without-terminal`](../appendix-a-glossary.md#close-without-terminal), and failed-create cleanup.
+- It matters only to an operation that deletes the workspace: close, destroy, [`close-without-terminal`](../appendix-a-glossary.md#close-without-terminal), and the cleanup of a failed create or reopen.
 - There it makes the result `Unknown`, unless the approved plan names that exact holder identity as accepted. Naming it is the human's informed choice. One example is an editor left open. (See [accepted holder](../appendix-a-glossary.md#accepted-holder).)
 - A holder the plan does not name is drift.
 - The holder scan excludes `kkd`, its own child processes, and the invoking `kk` process.
@@ -228,18 +263,26 @@ This section lists what can go wrong and what kiki does about each case.
 - **`kkd` crashes during a freeze.**
   - Each discovered process identity was committed to `process_records` before it was signalled. The row includes its prior stop state and the freeze's lifecycle operation id.
   - On restart, `kkd` rebuilds the [frozen set](../appendix-a-glossary.md#frozen-set) from those rows.
-  - Before the [final proof](../appendix-a-glossary.md#final-proof), it performs verified resume.
-  - After the final proof, it continues the journal forward.
+  - The close order is one list: freeze, post-freeze recheck, holder scan, checkpoint, each child step, final proof, kiki-side termination with verified exit, terminal-container close request, post-exit filesystem recheck, workspace forget, directory delete. [`close-without-terminal`](../appendix-a-glossary.md#close-without-terminal) uses the same list after its preflight inventory and approval.
+  - Before the [final proof](../appendix-a-glossary.md#final-proof), it performs verified resume. The same holds when a single frozen step runs past `[timeouts] frozen_step` before termination begins.
+  - After the final proof, it continues the journal forward. Once termination has begun, a failure is `CloseFailed` or the plan's own failed state. It is never resume.
   - The filesystem watch died with the old process. So the [post-exit filesystem recheck](../appendix-a-glossary.md#post-exit-filesystem-recheck) re-reads the generation and fingerprint, and compares them with the final proof's journaled values.
   - A mismatch is `CloseFailed` or `DestroyFailed`, with files preserved.
-- **`kkd` restarts while the Herdr server survives.** Agents keep running.
+- **`kkd` crashes during a hard pause.** A [hard pause](../appendix-a-glossary.md#hard-pause) is journaled. `agent_sessions.pause_state` is one of `None | Stopping | Stopped | Killed`, and `kkd` writes each value before it takes the matching step.
+  - On restart, recovery rolls a hard pause forward to the kill.
+  - Recovery never resumes a harness that was being retired.
+- **`kkd` crashes while starting the server.** The `terminal_servers` row is still `Starting`.
+  - On restart, `kkd` connects to the session's socket. If a server answers, `kkd` reads its peer identity and moves the row to `Open`.
+  - If no server answers, `kkd` marks that start as failed and ends the row. It does not start again at once. It starts a server on demand, the next time a command needs one, with a new row.
+- **`kkd` restarts while the Herdr server survives.** Agents keep running. This is the normal case, because the server runs in its own service-manager unit.
   - `kkd` reconnects and verifies the peer's `(pid, start_time)` against its open `terminal_servers` row. Then it snapshots, runs the [orphan scan](../appendix-a-glossary.md#orphan-scan), and reconciles.
-  - `agent` launchers reopen their supervision streams.
-  - A binding continues if its recorded launcher and harness process identities are still live under the same instance. The harness's next hook round-trip re-proves the incarnation as usual.
+  - `agent` launchers reopen their supervision streams. `kkd` authenticates each one by its accepted peer process identity.
+  - The in-memory `PassThrough` cache is gone. So the first pre-tool call from an incarnation that was already running before this `kkd` start is an unknown in-flight batch. The one exception is a hook payload that proves the call is the first call of a new [model turn](../appendix-a-glossary.md#model-turn). For an unknown batch, `kkd` leaves files untouched, hard-pauses the incarnation, and replaces it to establish a clean boundary.
+  - A binding continues if its recorded launcher and harness process identities are still live under the same instance. The incarnation continues too, subject to the next rule.
   - A live launcher whose harness is gone keeps its binding and its `agent` role. The incarnation is retired without acknowledgement, [`AgentStatus`](../appendix-a-glossary.md#agentstatus) is `Crashed`, and the thread's lifecycle is unchanged.
   - A binding whose `agent` launcher is gone ends, and its thread raises [`TerminalMissing`](../appendix-a-glossary.md#terminalmissing).
 - **The harness exits while its launcher lives.**
-  - The launcher reports the exit, re-reads the thread credential, and awaits the next gate.
+  - The launcher reports the exit, re-reads the thread credential, and awaits the next gate. `kkd` rotates that credential when the incarnation ends. The rotation does not close the launcher's supervision stream or reject its exit report, because `kkd` authenticates an accepted launcher by its peer process identity.
   - The incarnation is retired without acknowledgement. The thread shows `blocked`, never working.
   - A replacement incarnation is a new `agent_sessions` row and a new one-use gate, awaited by the same accepted launcher. It needs no terminal provisioning.
   - Its gate is activated only after the harness-remnant check above passes.
@@ -251,14 +294,16 @@ This section lists what can go wrong and what kiki does about each case.
 - **The Herdr server crashes or is killed.** Its PTYs close.
   - Processes that ignored hangup or left their session can survive. They are absent from every terminal view. (Hangup is the signal a process gets when its terminal closes.)
   - `kkd` observes the connection error. It treats every binding of that instance as ended and retires every incarnation without acknowledgement. It runs the orphan scan before anything else.
-  - `kkd` **may** start a fresh server so that `kk attach` and repair work. But it starts no agent on its own: each affected thread raises `TerminalMissing`.
-  - A terminal restart is an approved `kk repair` plan with a fresh credential, launch settings, gate, and handshake. It never reuses a remnant or [unbound container](../appendix-a-glossary.md#unbound-container).
-  - The plan does these steps in order:
-    1. It lists every remnant or unbound container whose processes hold the workspace, with those processes.
-    2. It closes each one through freeze, termination with verified exit, and a close request.
-    3. It re-runs the holder scan.
-    4. Only then does it provision a fresh terminal group.
-  - An unresolved [`OrphanedProcess`](../appendix-a-glossary.md#orphanedprocess) blocks that plan for its workspace.
+  - `kkd` starts a fresh server only on demand, the next time a command such as `kk attach` or a repair plan needs it. `kkd` itself started that server, so it gets an `Open` row, and each affected thread needs only `restart-terminal`. `kkd` starts no agent on its own: each affected thread raises `TerminalMissing`.
+  - A terminal restart is the approved `kk repair` plan [`restart-terminal`](../appendix-a-glossary.md#restart-terminal), with a fresh credential, launch settings, gate, and handshake. It never reuses a remnant or [unbound container](../appendix-a-glossary.md#unbound-container).
+  - `restart-terminal` is a journaled lifecycle operation with its own step list:
+    1. It lists every remnant or unbound container tied to the thread, with the processes in each, for approval.
+    2. It freezes those processes. If the freeze returns `Unknown`, it takes verified resume and the plan stops.
+    3. It proves that each listed container holds exactly the processes recorded at freeze. Then it terminates them with verified exit and requests each container's close.
+    4. It re-runs the holder scan and the orphan scan.
+    5. Only then does it provision a fresh terminal group.
+  - Its precondition is that no recorded process survives outside the listed containers. An unresolved [`OrphanedProcess`](../appendix-a-glossary.md#orphanedprocess) blocks the plan for its workspace until [`terminate-orphans`](../appendix-a-glossary.md#terminate-orphans) has run.
+  - If the restart fails after provisioning, `TerminalMissing` stays open and the thread stays `ProjectionDiverged`. The half-made group is removed by [`cleanup-failed-restart`](../appendix-a-glossary.md#cleanup-failed-restart), under the same limits as [`cleanup-failed-create`](../appendix-a-glossary.md#cleanup-failed-create).
 - **[Cold restore](../appendix-a-glossary.md#cold-restore).** A restarted server restores layout, labels, working directories, and the same public ids, with new processes.
   - Launch argv (the command and its arguments) is saved but not rerun. Launch environment and tokens are not kept.
   - A restored pane whose saved directory is gone has no process at all.
@@ -266,7 +311,10 @@ This section lists what can go wrong and what kiki does about each case.
   - A restored pane is a plain shell with no role, running in the jj workspace.
   - `kkd` handles a cold restore exactly as a server crash: new instance, ended bindings, orphan scan, `TerminalMissing`, and the same restart plan that closes remnant containers before provisioning.
   - A restored pane is never `Active` evidence. The generated configuration keeps Herdr from resuming agents itself.
-- **Live handoff** is unsupported in v1, and `kkd` never initiates it. An observed instance change with surviving recorded processes blocks boundary mutation and raises `TerminalMissing` with that evidence.
+- **Live handoff** is unsupported in v1, and `kkd` never initiates it. v1 does not re-prove survivors.
+  - After an observed handoff, including Herdr's own handoff or upgrade, the socket's peer is a server `kkd` did not start.
+  - `kkd` ends the old `terminal_servers` row, which ends its bindings and raises `TerminalMissing`. It records the new peer as `Unverified` and provisions nothing on it.
+  - The fix is `replace-terminal-server`, which stops that server and every process in it. After it, each thread is brought back with `restart-terminal`.
 - **A runtime call's reply is lost.** `kkd` never repeats a create or close blindly.
   - Provisioning recovers from a fresh snapshot and launcher reports. It rotates the [provision nonce](../appendix-a-glossary.md#provision-nonce) before any re-issued create call.
   - Close does not wait on the reply at all. Kiki has already terminated the frozen set with verified exit, and the close request is cleanup.
@@ -276,12 +324,16 @@ This section lists what can go wrong and what kiki does about each case.
   - `ProcessSupervisor` shows the group contains nothing but kiki's own blocked launchers; and
   - the workspace still equals its initial [materialization](../appendix-a-glossary.md#materialization).
 
-  Otherwise the saga stops with its projections intact. Cleanup is then an approved [repair plan](../appendix-a-glossary.md#repair-plan) that uses the close machinery.
+  Otherwise the saga stops with its projections intact. Cleanup is then an approved [repair plan](../appendix-a-glossary.md#repair-plan) that uses the close machinery: [`cleanup-failed-create`](../appendix-a-glossary.md#cleanup-failed-create) or [`cleanup-failed-reopen`](../appendix-a-glossary.md#cleanup-failed-reopen).
 
-- **`kkd` is unreachable from the hook.** What [`kk-hook`](../appendix-a-glossary.md#kk-hook) does depends on how far the batch has got.
-  - Before a batch has activated a [cascade barrier](../appendix-a-glossary.md#delivery-barrier), `kk-hook` **may** degrade to a cached batch-wide pass-through when `kkd` is unreachable. It logs the gap under `errors/<thread_id>.log`.
-  - If a restart loses that cache and the in-flight batch is unknown, kiki leaves files untouched. It replaces the incarnation to establish a clean boundary.
-  - Once reconciliation may have changed files, the durable barrier [fails closed](../appendix-a-glossary.md#fail-closed). Every sibling call remains blocked. An unprovable batch-completion boundary forces a hard restart with the saved payload.
+- **The ready handshake never arrives.** `kkd` waits up to `[timeouts] ready_handshake` (default `60s`) from launch. On expiry a creation becomes `CreateFailed`, and a reopen or restart takes its own failure state.
+- **`kkd` is unreachable from the hook, or slow.** [`kk-hook`](../appendix-a-glossary.md#kk-hook) is a stateless client that makes one call. What happens depends on how far that call got.
+  - **Not admitted in time.** `kk-hook` has `[timeouts] hook_connect` (default `1s`) to connect and be admitted. If that time runs out, it checks the thread's [barrier marker](../appendix-a-glossary.md#barrier-marker). With the marker present, it answers with the generic blocking deny. With the marker absent, it returns the harness's non-blocking decision, so the tool call goes ahead. Either way it logs the gap under `errors/<thread_id>.log`.
+  - **Admitted into a reconciliation.** Once `kkd` has admitted the call into a reconciliation, the hook waits up to `[timeouts] slow_path` (default `30s`). This is the [slow-path bound](../appendix-a-glossary.md#slow-path-bound). If it expires, or `kkd` crashes while it owns the reconciliation, the hook answers with a generic blocking deny ("kiki is reconciling; try again"). It never answers "continue". This is [failing closed](../appendix-a-glossary.md#fail-closed).
+  - **After `kkd` comes back.** The `PassThrough` cache was in `kkd`'s memory and is gone. The first pre-tool call from an incarnation that was already running is an unknown in-flight batch, unless the hook payload proves it is the first call of a new model turn. `kkd` leaves files untouched and replaces the incarnation to establish a clean boundary.
+  - The [cascade barrier](../appendix-a-glossary.md#delivery-barrier) for a blocked batch is durable in `sync_intents`. It survives the restart. An unprovable batch-completion boundary forces a hard restart with the saved payload.
+  - **The barrier marker.** When `kkd` binds a `Block` for a thread, it first writes a durable [barrier marker](../appendix-a-glossary.md#barrier-marker) file in that thread's runtime directory, before it changes any file. It removes the file when the barrier lifts. After a crash, recovery removes it only after the reconciliation is resolved. This is how the stateless hook knows to block while `kkd` is down.
+  - **A hook process that dies before answering.** A proof for each pinned harness version shows that the harness does not run the tool as if the hook had allowed it. If the proof fails, that harness version is unsupported for cascade delivery.
   - Missed transitions remain reconstructable from jj's operation DAG (its graph of operations). The next successful boundary probes actual files before mutation.
   - See [Harness adapter](harness-adapter.md).
 - **A same-UID adversary** can read credentials and invoke `kk` directly. The daemon's authorization model reduces accidental and buggy agent blast radius. It does not defend against active malice. See [Authority](../04-authority.md).

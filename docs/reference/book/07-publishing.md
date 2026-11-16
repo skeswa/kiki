@@ -33,18 +33,31 @@ Before presenting the publish plan for approval, kiki does two things in order:
 
 It validates the v1 linear [owned stack](appendix-a-glossary.md#owned-stack). It includes that head in the [plan digest](appendix-a-glossary.md#plan-digest) (a [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the plan).
 
-After approval, and immediately before pushing, kiki proves the head is unchanged. It then checkpoints the thread [bookmark](appendix-a-glossary.md#bookmark) to the [checkpoint target](appendix-a-glossary.md#checkpoint-target) for that head. A bookmark is jj's named pointer to a revision. The checkpoint target is one of:
+### The checkpoint target
 
-- the head itself; or
-- the head's parent, when the head is the empty, undescribed working-copy commit jj leaves after `jj commit` (see [Threads](03-threads.md#thread-identity)).
+Publish pushes the thread [bookmark](appendix-a-glossary.md#bookmark), so it first picks where the bookmark should go. A bookmark is jj's named pointer to a revision. The place is the [checkpoint target](appendix-a-glossary.md#checkpoint-target) for the pinned head, chosen by the one rule in [Threads](03-threads.md#what-a-checkpoint-does):
 
-The second case exists because jj refuses to push an undescribed commit, and an empty one has nothing to publish.
+- It is the head itself, unless the head is empty and undescribed.
+- For an empty, undescribed head, kiki walks back along the owned chain to the nearest commit that is not both empty and undescribed. jj leaves such an empty commit behind after `jj commit`, and it has nothing to publish.
+- If the walk leaves the owned chain without finding one, publish refuses with "nothing to checkpoint".
 
-That checkpoint is an explicit placement (see [checkpoint placement](appendix-a-glossary.md#checkpoint-placement)). It records the placement and resets the [expected bookmark target](appendix-a-glossary.md#expected-bookmark-target) to the pushed commit.
+### The description check
 
-Two things stop the push:
+jj refuses to push a commit that has no description. So publish checks first, before it places the bookmark. It looks at every commit the push would send: the checkpoint target and each commit below it on the owned chain that the remote does not have yet.
 
-- An unresolved bookmark [projection issue](appendix-a-glossary.md#projection-issue) ([`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing), [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), or [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted)) blocks the checkpoint. So kiki never pushes through a bookmark whose target it cannot explain.
+If any of those commits has no description, publish refuses and names the commits. Nothing is placed and nothing is pushed. The human adds the descriptions and runs `kk publish` again.
+
+### Placing the bookmark and pushing
+
+After approval, and immediately before pushing, kiki proves the head is unchanged. It then checkpoints the thread bookmark to the checkpoint target.
+
+That checkpoint is an explicit placement (see [checkpoint placement](appendix-a-glossary.md#checkpoint-placement)). It records the placement and resets the [expected bookmark target](appendix-a-glossary.md#expected-bookmark-target) to the pushed commit. Like every checkpoint, it only moves the bookmark forward along the owned chain.
+
+Four things stop the push:
+
+- An unresolved bookmark [projection issue](appendix-a-glossary.md#projection-issue) ([`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing), [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted), or `CheckpointAbandoned`) blocks the checkpoint. So kiki never pushes through a bookmark whose target it cannot explain.
+- A [checkpoint relationship](appendix-a-glossary.md#checkpoint-relationship) of `ahead` or `diverged` blocks the checkpoint, because the placement would move the bookmark backward or sideways. Publish stays blocked until the human applies [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target).
+- A commit without a description fails the description check above.
 - If the head has changed, the approval is invalid and kiki regenerates the plan.
 
 kiki never pushes whichever older commit the bookmark happened to retain.

@@ -59,7 +59,7 @@ For some risky operations, kiki asks a person at the keyboard to approve each on
 
 Commands never accept a reusable [Admin](appendix-a-glossary.md#bootstrap-admin-credential) credential from a flag. They never accept a raw approval token from a flag either. When an operation requires `HumanApproval`, `kk`:
 
-1. runs a non-mutating preflight through `BeginApproval`, using its ordinary thread or registration credential;
+1. runs a non-mutating preflight through `BeginApproval`, using its ordinary thread or registration credential (for `kk init`, first run, and the user-scoped `replace-terminal-server` plan, the user's Admin bootstrap credential, because no thread or registration credential applies);
 2. receives and displays the daemon's canonical view of the request: method, target, consequential arguments, [plan digest](appendix-a-glossary.md#plan-digest), and expiry;
 3. verifies that its stdin/stdout terminal is in the [foreground](<https://en.wikipedia.org/wiki/Job_control_(Unix)>), then confirms or cancels the challenge with its separately enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) credential;
 4. retries the exact operation with the issued approval id. The daemon claims that id into one durable operation journal before any external effects happen.
@@ -79,7 +79,36 @@ The flow [fails closed](appendix-a-glossary.md#fail-closed): it stops rather tha
 
 `--yes`, piped confirmation, environment approval, and reusable approval files do not exist.
 
-The first installation may use explicit Admin bootstrap, but only to enroll or recover an approval presenter. Operational methods reject Admin and presenter credentials.
+Explicit Admin bootstrap is used for three things only: to enroll or recover an approval presenter, to begin the approvals for `kk init` and first run (see [First run](#first-run)), and to diagnose and begin the approval of the user-scoped `replace-terminal-server` plan. Operational methods reject Admin and presenter credentials.
+
+## First run
+
+A new machine has no running daemon and no enrolled approval presenter. This section says how each one comes to exist. Nothing here happens silently.
+
+### Installing and starting the daemon
+
+The first `kk` command that needs [`kkd`](appendix-a-glossary.md#kkd) finds no daemon to talk to.
+
+- On an interactive terminal, `kk` asks once whether to install and start `kkd`. On a yes, it installs `kkd` under the user's service manager ([launchd](https://en.wikipedia.org/wiki/Launchd) on macOS, a [systemd](https://en.wikipedia.org/wiki/Systemd) user unit on Linux), starts it, and then runs the command that was typed.
+- On a no, or when `kk` is not running on a terminal, the command exits with an error that says the daemon is not installed and how to install it. Nothing is installed.
+- The question is asked once. Later commands find the daemon running, or the service manager starts it.
+
+### Enrolling the approval presenter
+
+Approvals need an enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter): the local program that shows a plan to a person at the keyboard and collects the answer.
+
+- `kk init` on a terminal enrolls the presenter when none is enrolled. It first shows what is being enrolled, and it enrolls only after the person confirms.
+- The enrollment uses the [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential).
+- `kk init --recover-presenter` replaces a lost presenter. It also uses the Admin bootstrap credential, shows what it will replace, and needs a terminal.
+- Without a terminal, no presenter is enrolled, and every command that needs approval fails closed.
+
+### Which credential begins the first approvals
+
+An approval is normally begun with a thread credential or a repo's registration credential. During `kk init` and first run, neither exists yet: the registration credential is issued only when the registration completes.
+
+- So the approvals for `kk init` and first run are begun under the user's [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential).
+- Admin only begins the challenge. The enrolled presenter still confirms it on a foreground terminal, and the registration still consumes the one-shot approval.
+- Enrolling the presenter and beginning these approvals are the only things `kk init` uses Admin for. Once a repo is registered, its commands use the registration or thread credential.
 
 ## `kk init`
 
@@ -106,7 +135,9 @@ It verifies prerequisites:
 
 ### Approval
 
-The first installation may explicitly use [Admin bootstrap](appendix-a-glossary.md#bootstrap-admin-credential) to enroll the foreground approval presenter. Registering a repo is then a one-shot approved operation (see [Foreground approval flow](#foreground-approval-flow)). The approval is bound to the repo's canonical path and derived repo id.
+On a terminal, `kk init` enrolls the foreground approval presenter when none is enrolled. It shows what is being enrolled first, and it uses [Admin bootstrap](appendix-a-glossary.md#bootstrap-admin-credential) for that one step (see [First run](#first-run)). Registering a repo is then a one-shot approved operation (see [Foreground approval flow](#foreground-approval-flow)). That approval is begun under the user's Admin bootstrap credential, because the repo has no registration credential yet. The approval is bound to the repo's canonical path and derived repo id.
+
+`kk init --recover-presenter` replaces a lost presenter using the Admin bootstrap credential. It registers nothing.
 
 `kk init` never turns bootstrap Admin into ambient CLI authority. The already-registered idempotent path is read-only and needs no new approval.
 
@@ -127,12 +158,19 @@ Re-registering after `kk repo unregister` is the explicit re-registration path.
 What `kk` does with no arguments depends on whether the TUI has shipped and on where you run it.
 
 - Bare `kk` opens the [overlay TUI](appendix-a-glossary.md#overlay-tui) in `NAVIGATE` mode (see [Interface](10-interface/spec.md)) once the TUI ships. A TUI is a [text-based user interface](https://en.wikipedia.org/wiki/Text-based_user_interface) drawn inside the terminal.
-- Before the TUI ships, it prints a short command summary and points to `kk ls`.
-- Outside a registered repo, `kk` falls back to the command summary plus `kk ls` even after the TUI ships.
+- Whenever no overlay is available, bare `kk` prints the [`kk ls`](#kk-ls) listing. That covers three cases: before the TUI ships, outside a registered repo, and when `kk` is not running on an interactive terminal.
 
 ## `kk new`
 
-`kk new` creates a [thread](appendix-a-glossary.md#thread), as specified in [Threads](03-threads.md).
+`kk new [<name>]` creates a [thread](appendix-a-glossary.md#thread), as specified in [Threads](03-threads.md).
+
+### The name
+
+`<name>` is optional. It sets the thread's display name and its bookmark name.
+
+- With `<name>`, the thread uses that name. The name is human-owned, so the v1.x [auto-rename](appendix-a-glossary.md#auto-rename) feature never changes it.
+- Without `<name>`, the thread gets the placeholder name `unnamed-<short-hex>`, which kiki owns. In the [acceptance slice](appendix-a-glossary.md#acceptance-slice) this is true even when a prompt is supplied.
+- Deriving a name from the prompt is v1.x work.
 
 ### Approval
 
@@ -152,6 +190,7 @@ Important flags:
 
 - `--follows <parent>` creates a live [follows](appendix-a-glossary.md#follows) edge — a link that makes this thread track a parent thread;
 - `--no-follow` suppresses contextual following;
+- a request to make the new thread follow another is refused when the new thread's harness failed its [`RestartStartup`](appendix-a-glossary.md#restartstartup-delivery-proof) proof. That harness runs managed sessions without cascade delivery, so its threads cannot follow. The refusal names that reason. This covers `--follows <parent>` and the contextual default alike; `--no-follow` creates the thread with no edge;
 - `-m "<prompt>"` supplies an initial prompt, delivered to the [harness](appendix-a-glossary.md#harness) as the first user turn;
 - `--harness <name>` selects a harness for the thread;
 - `--harness-arg <arg>` passes harness-specific arguments;
@@ -162,7 +201,7 @@ Important flags:
 The initial prompt can come from `-m` or [stdin](https://en.wikipedia.org/wiki/Standard_streams) (standard input).
 
 - If both are supplied, `-m` wins.
-- If neither is supplied, `kk new` proceeds without an initial prompt. The placeholder name becomes `unnamed-<short-hex>` (kk-owned), and the agent starts with no first-turn input.
+- If neither is supplied, `kk new` proceeds without an initial prompt, and the agent starts with no first-turn input.
 
 It is fine to spawn a thread before you know what it is about.
 
@@ -267,7 +306,7 @@ In particular, `kk attach` can cause `kkd` to start the server after a reboot or
 - every affected thread shows a [`TerminalMissing`](appendix-a-glossary.md#terminalmissing) issue until `kk repair` restarts it;
 - none is `Active` (see [Terminal runtime](13-architecture/terminal-runtime.md#runtime-changes-are-reconciliation)).
 
-A running [server instance](appendix-a-glossary.md#server-instance) that `kkd` did not start is unverified. Threads bound to it read `TerminalMissing` until `kkd` restarts the server under an approved plan.
+A running [server instance](appendix-a-glossary.md#server-instance) that `kkd` did not start is unverified. That includes the server left by Herdr's own handoff or upgrade. `kkd` provisions nothing on it, and the threads that were bound to the old server read `TerminalMissing`. The fix is the approved [`replace-terminal-server`](appendix-a-glossary.md#replace-terminal-server) plan (see [`kk repair --server`](#the-terminal-server-replace-terminal-server)), and after it `restart-terminal` for each thread.
 
 Detaching and reattaching a client changes nothing in kiki's state.
 
@@ -275,14 +314,16 @@ Detaching and reattaching a client changes nothing in kiki's state.
 
 `kk ls` lists your threads and the state each one is in.
 
-It lists operational threads: `Active` threads plus threads in visible creation, close, failure, and projection-repair states. (See [thread lifecycle states](appendix-a-glossary.md#thread-lifecycle-states).) Every non-Active row includes its lifecycle label spelled out in text; color is never the only signal. `Closed` stays outside the default lifecycle scope.
+It lists operational threads: `Active` threads plus threads in visible creation, close, failure, and projection-repair states. (See [thread lifecycle states](appendix-a-glossary.md#thread-lifecycle-states).) Every non-Active row includes its lifecycle label spelled out in text; color is never the only signal. `Closed` stays outside the default lifecycle scope, with one exception.
+
+The exception is a reopen in progress. A `Closed` thread with a `Reopen` operation in progress appears in the default listing, marked with the `…` glyph and the words that say a reopen is running. The overlay shows the same row.
 
 ### Where the list comes from
 
 `kk ls` reads kiki's state, not Herdr's. It works with no client attached and with the [dedicated server](appendix-a-glossary.md#dedicated-herdr-server) stopped.
 
 - A thread whose [terminal group](appendix-a-glossary.md#terminal-group), [server instance](appendix-a-glossary.md#server-instance), or agent role is gone is listed as `ProjectionDiverged` with the reason [`TerminalMissing`](appendix-a-glossary.md#terminalmissing).
-- A thread with a recorded process that is alive without a current binding, or with a [harness remnant](appendix-a-glossary.md#harness-remnant), is listed with the reason [`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess). A harness remnant is a process left behind by a harness that already ended.
+- A thread with an [orphan](appendix-a-glossary.md#orphan) is listed with the reason [`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess). An orphan is one of two things: a recorded process that is alive with no current binding and outside every container on the current server instance, or a [harness remnant](appendix-a-glossary.md#harness-remnant). A harness remnant is a process left behind by a harness that already ended.
 - Neither is ever listed as `Active`, whatever Herdr's sidebar or a restored pane shows.
 - A thread whose [harness](appendix-a-glossary.md#harness) crashed under a live launcher stays `Active` with the agent state shown as blocked.
 
@@ -295,7 +336,7 @@ Repo scope and lifecycle scope are independent:
 - Inside a registered repo, the default scope is the current repo.
 - Outside a registered repo, the default scope is all registered repos, and the output includes a `repo` column.
 - `--all-repos` widens repo scope from the current repo to all registered repos.
-- `--all` adds closed threads to the operational states.
+- `--all` adds closed threads to the operational states. A closed thread with an open [`CheckpointAbandoned`](appendix-a-glossary.md#checkpointabandoned) issue is shown here with that reason. It is not a loud attention event.
 - Destroyed threads stay hidden unless an explicit destroyed-thread flag is added.
 
 `--all` must not change repo scope.
@@ -374,28 +415,38 @@ The checkpoint line shows three facts:
 
 The relationship is defined purely on `bookmark_expected_commit_id` and the live head, tested on a single-parent path between them:
 
-| value      | meaning                                                                                                                                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `current`  | the expected target is the live head, or the live head is an empty, undescribed working-copy commit whose parent is the expected target — the state right after `jj commit` and right after `kk reopen` |
-| `behind`   | the live head is any other descendant of the expected target; the detailed label is `checkpoint behind head`                                                                                            |
-| `ahead`    | the live head is an ancestor of the expected target, for example after `jj edit` of an earlier commit                                                                                                   |
-| `diverged` | anything else                                                                                                                                                                                           |
+| value      | meaning                                                                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `current`  | the expected target is the live head, or it is the commit the checkpoint target rule below picks — the state right after `jj commit` and right after `kk reopen` |
+| `behind`   | the live head is any other descendant of the expected target; the detailed label is `checkpoint behind head`                                                     |
+| `ahead`    | the live head is an ancestor of the expected target, for example after `jj edit` of an earlier commit                                                            |
+| `diverged` | anything else                                                                                                                                                    |
 
 `behind` is the ordinary reading once work continues past a checkpoint.
 
-A checkpoint targets the live head, with one exception. When the live head is an empty, undescribed working-copy commit whose parent is on the owned chain, the checkpoint targets that parent. The thread then still reads `current`. (See [checkpoint target](appendix-a-glossary.md#checkpoint-target).)
+The [checkpoint target](appendix-a-glossary.md#checkpoint-target) is the commit a checkpoint would place the bookmark on. The rule is:
+
+- The target is the live head.
+- When the head is empty and undescribed, kiki walks back along the owned chain to the nearest commit that is not both empty and undescribed. That commit is the target.
+- If the walk reaches the expected target first, the bookmark stays where it is.
+- If the walk leaves the owned chain without finding either, the checkpoint refuses with "nothing to checkpoint".
+- Creation is the one exception: it places the bookmark on the new thread's first, empty commit.
+
+A thread reads `current` when the expected target equals the commit this rule picks, or equals the head.
 
 The placed checkpoint and the tracked expected target differ whenever jj has carried the bookmark to a successor since the last placement. That difference is normal and is not an issue.
 
 ### When a checkpoint refuses
 
-A checkpoint refuses when its target is not equal to or a descendant of the expected target. So while a thread reads `ahead` or `diverged`, publish, close, and detach stop at their checkpoint and say why.
+A checkpoint (at creation, publish, close, or detach) only moves the bookmark forward along the owned chain. It never moves it backward or sideways, and it never passes jj's `--allow-backwards` flag.
 
-Moving the bookmark backward or sideways is never a side effect of a checkpoint. It is a separately approved `kk repair` plan.
+So a checkpoint refuses when its target is not equal to or a descendant of the expected target. While a thread reads `ahead` or `diverged`, publish, close, and detach stop at their checkpoint and say why.
+
+The exit is the approved [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target) repair plan (see [Bookmark plans](#bookmark-plans)). It is offered for an `ahead` or `diverged` thread even when no issue is open. Two common ways to get there are `jj edit` of an earlier commit, and `jj rebase -r` of the bookmarked commit to somewhere else. Publish, close, and detach stay blocked until that plan is applied.
 
 ### Issues shown in the header
 
-Open bookmark issues are reported separately. An open [`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing), [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), or [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted) issue is printed by name beside the relationship, with the observed target or targets, and points to `kk repair`. It does not change the relationship word.
+Open bookmark issues are reported separately. An open [`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing), [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted), or [`CheckpointAbandoned`](appendix-a-glossary.md#checkpointabandoned) issue is printed by name beside the relationship, with the observed target or targets, and points to `kk repair`. It does not change the relationship word.
 
 The repository's [operation frontier](appendix-a-glossary.md#operation-frontier) can be [unmerged](appendix-a-glossary.md#unmerged-frontier): jj has more than one newest operation. When it is unmerged and its heads disagree about the head or the bookmark, the header prints `frontier unmerged` instead of a relationship. Kiki does not merge operation heads to answer a status query.
 
@@ -443,19 +494,40 @@ Preflight then takes the [boundary snapshot](appendix-a-glossary.md#boundary-sna
 
 The plan covers the whole [terminal group](appendix-a-glossary.md#terminal-group), not only the agent: every [role pane](appendix-a-glossary.md#role-pane) and every pane or tab the user added.
 
-The rendered plan lists the process inventory found at preflight and states its scope in these words: the approval covers every process in the listed terminal containers at freeze time. A process that appears in a listed container between preflight and freeze is terminated under that statement; it is not drift.
+The rendered plan lists the process inventory found at preflight. The plan card also shows the container-scope statement, in these words: the approval covers every process in the listed terminal containers at freeze time.
+
+The approval's [fingerprint](appendix-a-glossary.md#close-plan-fingerprint) covers:
+
+- the set of terminal containers;
+- the role launcher identities;
+- the set of [holders](appendix-a-glossary.md#holder) outside those containers;
+- the workspace state;
+- the [checkpoint target](appendix-a-glossary.md#checkpoint-target);
+- the child threads.
+
+It does not cover the list of processes inside each container. Those processes are covered by the container-scope statement and are recorded at freeze. So a process that joins a listed container between preflight and freeze is covered: it is terminated under that statement, and it is not [drift](appendix-a-glossary.md#drift). A "membership change" that counts as drift means a change in the container set, in a role launcher's identity, or in the holders outside the listed containers.
 
 ### Order of steps
 
 Close [freezes](appendix-a-glossary.md#freeze) (pauses) and accounts for all of those processes before it changes anything. Then, in order:
 
-1. Kiki places the checkpoint and runs the [final proof](appendix-a-glossary.md#final-proof).
-2. Kiki itself terminates the [frozen set](appendix-a-glossary.md#frozen-set) while it is still stopped, and verifies each exit by recorded identity (see [verified exit](appendix-a-glossary.md#verified-exit)).
-3. Only then does kiki ask Herdr to close the terminal group. That request is cleanup, and its reply is not evidence.
-4. A filesystem recheck follows (the [post-exit filesystem recheck](appendix-a-glossary.md#post-exit-filesystem-recheck)).
-5. Kiki forgets the jj workspace and deletes its directory.
+1. **Freeze.** Kiki freezes every process in the terminal group.
+2. **Post-freeze recheck.** Kiki repeats its loss checks against the frozen workspace (the [post-freeze recheck](appendix-a-glossary.md#post-freeze-recheck)).
+3. **Holder scan.** Kiki scans for [holders](appendix-a-glossary.md#holder) of the workspace outside the frozen set.
+4. **Checkpoint.** Kiki places the checkpoint.
+5. **Each child step.** Kiki does every approved child step.
+6. **Final proof.** Kiki runs the [final proof](appendix-a-glossary.md#final-proof). It checks that each listed container still holds its recorded launcher (if it had one) and exactly the processes recorded at freeze. Nothing is terminated before it.
+7. **Kiki-side termination with verified exit.** Kiki itself terminates the [frozen set](appendix-a-glossary.md#frozen-set) while it is still stopped, and verifies each exit by recorded identity (see [verified exit](appendix-a-glossary.md#verified-exit)).
+8. **Terminal-container close request.** Only then does kiki ask Herdr to close the terminal group. That request is cleanup, and its reply is not evidence.
+9. **Post-exit filesystem recheck.** A filesystem recheck follows (the [post-exit filesystem recheck](appendix-a-glossary.md#post-exit-filesystem-recheck)).
+10. **Workspace forget.** Kiki forgets the jj workspace.
+11. **Directory delete.** Kiki deletes the workspace directory.
 
-If exit or the recheck cannot be verified, the files stay and the thread becomes `CloseFailed`.
+Every close uses this one list. [`close-without-terminal`](appendix-a-glossary.md#close-without-terminal) runs the same steps after its own preflight inventory and approval.
+
+A failure before the final proof takes [verified resume](appendix-a-glossary.md#verified-resume): the frozen processes run again and the thread returns to `Active`. If the resume itself cannot be proved, the thread becomes `CloseFailed`. Any single step taken while processes are frozen must finish within `[timeouts] frozen_step`; if that time runs out before termination begins, kiki also takes verified resume.
+
+Once termination has begun there is no resume. If exit cannot be verified within `[timeouts] verified_exit`, or the recheck fails, the files stay and the thread becomes `CloseFailed`. `kk repair` then offers [`retry-close`](appendix-a-glossary.md#retry-close).
 
 ### Processes outside the listed containers
 
@@ -507,7 +579,7 @@ Kiki does not clean up automatically if reopen fails after any of these:
 - anything but kiki's own blocked launchers ran in the group;
 - the workspace changed from its initial [materialization](appendix-a-glossary.md#materialization) (the files kiki first wrote into it).
 
-The projections stay, and cleanup is an approved `kk repair` plan.
+The projections stay, and cleanup is the approved [`cleanup-failed-reopen`](appendix-a-glossary.md#cleanup-failed-reopen) plan in `kk repair`.
 
 ### Catch-up
 
@@ -542,7 +614,7 @@ The first comments surface is read-only. Feeding review comments into agent cont
 
 ## `kk thread interrupt`
 
-`kk thread interrupt <thread>` is the human's way to stop an agent that is stuck or off track. It is a v1.x management command.
+`kk thread interrupt [<thread>]` is the human's way to stop an agent that is stuck or off track. It is a v1.x management command. The target is optional and defaults to the contextual thread (see [Context resolution](#context-resolution)).
 
 It hard-stops the thread's agent and reframes it through the harness resume path. It is the explicit human escape hatch for a stuck or off-track agent, and it uses the same [hard-escalation](appendix-a-glossary.md#hard-escalation) shape as cascade conflict handling.
 
@@ -579,26 +651,25 @@ How the command selects a revision other than the thread's current one is settle
 
 ## `kk thread detach`
 
-`kk thread detach <thread>` removes the thread's live [follows](appendix-a-glossary.md#follows) edge, so the thread stops tracking its parent. See [Cascade](05-cascade.md#detach-and-graph-surgery) for what detach does and does not touch.
+`kk thread detach [<thread>]` removes the thread's live [follows](appendix-a-glossary.md#follows) edge, so the thread stops tracking its parent. The target is optional and defaults to the contextual thread (see [Context resolution](#context-resolution)). See [Cascade](05-cascade.md#detach-and-graph-surgery) for what detach does and does not touch.
 
 ### Order of steps
 
 Before detach decides that no reconciliation is pending, it does these things:
 
-1. It synchronously runs `RefreshToFrontier`.
+1. It synchronously runs [`RefreshToFrontier`](appendix-a-glossary.md#refreshtofrontier), which brings kiki's records up to date with jj's newest operations.
 2. It refreshes the parent and child [live heads](appendix-a-glossary.md#live-head) from that pinned view.
 3. It creates any transition a lagging watcher had not yet recorded.
 
-The user must reconcile that exact transition or explicitly discard it. Only then does detach checkpoint the child at its [checkpoint target](appendix-a-glossary.md#checkpoint-target) and delete the edge.
+The user must reconcile that exact transition or explicitly discard it. Pending parent work is discarded only with `--discard-pending`; without that flag, detach refuses while a transition is pending and says so. Only then does detach checkpoint the child at its [checkpoint target](appendix-a-glossary.md#checkpoint-target) and delete the edge.
 
-Follows graph surgery — `kk thread attach` and `kk thread reparent` — is out of v1.
+Follows graph surgery — `kk thread attach` and `kk thread reparent` — is out of v1. When those commands ship, they refuse the same way as `kk new --follows` for a thread whose harness failed its `RestartStartup` proof.
 
 ### Approval
 
-A same-thread detach with no pending reconciliation uses thread-scoped authority. Three cases require one-shot [approval](#foreground-approval-flow) bound to that choice:
+A same-thread detach with no pending reconciliation uses thread-scoped authority. Two cases require one-shot [approval](#foreground-approval-flow) bound to that choice:
 
-- discarding a pending transition;
-- rewriting revisions;
+- discarding a pending transition with `--discard-pending`;
 - detaching an explicitly targeted different thread.
 
 ## `kk thread destroy`
@@ -611,7 +682,7 @@ It permanently removes kiki's thread [projections](appendix-a-glossary.md#projec
 
 Important flags:
 
-- `--keep-log` retains transcript rows for explicit destroyed-thread views.
+- `--keep-log` retains the thread's transcript rows instead of deleting them. The view that reads those kept rows is future work; until it ships, no command shows them.
 - `--abandon-revisions` additionally abandons revisions — but only the exact validated linear owned chain named in the approval plan.
   - The plan lists every change/commit id and every affected registered descendant.
   - Ambiguous topology, foreign commits, or plan drift refuses the operation rather than widening the revset.
@@ -622,19 +693,20 @@ For an active thread, destroy stops processes before it touches history. The ord
 
 1. freeze;
 2. [post-freeze recheck](appendix-a-glossary.md#post-freeze-recheck);
-3. [final proof](appendix-a-glossary.md#final-proof);
-4. terminate the [frozen set](appendix-a-glossary.md#frozen-set) with [verified exit](appendix-a-glossary.md#verified-exit);
-5. terminal-group close request;
-6. [post-exit filesystem recheck](appendix-a-glossary.md#post-exit-filesystem-recheck);
-7. then bookmark deletion;
-8. the optional exact abandon;
-9. workspace forget and delete;
-10. credential revocation;
-11. and the tombstone.
+3. holder scan;
+4. [final proof](appendix-a-glossary.md#final-proof);
+5. terminate the [frozen set](appendix-a-glossary.md#frozen-set) with [verified exit](appendix-a-glossary.md#verified-exit);
+6. terminal-group close request;
+7. [post-exit filesystem recheck](appendix-a-glossary.md#post-exit-filesystem-recheck);
+8. then bookmark deletion;
+9. the optional exact abandon;
+10. workspace forget and delete;
+11. credential revocation;
+12. and the tombstone.
 
-Drift before termination takes the [verified-resume](appendix-a-glossary.md#verified-resume) path. Process termination is the first irreversible step. After it the thread can only finish the plan or become `DestroyFailed`.
+Drift before termination takes the [verified-resume](appendix-a-glossary.md#verified-resume) path. Process termination is the first irreversible step. After it the thread can only finish the plan or become `DestroyFailed`. From `DestroyFailed`, `kk repair` offers [`retry-destroy`](appendix-a-glossary.md#retry-destroy), which resumes that exact plan.
 
-The approval covers every process in the listed terminal containers at freeze time, as for close. A destroy from `ProjectionDiverged` lists and closes [remnant](appendix-a-glossary.md#remnant-container) or [unbound](appendix-a-glossary.md#unbound-container) containers that hold the workspace in the same way as a repair plan.
+The approval covers every process in the listed terminal containers at freeze time, as for close. A destroy from `ProjectionDiverged` lists and closes [remnant](appendix-a-glossary.md#remnant-container) or [unbound](appendix-a-glossary.md#unbound-container) containers tied to the thread in the same way as a repair plan.
 
 ### Approval
 
@@ -646,7 +718,7 @@ Destroy requires one-shot [foreground approval](#foreground-approval-flow) even 
 
 ## `kk repair`
 
-`kk repair [<thread>]` diagnoses a thread whose state went wrong and offers named plans to fix it.
+`kk repair [<thread>]` diagnoses a thread whose state went wrong and offers named plans to fix it. With `--repo` or `--server` it does the same for the repo or for the terminal server.
 
 It is the human-directed recovery surface for a `ProjectionDiverged`, `CreateFailed`, `CloseFailed`, `DestroyFailed`, exhausted-delivery, or other repairable lifecycle condition. The lifecycle and projection chapters own those states; this command owns their shared interaction shape.
 
@@ -668,7 +740,93 @@ Kiki may repair provably idempotent projection drift automatically in the backgr
 - A same-thread, non-destructive projection repair may use [`ThreadScoped`](appendix-a-glossary.md#threadscoped-credential).
 - Any destructive, revision-rewriting, topology-changing, or cross-thread plan requires one-shot [approval](#foreground-approval-flow) bound to the repair id and target.
 
-`--all` diagnoses all registered threads but does not apply plans.
+### Scopes: thread, repo, and server
+
+`kk repair` works at four scopes.
+
+- **One thread.** `kk repair [<thread>]` diagnoses one thread. The target defaults to the contextual thread.
+- **Every thread in the repo.** `kk repair --all` diagnoses every thread in the caller's repo, including closed threads with an open issue. It never crosses repos, and it does not apply plans.
+- **The repo.** `kk repair --repo` diagnoses repo-level issues for the caller's repo. `kk repair --repo --apply <plan-id>` applies one. It needs a one-shot approval with repo scope. The one repo-level issue in v1 is [`OperationHistoryRewritten`](#repository-operation-history).
+- **The terminal server.** `kk repair --server` diagnoses the user's [dedicated Herdr server](appendix-a-glossary.md#dedicated-herdr-server). `kk repair --server --apply <plan-id>` applies the user-scoped [`replace-terminal-server`](#the-terminal-server-replace-terminal-server) plan under a one-shot approval.
+
+### Every issue and its plan
+
+This table is the full list. It names the plan for each issue or failed state and says what approval the plan needs. "One-shot" means the [foreground approval flow](#foreground-approval-flow). Other chapters use these plan names.
+
+| Issue or failed state                             | Plan                                                                                                                         | Approval                                                                                                           |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| [`TerminalMissing`][i-tm]                         | [`restart-terminal`][p-rt], or [`close-without-terminal`][p-cwt]                                                             | one-shot                                                                                                           |
+| crashed harness under a live launcher             | [`restart-agent`][p-ra]                                                                                                      | none in the thread's own context                                                                                   |
+| [`OrphanedProcess`][i-op]                         | [`terminate-orphans`][p-to]                                                                                                  | one-shot                                                                                                           |
+| unverified or changed terminal server             | [`replace-terminal-server`][p-rts] (`kk repair --server`)                                                                    | one-shot, user scope                                                                                               |
+| `CreateFailed`                                    | [`cleanup-failed-create`][p-cfc]                                                                                             | one-shot                                                                                                           |
+| failed reopen                                     | [`cleanup-failed-reopen`][p-cfr]                                                                                             | one-shot                                                                                                           |
+| failed terminal restart                           | [`cleanup-failed-restart`][p-cfrs]                                                                                           | one-shot                                                                                                           |
+| `CloseFailed`                                     | [`retry-close`][p-rc]                                                                                                        | none; it continues the plan that was already approved                                                              |
+| `DestroyFailed`                                   | [`retry-destroy`][p-rd]                                                                                                      | none; it continues the plan that was already approved                                                              |
+| [`WorkspaceDirectoryMissing`][i-wdm]              | [`recreate-workspace`][p-rw]                                                                                                 | none in the thread's own context; one-shot from anywhere else                                                      |
+| [`WorkspaceRecordMissing`][i-wrm]                 | [`reattach-workspace`][p-raw]                                                                                                | none in the thread's own context; one-shot from anywhere else                                                      |
+| [`WorkspacePathMismatch`][i-wpm]                  | [`repoint-workspace`][p-rpw]                                                                                                 | none in the thread's own context; one-shot from anywhere else                                                      |
+| [exhausted intent][i-ei]                          | [`retry-delivery`][p-rdl], or [`discard-delivery`][p-dd]                                                                     | none in the thread's own context for retry; one-shot for discard                                                   |
+| [`BookmarkMissing`][i-bm]                         | [`restore-bookmark`][p-rb] while the expected target is visible; [`choose-bookmark-target`][p-cbt]                           | restore: none in the thread's own context; one-shot when applied to a different thread; choose: one-shot           |
+| [`BookmarkMoved`][i-bmv]                          | [`restore-bookmark`][p-rb] while the expected target is visible; [`adopt-bookmark`][p-ab]; [`choose-bookmark-target`][p-cbt] | restore: none in the thread's own context; one-shot when applied to a different thread; adopt and choose: one-shot |
+| [`BookmarkConflicted`][i-bc]                      | [`restore-bookmark`][p-rb] while the expected target is visible; [`choose-bookmark-target`][p-cbt]                           | restore: none in the thread's own context; one-shot when applied to a different thread; choose: one-shot           |
+| [`CheckpointAbandoned`][i-ca]                     | [`unhide-checkpoint`][p-uc] when unhiding would not create a divergent change; [`choose-bookmark-target`][p-cbt]             | one-shot                                                                                                           |
+| no open issue, relationship `ahead` or `diverged` | [`choose-bookmark-target`][p-cbt]                                                                                            | one-shot                                                                                                           |
+| [`OperationHistoryRewritten`][i-ohr] (repo level) | [`reanchor-history`][p-rh] (`kk repair --repo`)                                                                              | one-shot, repo scope                                                                                               |
+
+[i-tm]: appendix-a-glossary.md#terminalmissing
+[i-op]: appendix-a-glossary.md#orphanedprocess
+[i-wdm]: appendix-a-glossary.md#workspacedirectorymissing
+[i-wrm]: appendix-a-glossary.md#workspacerecordmissing
+[i-wpm]: appendix-a-glossary.md#workspacepathmismatch
+[i-ei]: appendix-a-glossary.md#exhausted-intent
+[i-bm]: appendix-a-glossary.md#bookmarkmissing
+[i-bmv]: appendix-a-glossary.md#bookmarkmoved
+[i-bc]: appendix-a-glossary.md#bookmarkconflicted
+[i-ca]: appendix-a-glossary.md#checkpointabandoned
+[i-ohr]: appendix-a-glossary.md#operationhistoryrewritten
+[p-rt]: appendix-a-glossary.md#restart-terminal
+[p-cwt]: appendix-a-glossary.md#close-without-terminal
+[p-ra]: appendix-a-glossary.md#restart-agent
+[p-to]: appendix-a-glossary.md#terminate-orphans
+[p-rts]: appendix-a-glossary.md#replace-terminal-server
+[p-cfc]: appendix-a-glossary.md#cleanup-failed-create
+[p-cfr]: appendix-a-glossary.md#cleanup-failed-reopen
+[p-cfrs]: appendix-a-glossary.md#cleanup-failed-restart
+[p-rc]: appendix-a-glossary.md#retry-close
+[p-rd]: appendix-a-glossary.md#retry-destroy
+[p-rw]: appendix-a-glossary.md#recreate-workspace
+[p-raw]: appendix-a-glossary.md#reattach-workspace
+[p-rpw]: appendix-a-glossary.md#repoint-workspace
+[p-rdl]: appendix-a-glossary.md#retry-delivery
+[p-dd]: appendix-a-glossary.md#discard-delivery
+[p-rb]: appendix-a-glossary.md#restore-bookmark
+[p-ab]: appendix-a-glossary.md#adopt-bookmark
+[p-cbt]: appendix-a-glossary.md#choose-bookmark-target
+[p-uc]: appendix-a-glossary.md#unhide-checkpoint
+[p-rh]: appendix-a-glossary.md#reanchor-history
+
+Three notes on the approval column:
+
+- "None in the thread's own context" means the plan uses `ThreadScoped` when it is applied from inside that thread. Applied to a different thread, every plan needs one-shot approval, as any cross-thread change does.
+- `retry-close` and `retry-destroy` continue the journal of a plan the human already approved. They never widen it. If the plan can no longer be finished as approved, the diagnosis says so and offers a fresh plan that needs a new approval.
+- A closed thread, a `CreateFailed` thread, and a `DestroyFailed` thread may also be destroyed through the [destroy](03-threads.md#destroy) preflight once that command ships.
+
+### Failed close and destroy
+
+- **[`retry-close`](appendix-a-glossary.md#retry-close)** resumes a `CloseFailed` thread's close journal from the step that failed. It re-runs exit verification by recorded identity and re-reads the workspace fingerprint before it forgets or deletes anything. Where the diagnosis instead proves a live terminal group and a responsive agent, it reports that the thread can return to `Active`.
+- **[`retry-destroy`](appendix-a-glossary.md#retry-destroy)** resumes a `DestroyFailed` thread's destroy journal in the same way. It applies exactly the approved plan, including the exact revision list when `--abandon-revisions` was approved.
+
+### Workspace plans
+
+Three issues are about the thread's jj [workspace](appendix-a-glossary.md#workspace). Kiki fixes such an issue by itself only when it can prove that exactly one fix is possible (see [Threads](03-threads.md#projection-divergence-and-repair)). Otherwise `kk repair` offers these plans:
+
+- **[`recreate-workspace`](appendix-a-glossary.md#recreate-workspace)** is for [`WorkspaceDirectoryMissing`](appendix-a-glossary.md#workspacedirectorymissing): the directory is gone. The plan creates the directory again from the checkpoint. Edits that were never recorded in jj are not recovered, and the plan says so.
+- **[`reattach-workspace`](appendix-a-glossary.md#reattach-workspace)** is for [`WorkspaceRecordMissing`](appendix-a-glossary.md#workspacerecordmissing): jj has forgotten the workspace, but the directory is still there. The plan creates the jj workspace record again for that directory.
+- **[`repoint-workspace`](appendix-a-glossary.md#repoint-workspace)** is for [`WorkspacePathMismatch`](appendix-a-glossary.md#workspacepathmismatch): the workspace is at a different path from the one kiki recorded. The plan records the path the human confirms. Kiki does this by itself only when jj's stable workspace id proves the moved directory is the same one.
+
+While one of these issues is open, kiki makes no change that depends on the broken workspace record, path, or directory.
 
 ### Exhausted delivery
 
@@ -679,7 +837,7 @@ An intent is kiki's durable record of one update it owes an agent (see [`sync_in
   - it increments the intent's [`delivery_epoch`](appendix-a-glossary.md#delivery-epoch);
   - it resets the soft-redelivery count.
 
-  It then permits one fresh bounded [`RestartStartup`](appendix-a-glossary.md#restartstartup-delivery-proof) cycle whose attempts are stamped with and counted under the new epoch. The human runs it after changing whatever made delivery fail, such as upgrading the harness.
+  It then permits one fresh [`RestartStartup`](appendix-a-glossary.md#restartstartup-delivery-proof) cycle of at most `[cascade] delivery_attempts` attempts (default 3). Those attempts are stamped with and counted under the new epoch. The human runs it after changing whatever made delivery fail, such as upgrading the harness.
 
 - **[`discard-delivery`](appendix-a-glossary.md#discard-delivery)** acknowledges the intent without delivery proof. It runs under a one-shot approval bound to the plan, and it records the human resolution on the intent. The payload is then never delivered to the agent, and the plan says so before it is approved.
 
@@ -698,7 +856,7 @@ A dead harness under a live launcher is never shown as working.
 - **[`restart-agent`](appendix-a-glossary.md#restart-agent).** This is the explicit restart path for that case.
   - It starts a replacement incarnation on the live launcher. That means a fresh one-use [launch gate](appendix-a-glossary.md#launch-gate), awaited by the same accepted launcher, with `RestartStartup` delivery if an intent is pending.
   - Its precondition is an inventory rooted at the `agent` launcher that shows no process other than the launcher itself.
-  - A surviving tool child of the retired harness is a [harness remnant](appendix-a-glossary.md#harness-remnant): it raises [`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess) and blocks the gate.
+  - A surviving tool child of the retired harness is a [harness remnant](appendix-a-glossary.md#harness-remnant): it raises [`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess) and blocks the gate until [`terminate-orphans`](appendix-a-glossary.md#terminate-orphans) clears it.
   - The plan provisions nothing in the terminal.
   - Applied in the thread's own context it uses `ThreadScoped` and needs no approval.
 
@@ -708,26 +866,68 @@ A dead harness under a live launcher is never shown as working.
 
 While the issue is open, boundary delivery, materialization, and lifecycle mutation are blocked, except for the approved plans below.
 
-A `TerminalMissing` issue covers a missing server instance, a missing terminal group, an ended `agent` role, a [cold restore](appendix-a-glossary.md#cold-restore), and an observed handoff. The diagnosis says which, with the recorded and observed server instance, binding, and process identities. It offers:
+A `TerminalMissing` issue covers a missing server instance, a missing terminal group, an ended `agent` role, a [cold restore](appendix-a-glossary.md#cold-restore), and an observed handoff. The diagnosis says which, with the recorded and observed server instance, binding, and process identities.
 
-- **Restart the terminal and agent ([`restart-terminal`](appendix-a-glossary.md#restart-terminal)).** Kiki never reuses a [remnant](appendix-a-glossary.md#remnant-container) or [unbound](appendix-a-glossary.md#unbound-container) container.
-  - The plan lists every remnant or unbound container whose processes hold the workspace, with those processes.
-  - On approval it closes each listed container — freeze, terminate with verified exit, then the close request. It then re-runs the holder scan, and only then provisions a fresh terminal group.
+Two kinds of leftover container matter to both plans below. Kiki never reuses either kind.
+
+- A [remnant container](appendix-a-glossary.md#remnant-container) is one Herdr restored after a cold restore.
+- An [unbound container](appendix-a-glossary.md#unbound-container) is a terminal container on the current server instance with no current binding. That includes a group whose binding ended because its `agent` launcher died while the group itself survived. Kiki ties an unbound container to a thread in two ways only: by kiki's record of a binding that ended on the same server instance, or by OS evidence that its processes hold the thread's workspace.
+
+The processes in these containers are terminal members, not [orphans](appendix-a-glossary.md#orphan). Both plans list the remnant and unbound containers with their processes and dispose of them. Both plans share one precondition: no recorded process survives outside the listed containers. A survivor outside them is an orphan and must be resolved first with [`terminate-orphans`](appendix-a-glossary.md#terminate-orphans).
+
+The diagnosis offers:
+
+- **Restart the terminal and agent ([`restart-terminal`](appendix-a-glossary.md#restart-terminal)).** This is a journaled lifecycle operation with its own step list.
+  - Its steps run in this order. [Terminal runtime](13-architecture/terminal-runtime.md#restarting-the-terminal) owns the list:
+    1. Preflight inventory and plan. The plan lists every remnant or unbound container tied to the thread (by an ended binding on the same server instance, or by OS evidence that its processes hold the thread's workspace), with the processes in each.
+    2. The approval is claimed with the operation journal.
+    3. Kiki freezes the processes in the listed containers. If the freeze returns `Unknown`, the plan takes [verified resume](appendix-a-glossary.md#verified-resume) and stops. Nothing is terminated.
+    4. Kiki proves that each listed container holds exactly the processes recorded at freeze. Then it terminates them with verified exit and requests each container's close.
+    5. Kiki runs the holder scan and the orphan scan again.
+    6. Only then does it provision a fresh terminal group.
   - It starts a new incarnation with a fresh credential, launch settings, launch gate, and [ready handshake](appendix-a-glossary.md#ready-handshake).
   - It provisions the `shell` and `ui` role panes as at creation.
-  - The thread returns to `Active` only when the ready handshake commits.
+  - The thread returns to `Active` only when the ready handshake commits. The handshake must arrive within `[timeouts] ready_handshake`.
   - A pending delivery reaches the new incarnation through the [cascade protocol](05-cascade.md#delivery-protocol); the plan never marks it delivered.
   - The restart plan requires one-shot approval, and that approval covers every process in the listed terminal containers at freeze time.
-- **`close-without-terminal`.** The thread goes from `ProjectionDiverged` to `CloseCommit` without a live agent. It is offered when no recorded process identity survives. It is offered after a reboot or server restart without the user first closing restored shells. Its order is fixed:
+  - **If it fails after provisioning,** `TerminalMissing` stays open and the thread stays `ProjectionDiverged`. The half-made terminal group is removed by [`cleanup-failed-restart`](appendix-a-glossary.md#cleanup-failed-restart), under the same limits as `cleanup-failed-create` (see [A failed terminal restart](#a-failed-terminal-restart)).
+- **[`close-without-terminal`](appendix-a-glossary.md#close-without-terminal).** The thread goes from `ProjectionDiverged` to `CloseCommit` without a live agent. It is offered after a reboot or server restart without the user first closing restored shells. It uses the same order as an ordinary close, and nothing is terminated before the final proof:
 
-  1. Preflight runs the same [workspace loss inventory](appendix-a-glossary.md#loss-inventory) as ordinary close and produces the plan, which lists every remnant or unbound container whose processes hold the workspace, and those processes.
+  1. Preflight runs the same [workspace loss inventory](appendix-a-glossary.md#loss-inventory) as ordinary close and produces the plan. The plan lists every remnant or unbound container tied to the thread (by an ended binding on the same server instance, or by OS evidence that its processes hold the thread's workspace), and the processes in each.
   2. Claiming the one-shot approval enters `CloseCommit`. The approval covers every process in the listed terminal containers at freeze time.
-  3. Each listed container is frozen and rechecked, which records its process identities; its processes are terminated with verified exit; then the container is closed. Each is a journaled `CloseCommit` step.
-  4. Then, in order: the holder scan, the checkpoint, the child steps, the final proof, the post-exit filesystem recheck, workspace forget, and directory delete.
+  3. Kiki [freezes](appendix-a-glossary.md#freeze) the processes in the listed remnant and unbound containers, which records their identities.
+  4. The [post-freeze recheck](appendix-a-glossary.md#post-freeze-recheck) runs.
+  5. The holder scan runs.
+  6. Kiki places the checkpoint.
+  7. Kiki does each child step.
+  8. The [final proof](appendix-a-glossary.md#final-proof) runs: each listed container holds exactly the processes recorded at freeze.
+  9. Kiki itself terminates those processes with [verified exit](appendix-a-glossary.md#verified-exit).
+  10. Kiki sends the terminal-container close request for each listed container.
+  11. The [post-exit filesystem recheck](appendix-a-glossary.md#post-exit-filesystem-recheck) runs.
+  12. Kiki forgets the jj workspace.
+  13. Kiki deletes the directory.
 
-  A failure before the first termination aborts the plan and returns the thread to `ProjectionDiverged` with its issue unchanged.
+  A failure before the final proof takes verified resume of the frozen processes. The plan stops, and the thread returns to `ProjectionDiverged` with its issue unchanged. A failure after termination has begun is `CloseFailed`.
 
 - **Destroy**, through the [destroy](03-threads.md#destroy) preflight, once that command ships. It lists and closes the same containers.
+
+#### The terminal server: `replace-terminal-server`
+
+Some problems belong to the dedicated server, not to one thread:
+
+- the running server is one [`kkd`](appendix-a-glossary.md#kkd) did not start, so it is unverified. That includes the server left by Herdr's own handoff or upgrade. `kkd` recognises a server it started by the peer identity on its `Open` `terminal_servers` row. For any other peer, it ends the old row, which ends its bindings and raises `TerminalMissing`, and it records the new peer as `Unverified`. It provisions nothing on an unverified server;
+- `[terminal] session`, `[terminal] herdr_bin`, or `[paths] herdr_dir` changed while a server instance is open. `kkd` does not start a second server. It keeps the old one and reports that a change is pending.
+
+The fix is [`replace-terminal-server`](appendix-a-glossary.md#replace-terminal-server). It is a user-scoped plan, not a thread-scoped one, and it is applied with `kk repair --server`.
+
+- The plan lists every thread and every process that the replacement stops, across all of the user's repos.
+- It needs a one-shot approval. The plan belongs to the user, not to a repo, so the approval is begun under the user's Admin bootstrap credential, the same as a first-run approval. It works from any directory.
+- On approval, kiki stops the old server with [verified exit](appendix-a-glossary.md#verified-exit), then starts a new one.
+- Every thread that was bound to the old server then reads `TerminalMissing`, and each one is brought back with `restart-terminal`.
+
+An instance change where `kkd` itself started the new server is not this case. One example is a start after a server crash. That server is verified, and each thread needs only `restart-terminal`.
+
+Kiki never replaces a running server without this plan, because stopping the server ends every thread's processes.
 
 #### Panes restored after a cold restore
 
@@ -743,27 +943,35 @@ No plan adopts or reuses a restored or surviving pane. A thread never returns to
 
 `OrphanedProcess` is a standing issue with two causes (see [orphan](appendix-a-glossary.md#orphan)):
 
-- a recorded process identity that is alive without a current binding;
-- a harness remnant under a live launcher.
+- **A survivor.** A recorded process identity is alive, has no current binding, and is not a member of a container on the current server instance.
+- **A [harness remnant](appendix-a-glossary.md#harness-remnant).** Any descendant of a live `agent` launcher, other than the launcher itself, while no incarnation is live. A remnant need not have been recorded before.
 
-Scans raise it at [`kkd`](appendix-a-glossary.md#kkd) start, when the server instance changes, and before any replacement incarnation. Recorded role processes that are pane members on the current server instance are terminal members, not orphans.
+The orphan scan raises it. The scan runs at these times:
 
-While the issue is open, kiki starts no replacement agent in that workspace and deletes nothing. It offers:
+- at [`kkd`](appendix-a-glossary.md#kkd) start, before any thread is reported `Active`, and whenever the `server_instance_id` changes;
+- before provisioning a replacement terminal group or opening a gate for a replacement incarnation;
+- before any step that forgets or deletes a jj workspace, where it runs together with the holder scan.
 
-- **Terminate and verify.** Under one-shot approval bound to the exact recorded identities, kiki terminates those processes and no others, then verifies their exit.
-  - Each identity is stopped and re-verified before it is killed.
-  - The issue clears only on verified exit.
-  - If exit cannot be verified, the issue stays.
+Processes that are members of a container on the current server instance are terminal members, not orphans, except a harness remnant under a live `agent` launcher. That holds for a bound terminal group and for an [unbound container](appendix-a-glossary.md#unbound-container) alike.
+
+While the issue is open, kiki blocks exactly replacement, materialization, and deletion for that thread: it starts no replacement agent and provisions no replacement terminal group for that workspace, changes no files there, and deletes nothing. It offers:
+
+- **[`terminate-orphans`](appendix-a-glossary.md#terminate-orphans).** This plan needs a one-shot approval.
+  - For a survivor, it uses the recorded identities.
+  - For a harness remnant, it runs freeze discovery rooted at the `agent` launcher, which finds and stops the launcher's descendants. The launcher itself is left alone.
+  - Either way, kiki records `FreezeDiscovery` rows under the approval, so every process it will signal is on record first.
+  - It terminates those processes and no others, then verifies their exit within `[timeouts] verified_exit`.
+  - The issue clears only on [verified exit](appendix-a-glossary.md#verified-exit). If exit cannot be verified, the issue stays.
 - **Leave blocked.** Nothing is signalled. The thread stays blocked, and the issue stays open until a later diagnosis finds the processes gone.
 
 #### Holders kiki never recorded
 
-An unrecorded same-UID [holder](appendix-a-glossary.md#holder) of the workspace is not `OrphanedProcess` and never blocks an `Active` thread's boundaries. It matters only to a plan that deletes the workspace: close, destroy, `close-without-terminal`, and failed-create cleanup.
+An unrecorded same-UID [holder](appendix-a-glossary.md#holder) of the workspace is not `OrphanedProcess` and never blocks an `Active` thread's boundaries. It matters only to a plan that deletes the workspace: close, destroy, `close-without-terminal`, and the failed-create and failed-reopen cleanups.
 
 - There the result is `Unknown`, and the files are kept, unless the approved plan names that exact holder identity as accepted — the human's informed choice.
 - A holder the plan did not name is drift.
 - The diagnosis reports each such holder's pid, its command line, and the step that clears it.
-- Kiki never [signals](<https://en.wikipedia.org/wiki/Signal_(IPC)>) a process whose identity it did not record.
+- Kiki never [signals](<https://en.wikipedia.org/wiki/Signal_(IPC)>) a process whose identity it did not record. (A harness remnant is recorded by freeze discovery under the `terminate-orphans` approval before it is signalled.)
 - The scan does not count `kkd`, its own child processes, or the invoking `kk` process.
 - The scan cannot see writers running as another user.
 
@@ -782,7 +990,17 @@ Otherwise the [saga](appendix-a-glossary.md#saga) stops with its projections int
 - It uses the close machinery — freeze, loss inventory, final proof, terminate, verified exit.
 - It requires one-shot approval with the same container-scope statement as close.
 
-A retry plan remains available where the journal can continue.
+`CreateFailed` has no retry plan. Its exit is `cleanup-failed-create`; after that the human runs `kk new` again.
+
+#### A failed terminal restart
+
+A [`restart-terminal`](appendix-a-glossary.md#restart-terminal) can fail after it provisioned a new terminal group — for example, when the ready handshake did not arrive within `[timeouts] ready_handshake`. `kk repair` then offers [`cleanup-failed-restart`](appendix-a-glossary.md#cleanup-failed-restart).
+
+- It has the same limits as `cleanup-failed-create`: the close machinery, and a one-shot approval with the container-scope statement.
+- It removes the half-made terminal group.
+- `TerminalMissing` stays open and the thread stays `ProjectionDiverged` until a later `restart-terminal` succeeds.
+
+Retry plans exist only for the failed states that name one: [`retry-close`](appendix-a-glossary.md#retry-close) for `CloseFailed` and [`retry-destroy`](appendix-a-glossary.md#retry-destroy) for `DestroyFailed`. A failed creation is not retried, and a failed terminal restart is cleaned up and then applied again as a new `restart-terminal`.
 
 ### Bookmark plans
 
@@ -793,56 +1011,85 @@ Kiki tracks the checkpoint [bookmark](appendix-a-glossary.md#bookmark) through j
 
 `kk repair` handles only what remains.
 
-Three named plans exist:
+There are four per-thread bookmark plans and one repo-level plan. This table is the source for them; other chapters agree with it.
 
-- **[`restore-bookmark`](appendix-a-glossary.md#restore-bookmark)** puts the bookmark back on the tracked expected target (`bookmark_expected_commit_id`), never on the older placed commit. It never targets a hidden commit. It does not change where publish or reopen will point, so in the thread's own context it uses `ThreadScoped` and needs no approval.
-- **[`adopt-bookmark`](appendix-a-glossary.md#adopt-bookmark)** accepts the single observed target as the checkpoint, under the adoption rule below. It changes where publish and reopen will point, so it requires one-shot approval.
-- **[`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target)** sets the bookmark to exactly one commit the human picks from the listed candidates, under the adoption rule. It requires one-shot approval. Kiki never picks.
+| Plan                                                                       | Offered for                                                                                                                                                                        | Target                                                            | Approval                                                                      | Placement `reason` |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------ |
+| [`restore-bookmark`](appendix-a-glossary.md#restore-bookmark)              | `BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, only while the expected target is visible                                                                                | the expected target                                               | none in the thread's own context; one-shot when applied to a different thread | `RepairRestore`    |
+| [`adopt-bookmark`](appendix-a-glossary.md#adopt-bookmark)                  | `BookmarkMoved` when the single observed target is the live head or on the owned chain                                                                                             | the observed target                                               | one-shot                                                                      | `RepairAdopt`      |
+| [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target)  | any bookmark issue (`BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, `CheckpointAbandoned`); also a thread with no open issue whose relationship is `ahead` or `diverged` | the live head or an on-chain commit the human picks               | one-shot                                                                      | `RepairChoose`     |
+| [`unhide-checkpoint`](appendix-a-glossary.md#unhide-checkpoint)            | `CheckpointAbandoned`, only when unhiding would not create a divergent change                                                                                                      | the expected target, made visible again                           | one-shot                                                                      | `RepairUnhide`     |
+| [`reanchor-history`](appendix-a-glossary.md#reanchor-history) (repo level) | `OperationHistoryRewritten`                                                                                                                                                        | see [Repository operation history](#repository-operation-history) | one-shot, repo scope                                                          | `Reanchor`         |
 
-Which plans each issue offers:
+The "placement `reason`" column is the value kiki records on the placement-history row when the plan is applied.
 
-| issue                | meaning                                                                                             | plans                                                                                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `BookmarkMissing`    | the bookmark is absent                                                                              | `restore-bookmark` when the expected target is visible; `unhide-checkpoint` for `CheckpointAbandoned`; `choose-bookmark-target` otherwise |
-| `BookmarkMoved`      | the bookmark names a single commit that is not an accepted successor of the expected target         | `restore-bookmark`; `adopt-bookmark`                                                                                                      |
-| `BookmarkConflicted` | the bookmark is conflicted or names more than one target; the diagnosis lists every observed target | `restore-bookmark`; `choose-bookmark-target` among the listed targets                                                                     |
+What each issue means:
 
-[`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing) with the evidence `CheckpointAbandoned` is the case where the checkpoint commit itself was abandoned. Typically a merged PR's remote branch was deleted and then fetched. Its plans are:
+| issue                                                               | meaning                                                                                                                            |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing)         | the bookmark is absent                                                                                                             |
+| [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved)             | the bookmark names a single commit that is not an accepted successor of the expected target                                        |
+| [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted)   | the bookmark is conflicted or names more than one target; the diagnosis lists every observed target                                |
+| [`CheckpointAbandoned`](appendix-a-glossary.md#checkpointabandoned) | the bookmark is absent, the expected target is hidden at the observed operation, and no visible successor is accepted in its place |
 
-- to unhide the expected target and re-place the bookmark there, under approval; or
-- for a closed thread, to destroy.
+Notes on the plans:
 
-#### The adoption rule
+- **`restore-bookmark`** puts the bookmark back on the tracked expected target (`bookmark_expected_commit_id`), never on the older placed commit. It never targets a hidden commit, so it is offered only while the expected target is visible. It does not change where publish or reopen will point, so in the thread's own context it uses `ThreadScoped` and needs no approval.
+- **`adopt-bookmark`** accepts the single observed target as the checkpoint. It changes where publish and reopen will point, so it requires one-shot approval.
+- **`choose-bookmark-target`** sets the bookmark to exactly one commit the human picks: the live head, or a commit on the validated owned chain. Kiki never picks. It is the exit whenever the expected target is hidden. It is also the exit for a thread that reads `ahead` or `diverged`.
+- **`unhide-checkpoint`** first makes the hidden expected target visible again and then places the bookmark on it. It is not offered when unhiding would create a divergent change (two visible commits for one change).
 
-The adoption rule is the one in [Threads](03-threads.md#projection-divergence-and-repair).
+#### Who may move the bookmark where
 
-- For an `Active` thread, a commit may be adopted only when it is the live head or lies on the validated owned chain.
-- For a `Closed` thread, adoption must validate the retained owned chain and every follows child, and it advances the archived `thread_head_commit_id` with the checkpoint.
-- Any other target is topology repair and needs a separately approved revision plan.
-- Moving the bookmark backward or sideways from the expected target is likewise its own separately approved plan. No checkpoint and no other repair plan does it.
+One rule covers every bookmark move kiki makes:
+
+- **A checkpoint only moves forward.** A checkpoint (at creation, publish, close, or detach) only moves the bookmark forward along the owned chain. It never moves it backward or sideways, and it never passes jj's `--allow-backwards` flag.
+- **Adopt and choose may place it anywhere on the chain.** The approved plans `adopt-bookmark` and `choose-bookmark-target` may place the bookmark on the live head or on any commit on the validated owned chain. That includes a commit behind the expected target. These plans may pass `--allow-backwards`.
+- **Restore goes back to the expected target.** `restore-bookmark` puts the bookmark back on the expected target. jj may see that as a backward move, so the plan may pass `--allow-backwards`. It still needs no approval in the thread's own context; applied to a different thread, it needs a one-shot approval.
+- **Unhide may pass the flag too.** `unhide-checkpoint` may also pass `--allow-backwards`.
+- **Never off the chain.** Kiki never places the bookmark on a commit that is off the owned chain. v1 has no plan for that. The human first fixes the shape with jj — for example, a rebase that puts the commit on the chain — and then adopts or chooses.
+
+For a `Closed` thread, adopt and choose must also validate the retained owned chain and every follows child, and they advance the archived `thread_head_commit_id` with the checkpoint. The full adoption rule is in [Threads](03-threads.md#projection-divergence-and-repair).
+
+#### An abandoned checkpoint
+
+[`CheckpointAbandoned`](appendix-a-glossary.md#checkpointabandoned) is the case where the checkpoint commit itself is hidden and the bookmark is gone with it. More exactly, three things hold: the bookmark is absent, the expected target is hidden, and no visible successor is accepted. `jj abandon` does this. So does a fetch that finds a merged pull request's remote branch deleted.
+
+A bookmark that is still present, on a commit kiki does not accept, is [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), even when the expected target is hidden. Its exit is `choose-bookmark-target`.
+
+- Its exits are `unhide-checkpoint` and `choose-bookmark-target`. `restore-bookmark` is not offered, because the expected target is hidden.
+- Sometimes another bookmark issue is already open, tracking is paused, and the expected target becomes hidden later. Then the open issue stays as it is and no second issue is added. `restore-bookmark` is withdrawn, and `choose-bookmark-target` is the exit.
+- A **closed** thread with `CheckpointAbandoned` is common after a squash-merged pull request and a fetch. The thread stays `Closed`; it does not move to `ProjectionDiverged`. It is reported on `kk ls --all` and `kk repair`. It is not a loud attention event, and it blocks only `kk reopen`. It has three exits: `unhide-checkpoint` followed by reopen; `choose-bookmark-target` onto a visible commit of the thread's archived owned chain, followed by reopen; or destroy when that command ships.
 
 #### While an issue is open, and after a plan applies
 
-While a bookmark issue is open, checkpoint, publish, close, and detach are blocked for that thread.
+While a bookmark issue is open on an active thread, checkpoint, publish, close, and detach are blocked for that thread.
 
 Every applied bookmark plan is an explicit placement, alongside creation, publish, close, and detach. Each applied plan:
 
-- appends a placement-history row;
+- appends a placement-history row with the `reason` from the table above;
 - sets both the placed checkpoint and the tracked expected target to the chosen commit;
 - is verified against the resulting jj operation.
 
 ### Repository operation history
 
-jj keeps an [operation log](https://docs.jj-vcs.dev/latest/operation-log/): a history of every change made to the repository. Kiki records operations from that log. `jj op abandon` and jj's garbage collection rewrite or remove operations kiki recorded.
+jj keeps an [operation log](https://docs.jj-vcs.dev/latest/operation-log/): a history of every change made to the repository. Kiki records operations from that log. `jj op abandon`, and anything else that rewrites the ancestry of the newest operation, can remove or replace operations kiki recorded. (`jj util gc` is not a cause. It only removes operations that are already unreachable.)
 
-The case that matters is when no current operation head descends from any recorded operation. Then:
+Kiki decides that history was rewritten by one test: some recorded operation that was an ancestor of the last recorded [frontier](appendix-a-glossary.md#operation-frontier) is no longer reachable from the current frontier. jj's constant root operation is never counted. This test catches an ordinary `jj op abandon` in the middle of the log, where older operation ids stay the same and newer ones change.
+
+When that happens:
 
 - Kiki [re-anchors](appendix-a-glossary.md#re-anchoring) silently if every thread's bookmark still equals its expected target and every managed workspace's `@` still equals its cached head. (`@` is jj's name for a workspace's current commit.)
-- Otherwise it raises one repo-level issue, [`OperationHistoryRewritten`](appendix-a-glossary.md#operationhistoryrewritten), listing the threads that differ. It raises no per-thread bookmark issue for the gap.
+- Otherwise it raises one repo-level issue, [`OperationHistoryRewritten`](appendix-a-glossary.md#operationhistoryrewritten), listing the threads that differ. Before approval, it raises no per-thread bookmark issue for the gap.
 
-While `OperationHistoryRewritten` is open, checkpoint, publish, close, detach, and explicit rebase are blocked for the listed threads; head observation continues.
+While `OperationHistoryRewritten` is open, checkpoint, publish, close, detach, and explicit rebase are blocked for the listed threads; head observation continues. Between detection and approval, no anchor row exists. Bookmark classification is paused in that repo, and it resumes from the anchor recorded on approval.
 
-`kk repair` offers the [`reanchor-history`](appendix-a-glossary.md#reanchor-history) plan. The plan shows the observed bookmark and head for each listed thread. On one-shot approval, it records them as fresh placements against the current operation.
+`kk repair --repo` diagnoses the issue and offers the [`reanchor-history`](appendix-a-glossary.md#reanchor-history) plan. `kk repair --repo --apply <plan-id>` applies it under a one-shot approval with repo scope.
+
+The plan works thread by thread. It lists every affected thread with its observed bookmark state. On approval, for each listed thread:
+
+- **The bookmark is usable.** If the bookmark is present, not conflicted, and on the live head or the owned chain, kiki records a fresh placement (`reason = Reanchor`) at the observed commit against the current operation.
+- **The bookmark is not usable.** For every other listed thread, kiki raises the matching per-thread issue at the new anchor: `BookmarkMissing`, `BookmarkConflicted`, or `BookmarkMoved`. The ordinary [bookmark plans](#bookmark-plans) then fix it.
 
 ## `kk doctor`
 
@@ -904,17 +1151,29 @@ Rows identify the authoritative SQLite source. Kiki does not read or merge an `a
 The [acceptance slice](appendix-a-glossary.md#acceptance-slice) provides `kk config get|show` for the minimal supported configuration; see [Configuration](11-configuration.md). `set|unset|edit` and the full layering surface are v1.x additions.
 
 - `kk config get <key>` reports the effective value and the layer it came from.
+- `kk config show` prints the whole merged configuration. Beside each value it names the layer the value came from.
 - Unknown keys warn rather than error.
 - Structural key changes must tell the user which of three things applies: they hot-reload, they take effect at the next lifecycle event, or they require daemon restart.
 
 ## Deferred thread management commands
 
-Scope tiers are recorded in [Orientation](01-orientation.md). Two groups of thread commands are not in the [acceptance slice](appendix-a-glossary.md#acceptance-slice):
+Scope tiers are recorded in [Orientation](01-orientation.md). Two groups of commands are not in the [acceptance slice](appendix-a-glossary.md#acceptance-slice):
 
-- **v1.x:** `kk thread destroy`, `kk thread interrupt`, `kk thread restart --harness`, `kk thread describe --refresh`, `kk doctor`, and `kk privacy consent`.
+- **v1.x:** `kk publish`, `kk thread transcript`, `kk thread comments`, `kk thread destroy`, `kk thread interrupt`, `kk thread restart --harness`, `kk thread describe --refresh`, `kk doctor`, and `kk privacy consent`.
 - **Out of v1:** follows graph surgery, `kk thread attach` and `kk thread reparent`. `kk thread attach` would re-establish a follows link; it is unrelated to [`kk attach`](#kk-attach), which opens a terminal view.
 
-Re-pointing a thread at an unambiguously moved workspace is a named `kk repair` plan, so recovery does not need a second command protocol.
+Re-pointing a thread at a moved workspace is the [`repoint-workspace`](appendix-a-glossary.md#repoint-workspace) plan in `kk repair`, so recovery does not need a second command protocol.
+
+## Internal commands
+
+One `kk` subcommand is hidden. It does not appear in help output, and people do not run it.
+
+- **`kk ui-pane`** is the long-lived process that draws the v1.x [`ui` role pane](appendix-a-glossary.md#ui-role-pane). Only the `ui` [pane launcher](appendix-a-glossary.md#pane-launcher) runs it: the launcher claims the `ui` role and then replaces itself with `kk ui-pane`.
+  - It reads through [pinned reads](appendix-a-glossary.md#pinned-read) only and never snapshots a working copy.
+  - Its keys are navigation only.
+  - Run by hand outside a `ui` role pane, it exits with an error.
+
+See [Interface](10-interface/spec.md#ui-pane) for what the pane shows.
 
 ## Repo registry
 

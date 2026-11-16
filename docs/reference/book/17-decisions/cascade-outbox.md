@@ -27,6 +27,7 @@ Every delivered intent uses one of two explicit modes. The proof for each mode l
   - The tagged payload is the replacement process's mandatory first [harness](../appendix-a-glossary.md#harness) input.
   - Its acceptance handshake marks delivery.
   - Only the first model turn that causally echoes that exact id may acknowledge it.
+  - _Note, 2026-11-16:_ the echo requirement was later replaced. The session-start hook now reports the id with `ReportHarnessReady`, and `kkd` matches the first pre-tool hook call of a model turn in that incarnation by its incarnation id. See [Acknowledging a restart delivery](../05-cascade.md#acknowledging-a-restart-delivery).
   - Startup input does not invent a tool batch.
 
 A sibling hook, new batch id, process start, or settings fingerprint is never acknowledgement evidence by itself.

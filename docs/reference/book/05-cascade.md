@@ -78,10 +78,11 @@ So an operation, or its absence, is not freshness evidence. kiki discovers actua
 
 ### What counts as a safe boundary
 
-The safe boundary is a [harness](appendix-a-glossary.md#harness) fact. (A harness is the agent program kiki runs, such as Claude Code or Codex.) It is established only by one of these two things:
+The safe boundary is a [harness](appendix-a-glossary.md#harness) fact. (A harness is the agent program kiki runs, such as Claude Code or Codex.) It is established only by one of these three things:
 
-- the managed harness's pre-tool hook, which is the hook that fires before an agent's tool call runs; or
-- **[agent quiescence](appendix-a-glossary.md#agent-quiescence)**: the harness adapter's `AgentStatus::Quiescent`, proven by that adapter. Quiescence means the agent is idle.
+- the managed harness's pre-tool hook, which is the hook that fires before an agent's tool call runs;
+- **[agent quiescence](appendix-a-glossary.md#agent-quiescence)**: the harness adapter's `AgentStatus::Quiescent`, proven by that adapter. Quiescence means the agent is idle; or
+- **no live agent**: the thread has no live [incarnation](appendix-a-glossary.md#incarnation), and the remnant check has passed. The remnant check is the inventory rooted at the `agent` launcher that shows no process left over from the retired harness. With no harness and no leftover tool process, nothing can be mid-edit.
 
 Agent quiescence is a different thing from the **[process quiescence proof](appendix-a-glossary.md#process-quiescence-proof)**. That proof is the [`ProcessSupervisor`](appendix-a-glossary.md#processsupervisor) freeze fixed point defined in [Terminal runtime](13-architecture/terminal-runtime.md#process-supervision). Only close, destroy, and repair use the process quiescence proof. Cascade never uses a process freeze as its boundary.
 
@@ -146,6 +147,8 @@ The same rule applies when a follows edge is first created. `thread_head_commit_
 4. It uses that exact commit as both the child's base and the edge's initial synchronized-parent anchor.
 
 kiki never bases a child on a possibly lagging watcher observation.
+
+One request is refused before any of this runs. If the child's harness failed its [`RestartStartup` proof](appendix-a-glossary.md#restartstartup-delivery-proof), that harness runs managed sessions without cascade delivery, and its threads cannot follow other threads. A request to make such a thread follow another (`kk new --follows`, or the contextual default of `kk new`) is refused with that reason. See [Commands](09-commands.md#kk-new).
 
 ## Coalescing and multi-hop evolution
 
@@ -220,14 +223,15 @@ Each **[runtime agent incarnation](appendix-a-glossary.md#runtime-agent-incarnat
 The active intent embeds the durable delivery proof. There are two kinds:
 
 - A [`SoftBatch` proof](appendix-a-glossary.md#softbatch-delivery-proof) names the runtime incarnation, [model turn](appendix-a-glossary.md#model-turn), [tool batch](appendix-a-glossary.md#tool-batch), binding time, and an optional exact batch-completion time. A tool batch is the set of tool calls the harness sends out together.
-- A [`RestartStartup` proof](appendix-a-glossary.md#restartstartup-delivery-proof) names the replacement incarnation and a kiki-minted one-use `startup_delivery_id`. The harness must causally echo that id on the first model turn generated from that startup input. "Causally echo" means the id comes back because the model really read the startup input.
+- A [`RestartStartup` proof](appendix-a-glossary.md#restartstartup-delivery-proof) names the replacement incarnation and a kiki-minted one-use `startup_delivery_id`. The launch specification carries that id in the launcher environment. The session-start hook reports it with `ReportHarnessReady`. `kkd` then matches the first pre-tool hook call of a model turn in that incarnation by its incarnation id, and that call is the acknowledgement. The model does not have to repeat the id.
 
 ### Batch admission is only a cache
 
 [Batch admission](appendix-a-glossary.md#batch-admission) is kiki's decision, for one tool batch, to either block it (`Block`) or let it run (`PassThrough`). In-memory batch admission is only an optimization.
 
+- [`kkd`](appendix-a-glossary.md#kkd) owns the admission cache. It lives in `kkd`'s memory, keyed by incarnation and batch. [`kk-hook`](appendix-a-glossary.md#kk-hook) keeps no state. It is a client that makes one call and exits.
 - A durable `Block` can be reconstructed from the intent.
-- A lost `PassThrough` admission is not guessed or reconstructed. Instead, the adapter restarts the incarnation before permitting any reconciliation decision that could mutate the workspace.
+- A lost `PassThrough` admission is not guessed or reconstructed. Instead, `kkd` restarts the incarnation before permitting any reconciliation decision that could mutate the workspace.
 - Starting any replacement process retires the prior marker without acknowledging the intent.
 - When a payload is pending, the replacement receives it through `RestartStartup` before any tool is allowed to run.
 
@@ -241,6 +245,8 @@ Two hooks, or a hook and a recovery job, could try to reconcile the same thread 
 - The lock serializes concurrent hook decisions and recovery for one thread. To serialize is to make them run one at a time.
 - The [op-log watcher](appendix-a-glossary.md#op-log-watcher) may update only a `Detected` intent.
 - After an intent enters `Reconciling`, newer work gets a later sequence number.
+
+The same lock, held for the whole length of a lifecycle operation, is called the [lifecycle lock](appendix-a-glossary.md#lifecycle-lock). A second, per-repo lock, the [repo jj lock](appendix-a-glossary.md#repo-jj-lock), wraps each unpinned working-copy command and each integration of operation heads. [Invariants](02-invariants.md#locks-and-their-order) defines both and fixes their order: parent thread lock, then child thread lock, then the repo jj lock.
 
 ## Workspace probe
 
@@ -273,8 +279,9 @@ The probe never snapshots. One kiki-run command does: the **boundary snapshot**.
 - one of these holds:
   - the agent is at [agent quiescence](appendix-a-glossary.md#agent-quiescence); or
   - its tool batch is held at a harness boundary; or
-  - in a lifecycle preflight for a harness that cannot prove quiescence, the human has been warned that the agent may be working;
+  - in a lifecycle preflight for a harness that cannot prove quiescence, the human has been warned that the agent may be working. This warned rule also covers an idle child's snapshot during a parent's close;
 - the thread's [reconciliation lock](appendix-a-glossary.md#reconciliation-lock) is held;
+- the [repo jj lock](appendix-a-glossary.md#repo-jj-lock) is held, from the frontier sample until the fresh sample afterward;
 - a frontier sample shows exactly one operation head (the [operation frontier](appendix-a-glossary.md#operation-frontier) is the set of newest operations); and
 - the resulting operation is attributed.
 
@@ -304,7 +311,7 @@ At the child's safe boundary:
    - Ambiguity becomes [`TopologyDiverged`](appendix-a-glossary.md#topologydiverged).
 3. Run the non-materializing workspace probe.
 4. For `FreshClean | FreshDirty`: verify actual ancestry, then continue to result persistence without rewriting files. Once the base was already materialized, a `NativeRewrite` does not need to disturb later edits.
-5. For `StaleClean`: run `jj workspace update-stale`. Then verify the actual resulting workspace commit and ancestry from the exact resulting operation. The command's exit status is not that verification.
+5. For `StaleClean`: run `jj workspace update-stale` under the [repo jj lock](appendix-a-glossary.md#repo-jj-lock). Then verify the actual resulting workspace commit and ancestry from the exact resulting operation. The command's exit status is not that verification.
 6. For `StaleDirty | Unknown`: [hard-pause](appendix-a-glossary.md#hard-pause) the agent and enter the recovery path below.
    - That path creates the [recovery bundle](appendix-a-glossary.md#recovery-bundle) first.
    - It then records `RecoveryRequired` in the same transaction as that bundle.
@@ -390,7 +397,7 @@ At the child's safe boundary:
 The CLI PoC (proof of concept) must evaluate jj's `--no-integrate-operation` plus `jj op integrate` as the preferred way to inspect a planned result before integrating it. `jj op integrate` is a deliberate operation-head integration:
 
 - it is the integration entry in the closed list of unpinned commands;
-- it runs under the [reconciliation lock](appendix-a-glossary.md#reconciliation-lock); and
+- it runs under the [reconciliation lock](appendix-a-glossary.md#reconciliation-lock) and the [repo jj lock](appendix-a-glossary.md#repo-jj-lock); and
 - its result is attributed and classified like any other integration.
 
 Recovery must use exact operation ids. It must not rerun an ambiguous "rebase onto current parent" command.
@@ -455,14 +462,18 @@ If the installed harness version cannot provide or support an unambiguous batch-
 
 The first `PreToolUse` admitted for a batch fixes that batch's decision under the [reconciliation lock](appendix-a-glossary.md#reconciliation-lock).
 
-- **If no intent is ready,** the adapter caches [`PassThrough`](appendix-a-glossary.md#batch-admission) for the batch. Intents detected afterward wait for the next batch. A later sibling hook may not begin reconciliation.
+- **If no intent is ready,** `kkd` caches [`PassThrough`](appendix-a-glossary.md#batch-admission) for the batch, in memory, keyed by incarnation and batch. Intents detected afterward wait for the next batch. A later sibling hook may not begin reconciliation.
 - **If work is ready,** kiki writes the complete `SoftBatch` proof and durably fixes `Block(intent_id)` before reconciliation may perform any workspace mutation. kiki retains the reconciliation lock through that decision and mutation.
 
 All sibling calls reuse the fixed decision. This avoids an impossible promise: retracting a tool call that was already admitted before a later hook arrived.
 
 ### When the `PassThrough` cache is lost
 
-`PassThrough` needs no cascade row. But losing that cache means kiki cannot prove whether another call in the batch was already admitted. So the [hook launcher](appendix-a-glossary.md#hook-launcher) does three things:
+`PassThrough` needs no cascade row. The cache lives only in `kkd`'s memory, so a `kkd` restart loses it. Losing it means kiki cannot prove whether another call in the batch was already admitted.
+
+The rule for telling is this. Take the first pre-tool call that arrives from an incarnation that was already running before this `kkd` start. That call belongs to an **unknown in-flight batch**, unless the hook payload proves it is the first call of a new model turn.
+
+For an unknown in-flight batch, `kkd` does three things. The hook does none of them; it only relays `kkd`'s answer.
 
 - it blocks the unknown call;
 - it [hard-pauses](appendix-a-glossary.md#hard-pause) the incarnation without changing the workspace; and
@@ -481,6 +492,32 @@ Cache loss may cause a disruptive restart. It never causes a mid-batch mutation,
 
 An already durable `Block` is different. It remains [fail-closed](appendix-a-glossary.md#fail-closed) and follows its intent, not this cache-loss path.
 
+### The barrier marker
+
+A bound `Block` must hold even while `kkd` is down. `kk-hook` keeps no state and cannot read the database, so `kkd` leaves it a file to check: the [barrier marker](appendix-a-glossary.md#barrier-marker).
+
+- When `kkd` binds a `Block` for a thread, it first writes the marker file durably at `~/.config/kiki/repos/<repo_id>/barriers/<thread_id>`. It does this before it changes any workspace file.
+- `kkd` removes the marker when the barrier lifts. That happens at exactly two moments: when the delivery is acknowledged by a later model turn, or when the blocked incarnation has been retired and its replacement's gate is recorded.
+- After a crash, recovery removes the marker only after the reconciliation it guards is resolved.
+- The hook only checks whether the file exists. It never writes or removes it.
+
+So a tool call can never run against changed files just because `kkd` was down when the hook asked.
+
+### The hook's time budget
+
+`kk-hook` works within two time limits. Both are `[timeouts]` keys in [Configuration](11-configuration.md).
+
+- **`hook_connect` (default `1s`)** covers only connecting to `kkd` and being admitted. If it expires, the hook checks the thread's [barrier marker](appendix-a-glossary.md#barrier-marker).
+  - **Marker present.** A `Block` is bound for this thread. The hook answers with the generic blocking deny.
+  - **Marker absent.** The hook returns the harness's non-blocking decision, and the tool call runs.
+- **`slow_path` (default `30s`)** is the [slow-path bound](appendix-a-glossary.md#slow-path-bound). It applies once `kkd` has admitted a call into a reconciliation. The hook then waits up to this long for the answer.
+
+If `slow_path` expires, or the owner of the reconciliation crashes, the answer is a generic blocking deny: "kiki is reconciling; try again". It is never "continue". A call that was admitted into a reconciliation may be facing changed files, so it must not run unexplained.
+
+Each harness adapter pins the harness's own hook timeout above `slow_path` plus a margin. Otherwise the harness would give up on the hook first and let the call through.
+
+A `kk-hook` process can also die before it answers. The marker cannot help then, because no hook is left to check it. This case is covered by a proof for each pinned harness version: when the hook process dies without an answer, the harness must not run the tool as if the hook had allowed it. If that proof fails, that harness version is unsupported for cascade delivery.
+
 ### Steps on every pre-tool call
 
 On every `PreToolUse` call:
@@ -489,20 +526,20 @@ On every `PreToolUse` call:
    - Handle `RestartStartup` through step 2 before consulting batch admission.
    - Otherwise, a cached `PassThrough` returns immediately, and newly detected work waits for a later batch.
    - A missing admission cache for an unknown in-flight batch takes the cache-loss restart path above.
-2. If the active intent uses `RestartStartup`, acknowledge only when this call names its replacement incarnation and the exact `startup_delivery_id`.
-   - A match proves this model turn consumed the startup payload. Clear that delivery proof and marker atomically, then select the next intent.
-   - A missing or mismatched id blocks and fails closed.
+2. If the active intent uses `RestartStartup`, acknowledge only when both of these hold: the session-start hook already reported the exact `startup_delivery_id` with `ReportHarnessReady`, and this call is the first pre-tool hook call of a model turn in the replacement incarnation. `kkd` matches the call by its incarnation id.
+   - A match proves this model turn came after the startup payload. Clear that delivery proof and marker atomically, then select the next intent.
+   - A call from any other incarnation, or a handshake with a missing or different startup id, blocks and fails closed.
 3. If an active `SoftBatch` `Block` names this `tool_batch_id`, block the requested tool, and never acknowledge from it.
    - If the payload is prepared, emit it byte-identically.
-   - If the intent is still `Reconciling`, the sibling waits behind the owning reconciliation within the hook budget.
-   - If the owner crashes or times out, the call stays blocked and kiki enters recovery or hard restart.
+   - If the intent is still `Reconciling`, the sibling waits behind the owning reconciliation, up to `[timeouts] slow_path`.
+   - If that bound expires or the owner crashes, the call gets the generic blocking deny ("kiki is reconciling; try again"), and kiki enters recovery or hard restart.
    - It never emits a nonexistent payload, and never passes through.
 4. If an active `SoftBatch` names another batch that has not been durably marked complete, fail closed: block the tool and initiate hard-restart recovery. An absent, crashed, or reordered `PostToolBatch` must never turn into acknowledgement by inference.
 5. If the `SoftBatch` is complete, the intent is `Delivered`, and this call's `model_turn_id` is later than the delivered turn: atomically mark the intent `Acknowledged`, clear the incarnation marker and delivery-proof fields, then select the next intent.
    - The exact recovered `Materialized` case is defined below.
    - `Reconciling` and `RecoveryRequired` can never be acknowledged.
    - A different batch id alone is not enough; the adapter must prove a later model turn.
-6. Find the oldest unacknowledged prepared intent, or the oldest `Detected` intent. Before reconciliation or any possible workspace mutation, do all of this atomically:
+6. Find the oldest unacknowledged prepared intent, or the oldest `Detected` intent. Before reconciliation or any possible workspace mutation, first write the thread's [barrier marker](appendix-a-glossary.md#barrier-marker) durably. Then do all of this atomically:
    - fix `Block(intent_id)`;
    - set `delivery_mode=SoftBatch`; and
    - bind the current incarnation, model turn, and tool batch.
@@ -518,7 +555,7 @@ On every `PreToolUse` call:
 
 `PostToolBatch` never acknowledges an intent.
 
-- For `PassThrough`, it expires the hook launcher's cache entry.
+- For `PassThrough`, it expires `kkd`'s cache entry for that batch.
 - For a `SoftBatch` `Block`, it verifies the active incarnation, turn, and batch tuple. Then it durably sets that proof's `batch_completed_at`.
 - `RestartStartup` does not accept a batch-completion report.
 
@@ -576,7 +613,7 @@ In one transaction, kiki creates a replacement incarnation and a one-use `startu
 
 **Where the replacement starts.** The replacement incarnation starts on the same live `agent` [pane launcher](appendix-a-glossary.md#pane-launcher), through a fresh one-use [launch gate](appendix-a-glossary.md#launch-gate). It needs no terminal provisioning. The pane launcher cannot start the harness without that input.
 
-**No leftover processes.** Before that gate is activated, an inventory rooted at the launcher must show no process other than the launcher itself. No tool child of the retired harness may survive in the launcher's descendant, session, or [process-group](https://en.wikipedia.org/wiki/Process_group) set. A survivor raises [`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess) with harness-remnant evidence (see [orphan](appendix-a-glossary.md#orphan)). It blocks the gate and any workspace materialization until it is resolved.
+**No leftover processes.** Before that gate is activated, an inventory rooted at the launcher must show no process other than the launcher itself. No tool child of the retired harness may survive in the launcher's descendant, session, or [process-group](https://en.wikipedia.org/wiki/Process_group) set. A survivor raises [`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess) with harness-remnant evidence (see [orphan](appendix-a-glossary.md#orphan)). It blocks replacement, materialization, and deletion until the approved [`terminate-orphans`](appendix-a-glossary.md#terminate-orphans) plan resolves it.
 
 **Approval.** These restarts — the cascade hard restart and the `RestartStartup` replacement — are daemon-initiated steps of the delivery protocol and need no human approval. A human-requested interruption or close does.
 
@@ -584,7 +621,7 @@ In one transaction, kiki creates a replacement incarnation and a one-use `startu
 
 - the thread has [`TerminalMissing`](appendix-a-glossary.md#terminalmissing);
 - the intent waits unacknowledged behind that repair; and
-- the incarnation the approved restart plan starts receives the saved payload through this same `RestartStartup` path.
+- the incarnation that the approved [`restart-terminal`](appendix-a-glossary.md#restart-terminal) plan starts receives the saved payload through this same `RestartStartup` path.
 
 **If the harness crashed outside a delivery.** A harness that crashed under a live launcher outside a delivery is restarted by the `kk repair` plan [`restart-agent`](appendix-a-glossary.md#restart-agent). That plan:
 
@@ -594,13 +631,13 @@ In one transaction, kiki creates a replacement incarnation and a one-use `startu
 
 **The handshake.** A [ready handshake](appendix-a-glossary.md#ready-handshake) proving the harness accepted the tagged startup input marks the intent `Delivered` and sets the replacement incarnation's `delivered_intent_id`. A crash before the handshake retires that attempt without acknowledgement, and kiki retries with a new incarnation and a new id.
 
-**Retries are bounded.** Those retries are bounded, and the bound is durable:
+**Retries are bounded.** Those retries are bounded by `[cascade] delivery_attempts` (default `3`), and the bound is durable:
 
 - every replacement attempt is already a persisted incarnation row bound to the intent;
 - the bound is evaluated against that durable history, not an in-memory counter; and
 - exhaustion is recorded on the intent in the same transaction that abandons the final attempt.
 
-When attempts for one intent keep failing their handshake or echo, kiki stops retrying. It then:
+When attempts for one intent keep failing their handshake, kiki stops retrying. It then:
 
 - leaves the intent unacknowledged with its saved payload intact;
 - keeps the agent hard-paused; and
@@ -629,18 +666,24 @@ These two exits are the only writes permitted against an exhausted intent.
 
 ### Acknowledging a restart delivery
 
-The first `PreToolUse` generated by the replacement process may acknowledge only when it names the replacement incarnation and causally echoes the exact `startup_delivery_id`. That evidence proves the model turn was generated after consuming the startup payload.
+A restart delivery is acknowledged by one mechanism:
+
+1. The launch specification carries the `startup_delivery_id` in the launcher environment.
+2. The session-start hook reports that id with `ReportHarnessReady`.
+3. `kkd` matches the first pre-tool hook call of a model turn in that incarnation by its incarnation id. That call is the acknowledgement.
+
+That evidence proves the model turn was generated after the replacement process took in the startup payload.
 
 - The acknowledgement transaction then clears the `RestartStartup` proof and incarnation marker before selecting the next intent.
 - It does not require or fabricate a tool-batch id for the startup input.
 - No tool from the interrupted batch is replayed automatically.
-- A mismatched or absent startup id fails closed.
+- A handshake with a mismatched or absent startup id fails closed. So does a call from any other incarnation.
 
 ### Crash safety
 
 Crashes stay safe at every point.
 
-- **Crash after binding the barrier and changing files, but before persisting `Materialized`.** Every sibling hook still fails closed. Restart finds `Reconciling`, probes actual workspace state, and resumes recovery.
+- **Crash after binding the barrier and changing files, but before persisting `Materialized`.** Every sibling hook that was admitted still fails closed: it gets the generic blocking deny. Restart finds `Reconciling`, probes actual workspace state, and resumes recovery.
 - **Crash after the atomic `Materialized` transaction.** The embedded payload is available for retry. Restart reconstructs the intent's `SoftBatch` or `RestartStartup` proof and validates only that mode's exact evidence.
 
 Three things are always true:
@@ -697,7 +740,7 @@ kiki does not resume the agent on a clean X2-based tree that omits the edit.
 3. Restart then binds a new `RestartStartup` attempt.
 4. The replacement process receives N's embedded payload byte-for-byte, with a one-use `startup_delivery_id`. This holds even when the harness conversation id is reused.
 5. No replacement-process tool runs first.
-6. The replacement's first causally tagged [model turn](appendix-a-glossary.md#model-turn) acknowledges N.
+6. The session-start hook reports the startup id. The first pre-tool hook call of a [model turn](appendix-a-glossary.md#model-turn) in the replacement incarnation then acknowledges N.
 
 The agent may see the payload twice across processes. The transcript projection records it once, through `dedup_key=cascade:<intent_id>`.
 
@@ -772,10 +815,10 @@ A parent thread's bookmark or commits can be changed or thrown away from outside
 A change to the parent's checkpoint [bookmark](appendix-a-glossary.md#bookmark) never changes the pinned follows relationship.
 
 - jj carrying the bookmark to a proven rewrite successor is ordinary and raises nothing.
-- Deleting the bookmark, moving it elsewhere, or leaving it conflicted creates [`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing), [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), or [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted), and the parent enters `ProjectionDiverged` (see [projection divergence](appendix-a-glossary.md#projection-divergence)).
+- Deleting the bookmark, moving it elsewhere, or leaving it conflicted creates [`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing), [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), or [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted). Abandoning the bookmarked commit creates [`CheckpointAbandoned`](appendix-a-glossary.md#checkpointabandoned). In each case an active parent enters `ProjectionDiverged` (see [projection divergence](appendix-a-glossary.md#projection-divergence)).
 - If an external jj operation abandons the parent live head or owned revisions, or otherwise makes ancestry ambiguous, kiki records [`TopologyDiverged`](appendix-a-glossary.md#topologydiverged) and requires human attention.
 
-`jj abandon` also deletes a bookmark on the abandoned commit by default, so one abandon can produce both results. Each is classified on its own and neither replaces the other.
+`jj abandon` hides the commit and also deletes a bookmark on it by default. So one abandon can produce both a bookmark issue and `TopologyDiverged`. Each is classified on its own and neither replaces the other.
 
 kiki does not silently choose a new parent. It does not reinterpret a bookmark as the head.
 
@@ -783,10 +826,10 @@ kiki does not silently choose a new parent. It does not reinterpret a bookmark a
 
 Detaching makes a child thread independent of its parent. This section gives the order of steps, so that no pending parent change is lost on the way.
 
-`kk thread detach` removes the [follows edge](appendix-a-glossary.md#follows-edge) and leaves the child's current ancestry unchanged. The steps are:
+`kk thread detach [<thread>]` removes the [follows edge](appendix-a-glossary.md#follows-edge) and leaves the child's current ancestry unchanged. With no argument it acts on the contextual thread. The steps are:
 
 1. It first runs `RefreshToFrontier`. This step refreshes the parent and child workspace heads from the pinned operation view. It also creates any transition a lagging watcher had not yet recorded.
-2. The user must reconcile that exact transition, or explicitly discard it with one-shot [approval](appendix-a-glossary.md#human-approval).
+2. The user must reconcile that exact transition. Pending parent work is discarded only with `--discard-pending`, which needs a one-shot [approval](appendix-a-glossary.md#human-approval).
 3. Only then does kiki checkpoint the child at its [checkpoint target](appendix-a-glossary.md#checkpoint-target) and delete the edge.
 
 kiki preserves the thread-owned base anchor, so the now-independent thread stays publishable, reopenable, and safe to validate later. Broader graph surgery stays deferred beyond v1.

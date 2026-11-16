@@ -6,7 +6,7 @@ kiki may eventually help keep three kinds of text current as work changes:
 - checkpoint [bookmark](appendix-a-glossary.md#bookmark) names; and
 - revision descriptions, which are the commit messages of [jj](https://docs.jj-vcs.dev/latest/), the version-control tool kiki drives.
 
-Both the ownership foundation and the execution loop are [v1.x](appendix-a-glossary.md#v1-x-polish) work. The [acceptance slice](appendix-a-glossary.md#acceptance-slice) (the first accepted release) writes no AI-authored metadata, so it does not need to carry a ledger before that behavior exists. When the feature ships, kiki must know which prose it owns and which belongs to the human.
+Both the ownership foundation and the execution loop are [v1.x](appendix-a-glossary.md#v1-x-polish) work. The [acceptance slice](appendix-a-glossary.md#acceptance-slice) (the set of features v1 must ship to be accepted) writes no AI-authored metadata, so it does not need to carry a ledger before that behavior exists. When the feature ships, kiki must know which prose it owns and which belongs to the human.
 
 ## Ownership ledger
 
@@ -85,7 +85,7 @@ If kiki cannot acquire the lock within 5 seconds, it abandons the attempt and re
 
 ## Configuration
 
-These settings turn the feature on and control how often it runs. They live in kiki's [TOML](https://toml.io/) configuration file.
+These settings turn the feature on and control how often it runs. They are kiki configuration keys; see [Configuration](11-configuration.md) for the layers.
 
 `[autorename]` controls the feature:
 

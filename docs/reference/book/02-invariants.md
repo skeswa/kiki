@@ -18,7 +18,7 @@ Code should treat a jj bookmark like a bookmark left in a book. It marks a check
 
 [Projections](appendix-a-glossary.md#projection) can change, so kiki observes them instead of assuming it still owns them. kiki must classify each of these cases explicitly:
 
-- a missing, conflicted, or externally moved [bookmark](appendix-a-glossary.md#bookmark);
+- a missing, conflicted, or externally moved [bookmark](appendix-a-glossary.md#bookmark), or a checkpoint whose commit was abandoned;
 - a missing jj [workspace](appendix-a-glossary.md#workspace) record;
 - a mismatched workspace path;
 - a missing [terminal group](appendix-a-glossary.md#terminal-group);
@@ -28,8 +28,8 @@ kiki may repair a projection automatically only when it can prove what the corre
 
 A broken projection does not erase the abilities kiki can still prove:
 
-- **Only the bookmark is bad.** Checkpoint, publish, close, and detach are blocked. Unambiguous workspace-head tracking and follows classification keep working.
-- **The terminal group or its `agent` role is missing, or a recorded process survives where none should.** kiki can still observe the head. Boundary mutation is blocked.
+- **Only the bookmark is bad.** Checkpoint, publish, close, and detach are blocked. Unambiguous workspace-head tracking and follows classification keep working. On a closed thread, an abandoned checkpoint blocks only `kk reopen`.
+- **The terminal group or its `agent` role is missing, or a recorded process or a harness remnant survives where none should.** kiki can still observe the head. A missing terminal group or `agent` role blocks boundary mutation. A surviving recorded process or harness remnant ([`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess)) blocks exactly three things: replacement, materialization, and deletion.
 - **The workspace's identity or path is ambiguous.** Only this case suspends both head observation and boundary mutation.
 
 An in-flight [lifecycle journal](appendix-a-glossary.md#lifecycle-journal) may own a temporary projection change. If so, that change fails or resumes the journal. It does not create a competing [state machine](https://en.wikipedia.org/wiki/Finite-state_machine).
@@ -44,6 +44,21 @@ These operations are therefore durable [sagas](appendix-a-glossary.md#saga). A s
 - Restart recovery or an explicit command can then continue from that record.
 - A reopened thread stays `Closed` until the replacement [incarnation's](appendix-a-glossary.md#incarnation) [ready handshake](appendix-a-glossary.md#ready-handshake) commits.
 - No recovery path may leave a thread that looks `Active` after its managed agent and [terminal group](appendix-a-glossary.md#terminal-group) were already destroyed.
+
+### Locks and their order
+
+Kiki uses two kinds of lock. Both live in `kkd`'s memory. Crash recovery comes from the journals, never from a lock.
+
+- **The lifecycle lock.** Each thread has one [reconciliation lock](appendix-a-glossary.md#reconciliation-lock). It makes cascade reconciliation for that thread run one step at a time. The [lifecycle lock](appendix-a-glossary.md#lifecycle-lock) is that same lock, held for the whole length of a lifecycle operation such as close, detach, reopen, or a repair. It is not a second lock. So a lifecycle operation and a reconciliation of the same thread can never run at the same moment.
+- **The repo jj lock.** Each repo has one [repo jj lock](appendix-a-glossary.md#repo-jj-lock). `kkd` holds it around every unpinned working-copy command it runs and around every integration of operation heads. It is held from the frontier sample that the step depends on until the re-sample. For a working-copy command that sample shows a single head. A deliberate integration starts from a sample with several heads. It is short and innermost. It is never held across a wait: not for a human, not for an agent, and not for a hook.
+
+Locks are always taken in one order:
+
+1. the parent thread's lock;
+2. the child thread's lock;
+3. the repo jj lock.
+
+A step that needs only some of these takes them in the same order and skips the rest. One fixed order means two operations can never each hold a lock the other is waiting for.
 
 ## The terminal runtime is a projection, not an authority
 
@@ -73,7 +88,7 @@ Kiki hosts each thread's terminals in a [terminal group](appendix-a-glossary.md#
 **Absence from the terminal is not absence from the machine.**
 
 - A process can outlive its pane, its terminal group, and the terminal server. This is true under any terminal host.
-- Kiki scans for surviving recorded processes before it starts a replacement agent.
+- Kiki scans for surviving recorded processes and harness remnants before it starts a replacement agent.
 - Kiki scans for every [holder](appendix-a-glossary.md#holder) of the workspace before it deletes one. A holder is a process that still has the workspace open.
 - Kiki ends processes itself, by verified identity, before it asks the terminal to close anything. It rechecks the files afterwards.
 - An unknown writer, an unstable process set, or drift after the [final proof](appendix-a-glossary.md#final-proof) preserves the files.
@@ -104,7 +119,7 @@ When a parent commit is rewritten, jj may immediately evolve the descendant comm
 Instead, kiki does two things:
 
 1. It records the exact transition, from the [last synchronized base](appendix-a-glossary.md#synchronized-base) to the evolved base.
-2. It materializes the child's current jj state only at an agent boundary or at [agent quiescence](appendix-a-glossary.md#agent-quiescence).
+2. It materializes the child's current jj state only at a [safe boundary](appendix-a-glossary.md#safe-boundary). There are three: an agent boundary, [agent quiescence](appendix-a-glossary.md#agent-quiescence), or a moment when the thread has no live [incarnation](appendix-a-glossary.md#incarnation) and the check for leftover harness processes has passed.
 
 Agent quiescence is a moment when the [harness](appendix-a-glossary.md#harness) adapter proves the agent is idle. This is distinct from the [process quiescence proof](appendix-a-glossary.md#process-quiescence-proof) that close uses.
 
@@ -153,6 +168,7 @@ For every v1 adapter — [Claude Code](https://docs.claude.com/en/docs/claude-co
 A batch is the set of tool calls the harness dispatches together. See [tool batch](appendix-a-glossary.md#tool-batch). The rules for a batch are:
 
 - If one tool in a dispatched batch triggers reconciliation, kiki durably binds `Block` and the complete batch identity before it changes the workspace.
+- Before it binds the `Block`, `kkd` writes a durable [barrier marker](appendix-a-glossary.md#barrier-marker) file for the thread. While that file exists, a hook that cannot reach `kkd` blocks the tool call instead of letting it through. `kkd` removes the file when the barrier lifts.
 - Every tool call in that batch is blocked.
 - Batch completion establishes soft-delivery proof: evidence that the payload reached the harness. See [`SoftBatch` delivery proof](appendix-a-glossary.md#softbatch-delivery-proof).
 - Only a later [model turn](appendix-a-glossary.md#model-turn) may acknowledge the payload.
@@ -199,19 +215,20 @@ So kiki follows two rules:
 
 A closed list of commands is not pinned that way:
 
-- **The [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) and `jj workspace update-stale` in a managed workspace.** Both act on a working copy. The boundary snapshot is a kiki-run snapshot of a managed workspace. Kiki takes it at [agent quiescence](appendix-a-glossary.md#agent-quiescence) or a held harness boundary. For a harness that cannot prove quiescence, kiki may also take it at a lifecycle preflight. Its purpose is that a pinned head contains every tracked edit before a checkpoint that precedes deletion or publication.
+- **The [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) and `jj workspace update-stale` in a managed workspace.** Both act on a working copy. The boundary snapshot is a kiki-run snapshot of a managed workspace. Kiki takes it at [agent quiescence](appendix-a-glossary.md#agent-quiescence) or a held harness boundary. For a harness that cannot prove quiescence, kiki may also take it at a lifecycle preflight, after warning the human that the agent may be working. The same warned rule covers a child's snapshot during a parent's close. Its purpose is that a pinned head contains every tracked edit before a checkpoint that precedes deletion or publication.
 - **[Deliberate integration](appendix-a-glossary.md#deliberate-integration) of divergent operation heads.** This is what kiki does when a step needs one view and there are several.
 - **The human-invoked passthroughs.** These are the body of `kk status`, and the overlay's diff preview for the caller's own thread. The `kk` CLI runs these in the caller's own workspace as an explicit human request, exactly as if the human had typed the jj command.
 
-These commands run under strict conditions:
+The first two entries are the commands `kkd` runs. They run under strict conditions:
 
-- The working-copy commands run only under the thread's reconciliation or lifecycle lock.
+- The working-copy commands run only under the thread's lock: the reconciliation lock, or the same lock held as the lifecycle lock. See [Locks and their order](#locks-and-their-order).
+- The working-copy commands and integration both run under the [repo jj lock](appendix-a-glossary.md#repo-jj-lock). It is taken last and held only from the frontier sample to the fresh sample.
 - The working-copy commands run only after a frontier sample shows a single head. (The [operation frontier](appendix-a-glossary.md#operation-frontier) is the current set of operation heads.)
 - The working-copy commands are followed by a fresh sample.
-- Integration runs under the same lock.
+- Integration also runs under the thread lock of the step that needs the single view.
 - Kiki attributes every operation any of these commands writes. One command can write more than one.
 
-The passthroughs are direct human jj use that happens to be spelled `kk`. `kkd` never runs them. No background renderer, watcher, or polling path runs them either.
+The passthroughs are direct human jj use that happens to be spelled `kk`. `kkd` never runs them, so they take none of `kkd`'s locks. Kiki treats the operations they write like any other human jj command. No background renderer, watcher, or polling path runs them either.
 
 ### Everything else is pinned
 

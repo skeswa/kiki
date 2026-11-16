@@ -20,7 +20,7 @@ All of these clients use the same service contract:
 
 - [`kk`](../appendix-a-glossary.md#kk), the command-line program;
 - the [pane launcher](../appendix-a-glossary.md#pane-launcher);
-- [`kk-hook`](../appendix-a-glossary.md#kk-hook);
+- [`kk-hook`](../appendix-a-glossary.md#kk-hook), a stateless client that makes one call per run;
 - the [overlay](../appendix-a-glossary.md#overlay-tui);
 - the optional [`ui` pane](../appendix-a-glossary.md#ui-role-pane);
 - future UIs.
@@ -28,6 +28,7 @@ All of these clients use the same service contract:
 Terminals work like this:
 
 - Terminals are hosted by a [dedicated Herdr server](../appendix-a-glossary.md#dedicated-herdr-server). [Herdr](../appendix-a-glossary.md#herdr) is the [terminal multiplexer](../appendix-a-glossary.md#ext-terminal-multiplexer) kiki uses.
+- `kkd` starts that server as its own service-manager unit, so the server and the agents keep running when `kkd` crashes, restarts, or is upgraded.
 - `kkd` drives that server through [`TerminalRuntime`](../appendix-a-glossary.md#terminalruntime).
 - Which terminal a human is looking at belongs to each [Herdr client](../appendix-a-glossary.md#herdr-client). `kk` requests it through [`TerminalClient`](../appendix-a-glossary.md#terminalclient).
 
@@ -48,8 +49,7 @@ flowchart LR
         TUI["kk overlay TUI\n(v1.x)"]
         UiPane["kk ui role pane\n(v1.x, optional)"]
         Launcher["pane launcher\nhidden kk subcommand\ndirect child of every role pane"]
-        Hook["kk-hook\nexclusive PreToolUse + PostToolBatch sidecar"]
-        HookLauncher["hook launcher\nper thread, hook side\nbatch admission cache"]
+        Hook["kk-hook\nexclusive PreToolUse + PostToolBatch sidecar\nstateless: one call per run"]
         AgentMcp["Agent MCP client\nread-only transcript tools\n(v1.x polish)"]
         FutureUI["future native / web UI"]
     end
@@ -74,8 +74,6 @@ flowchart LR
     UiPane --> GrpcSock
     Launcher --> GrpcSock
     Hook --> GrpcSock
-    HookLauncher --> GrpcSock
-    HookLauncher -. answers for a dead sidecar .-> Hook
     FutureUI --> GrpcSock
     AgentMcp --> McpSock
 
@@ -87,7 +85,7 @@ flowchart LR
         ThreadCtl["ThreadController per thread\nworkspace + terminal group + harness lifecycle"]
         TermRt["TerminalRuntime\nensure server / provision / observe / close / publish / notify"]
         ProcSup["ProcessSupervisor\nidentity, freeze, verified resume and exit,\nholder inventory, orphan scan"]
-        Cascade["CascadeOrchestrator\nclassify / reconcile / batch barrier / acknowledge"]
+        Cascade["CascadeOrchestrator\nclassify / reconcile / batch barrier / acknowledge\nin-memory PassThrough cache"]
         Watcher["jj op-log watcher\nexternal op detection"]
         Transcript["ThreadTranscriptStore\nJSONL tail + consented recall\n(v1.x)"]
         Metadata["MetadataLedger + AICompose\nauto-describe / auto-rename\n(v1.x)"]
@@ -111,7 +109,7 @@ flowchart LR
     Watcher --> Transcript
 
     subgraph State["Persistent state"]
-        UserDb["~/.config/kiki/state.db\nrepo registry, presenters, unscoped audit"]
+        UserDb["~/.config/kiki/state.db\nrepo registry, presenters, Admin credential record,\nterminal servers, unscoped audit"]
         RepoDb["~/.config/kiki/repos/<repo_id>/state.db\nthreads, credentials, audit, transcripts\n(centralized; no state inside the source repo)"]
     end
 
@@ -127,7 +125,7 @@ flowchart LR
 
     subgraph Tools["External tools kk coordinates"]
         Jj["jj / git repo\nworkspaces, bookmarks, op log"]
-        Herdr["dedicated Herdr server (session: kiki)\nstarted only by kkd, outside the terminal application\none terminal group per thread\nrole panes, native sidebar, toasts"]
+        Herdr["dedicated Herdr server (session: kiki)\nstarted only by kkd, as its own service-manager unit\noutlives the terminal application and kkd\none terminal group per thread\nrole panes, native sidebar, toasts"]
         OsProc["local OS\nprocesses and workspace holders"]
         Harnesses["Claude Code / Codex\nagent sessions + JSONL"]
         Gh["gh / GitHub\nPRs, CI, review comments"]

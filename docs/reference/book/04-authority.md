@@ -25,6 +25,8 @@ A [`ThreadScoped<thread_id>`](appendix-a-glossary.md#threadscoped-credential) cr
 
 Rotation keeps the file in one place. The file's path is stable and its contents are replaced atomically (all at once). The pane launcher re-reads it after reporting a [harness](appendix-a-glossary.md#harness) exit. `kk` and `kk-hook` read it on every invocation.
 
+Rotation does not cut off a running pane launcher. A launcher presents the credential once, with its claim. After `kkd` accepts that claim, the launcher's calls are authenticated by the accepted peer process identity — the `(pid, start_time)` that `kkd` read from the OS. So rotating the credential when an incarnation ends does not close the launcher's `SuperviseLauncher` stream, and it does not reject the launcher's `ReportHarnessExit`.
+
 ### `RegistrationScoped<repo_id>`
 
 A [`RegistrationScoped<repo_id>`](appendix-a-glossary.md#registrationscoped) credential:
@@ -61,6 +63,7 @@ An [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) is the part o
 - It exists for daemon setup and approval-presenter enrollment, not as ambient CLI authority.
 - An installation may persist an Admin secret outside thread workspaces. But `kk` does not automatically load it for ordinary commands, and agents are never given it.
 - Only explicit bootstrap and recovery endpoints accept Admin. Operational thread methods reject it.
+- There is one more use. The approvals for `kk init` and first run are begun under the user's Admin bootstrap credential, because no thread credential or registration credential exists yet. So `kk init` calls `BeginApproval` for a repo registration with Admin. The user-scoped `replace-terminal-server` plan (`kk repair --server`) is begun the same way, because it belongs to no repo. Admin can only begin these challenges. The enrolled presenter must still confirm it, and the registration still consumes the resulting `HumanApproval`.
 - After enrollment, the daemon authorizes a consequential operation by validating and claiming its `HumanApproval`. It never accepts Admin in place of that capability.
 
 ### Claiming an approval
@@ -77,7 +80,7 @@ After a crash, kiki resumes or reconciles that same operation id. It cannot reus
 
 Consequential commands all use one protocol. A confirmation prompt by itself is not authority:
 
-1. **Begin.** The operational client authenticates with its `ThreadScoped` or registration credential. It calls `BeginApproval` with the complete proposed method, target, and security-relevant arguments. The daemon then:
+1. **Begin.** The operational client authenticates with its `ThreadScoped` or registration credential. The exceptions are `kk init`, first run, and the user-scoped `replace-terminal-server` plan: no thread or registration credential applies, so that approval is begun under the user's [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential). It calls `BeginApproval` with the complete proposed method, target, and security-relevant arguments. The daemon then:
    - runs a non-mutating preflight;
    - canonicalizes the plan into one fixed form;
    - stores a short-lived pending challenge bound to the requesting credential;
@@ -105,7 +108,7 @@ A [thread-scoped credential](appendix-a-glossary.md#threadscoped-credential) may
 
 - read its own thread state, working-state summary, and non-sensitive audit slice;
 - read and advance cascade delivery state — the record of updates flowing from a followed thread — for its own thread, through the specific hook methods;
-- perform ordinary same-thread lifecycle or metadata operations that are neither destructive nor externally visible;
+- perform ordinary same-thread lifecycle or metadata operations that are neither destructive nor externally visible, and that are not on the approval list below;
 - read the minimal same-repo summary and [terminal target](appendix-a-glossary.md#terminal-target) (where the thread's [terminal group](appendix-a-glossary.md#terminal-group) currently lives) that `kk ls` and `kk switch` need.
 
 It must not, by itself:
@@ -122,11 +125,15 @@ The transport checks both the credential's scope and the requested target. Suppl
 
 The following require a [`HumanApproval`](appendix-a-glossary.md#human-approval) bound to the exact method and target, even when the caller already holds a valid thread credential:
 
+- repo registration with `kk init`;
+- thread creation with `kk new`, and `kk reopen`;
 - any mutation of a thread other than the caller's contextual thread;
-- destructive operations, including thread destroy, repo unregister, discarding pending reconciliation, and any repair that deletes or rewrites state;
+- destructive operations, including thread destroy, repo unregister, discarding pending reconciliation (for example `kk thread detach --discard-pending`), and any repair that deletes or rewrites state;
+- repairs that place or re-create the checkpoint bookmark under approval: [`adopt-bookmark`](appendix-a-glossary.md#adopt-bookmark), [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target), [`unhide-checkpoint`](appendix-a-glossary.md#unhide-checkpoint), and the repo-level [`reanchor-history`](appendix-a-glossary.md#reanchor-history). `restore-bookmark` only puts the bookmark back on the expected target, so it needs no approval in the thread's own context; applied to a different thread, it needs a one-shot approval;
 - sensitive reads, including another thread's transcript or diff, and repo-wide detailed audit arguments;
 - externally visible actions, including publish, remote branch rewriting, PR mutation, and comments;
 - process-destructive operations a human requests, such as interrupting or closing a live agent session. The approval covers every process in the listed terminal containers at freeze time, and the rendered plan says so;
+- [`terminate-orphans`](appendix-a-glossary.md#terminate-orphans), which ends leftover processes, and [`replace-terminal-server`](appendix-a-glossary.md#replace-terminal-server), which stops the whole dedicated server and every process in it;
 - topology surgery whose result cannot be derived unambiguously from already recorded intent. (Topology is the shape of the commit graph.)
 
 ### Restarts that need no approval
@@ -135,6 +142,9 @@ Kiki's own protocol restarts are not on this list.
 
 - The cascade's delivery protocol may retire an [incarnation](appendix-a-glossary.md#incarnation) and start a replacement to deliver a saved payload. That is a daemon-initiated step of a contract the human already accepted by following a thread. It consumes no approval.
 - Applying [`restart-agent`](appendix-a-glossary.md#restart-agent) in the thread's own context to a harness that has already exited destroys nothing. It needs no approval either.
+- [`retry-close`](appendix-a-glossary.md#retry-close) and [`retry-destroy`](appendix-a-glossary.md#retry-destroy) need no new approval. They continue a plan the human already approved, and they never widen it.
+
+The approval each repair plan needs is listed in one table, [Every issue and its plan](09-commands.md#every-issue-and-its-plan) in Commands. That table is the owner; this chapter states the rules behind it.
 
 ### No unattended approval
 

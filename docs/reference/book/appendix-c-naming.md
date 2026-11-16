@@ -12,7 +12,7 @@ This list gives the exact name of each program, directory, and file that belongs
 - Hook sidecar: `kk-hook`. It is the small program that a managed [harness](appendix-a-glossary.md#harness) (the program that runs a coding agent) calls at its [hook](appendix-a-glossary.md#ext-hook) points. For the managed harness adapters, it handles exclusive `PreToolUse` admission plus `PostToolBatch` completion reporting. See [`kk-hook`](appendix-a-glossary.md#kk-hook) and [PreToolUse / PostToolBatch hooks](appendix-a-glossary.md#pretooluse-posttoolbatch-hooks).
 - User state directory: `~/.config/kiki/`
 - User config: `~/.config/kiki/config.toml`. The file is written in [TOML](https://toml.io/), a simple format for settings.
-- Per-repo state and gitignored config: `~/.config/kiki/repos/<repo_id>/`. This location is centralized: the source repo's filesystem holds no kiki state.
+- Per-repo state and repo-local config, both kept outside the repository: `~/.config/kiki/repos/<repo_id>/`. This location is centralized: the source repo's filesystem holds no kiki state.
 - Generated [Herdr](appendix-a-glossary.md#herdr) configuration: `~/.config/kiki/herdr/config.toml`. Herdr is the [terminal multiplexer](appendix-a-glossary.md#ext-terminal-multiplexer) that hosts kiki's terminals.
   - `[paths] herdr_dir` holds only this file.
   - The [dedicated server](appendix-a-glossary.md#dedicated-herdr-server) is the Herdr session named `kiki` by default.
@@ -36,6 +36,8 @@ Daily-driver verbs are the commands you use every day. They should be short and 
 - `publish`
 
 Namespaced subcommands such as `thread`, `config`, and `audit` are for management surfaces. A namespaced subcommand is a command grouped under another word, and `kk thread interrupt` is one.
+
+One subcommand is hidden and internal: `kk ui-pane`. Only the `ui` [pane launcher](appendix-a-glossary.md#pane-launcher) runs it, to draw the optional UI pane. People do not type it.
 
 Two commands contain the word "attach", and the two are unrelated:
 

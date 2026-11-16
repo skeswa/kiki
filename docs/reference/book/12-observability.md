@@ -24,25 +24,50 @@ Audit logs are separate. They answer what happened and who invoked it. Notificat
 
 ## Attention events
 
-An [attention event](appendix-a-glossary.md#attention-event) is something that happened in a thread that a person may need to know about. The table lists each event and what kiki does about it by default.
+An [attention event](appendix-a-glossary.md#attention-event) is something that happened in a thread that a person may need to know about. The table lists each event, the tier it ships in, and what kiki does about it by default.
+
+The scope ledger in [Orientation](01-orientation.md) decides which events are in the acceptance slice: a blocked or crashed agent, a conflicted cascade, an exhausted delivery, a followed parent abandoned, a failed lifecycle operation, and a [projection issue](appendix-a-glossary.md#projection-issue). The rest of the vocabulary is v1.x, except where the table says otherwise.
 
 The default notification vocabulary is:
 
-| Event                                            | Default                                                                                     |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Agent hit a permission prompt                    | Loud notification; mark the thread blocked until acknowledged                               |
-| Cascade reconciliation exposed textual conflicts | Loud notification; mark the cascade `conflicted`                                            |
-| Follows parent merged                            | Notification once remote merge observation ships; warning if reconciliation or detach fails |
-| Follows parent abandoned                         | Notification and warning; human lifecycle decision required                                 |
-| PR check failed                                  | Notification and warning once GitHub polling ships                                          |
-| Agent reports goal complete                      | Status mark only                                                                            |
-| Agent silent beyond the silence threshold        | Dim status only; never `blocked`. The threshold is a deferred `[notifications]` key         |
-| Auto-rename or auto-describe write completed     | No notification; visible in audit once metadata execution ships                             |
-| External branch force-push detected              | Warning; explicit reconciliation required once remote observation ships                     |
+| Event                                            | Tier             | Default level | What kiki does                                                                                              |
+| ------------------------------------------------ | ---------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| Agent hit a permission prompt                    | acceptance slice | `loud`        | Notification; mark the agent `blocked` until acknowledged. Needs the adapter proof described below          |
+| Agent crashed                                    | acceptance slice | `loud`        | Notification; mark the agent `blocked`. `kk repair` offers `restart-agent`                                  |
+| Cascade reconciliation exposed textual conflicts | acceptance slice | `loud`        | Notification; mark the cascade `conflicted`                                                                 |
+| Lifecycle operation failed                       | acceptance slice | `loud`        | Notification; the thread shows its failed state (`CreateFailed`, `CloseFailed`, a failed reopen or restart) |
+| Projection issue opened                          | acceptance slice | `loud`        | Notification; the thread shows `ProjectionDiverged` with the reason, and points to `kk repair`              |
+| Delivery attempts exhausted                      | acceptance slice | `loud`        | Notification; the agent stays hard-paused until `retry-delivery` or `discard-delivery`                      |
+| Follows parent abandoned                         | acceptance slice | `loud`        | Notification and warning; the child shows topology divergence, and a human lifecycle decision is required   |
+| Agent reports goal complete                      | acceptance slice | `soft`        | Status mark (`finished`), plus an overlay toast once the overlay ships                                      |
+| Follows parent merged                            | v1.x             | `loud`        | Notification once remote merge observation ships; warning if reconciliation or detach fails                 |
+| PR check failed                                  | v1.x             | `loud`        | Notification and warning once GitHub polling ships                                                          |
+| External branch force-push detected              | v1.x             | `loud`        | Warning; explicit reconciliation required once remote observation ships                                     |
+| Agent silent beyond the silence threshold        | v1.x             | `silent`      | Dim status only; never `blocked`. The threshold is a deferred `[notifications]` key                         |
+| Auto-rename or auto-describe write completed     | v1.x             | `silent`      | No notification; visible in audit once metadata execution ships                                             |
 
 In the table, a "follows parent" is the thread that another thread [follows](appendix-a-glossary.md#follows) (tracks). A PR is a GitHub [pull request](https://docs.github.com/en/pull-requests).
 
-These defaults are configurable under `[notifications]`.
+Some notes on the rows:
+
+- **Projection issue.** One case is quiet. A closed thread's [`CheckpointAbandoned`](appendix-a-glossary.md#checkpointabandoned) issue is common after a squash-merged pull request. It is reported on `kk ls --all` and `kk repair`, and it is not a loud attention event.
+- **Exhausted delivery.** See [exhausted intent](appendix-a-glossary.md#exhausted-intent).
+- **Follows parent abandoned.** The parent's live head or owned revisions were abandoned locally. Kiki sees this in jj's operation log, so the event needs no remote polling.
+- **Acceptance-slice list.** The acceptance-slice rows match the scope ledger in [Orientation](01-orientation.md): a blocked or crashed agent, a conflicted cascade, an exhausted delivery, a followed parent abandoned, a failed lifecycle operation, and a projection issue, plus goal complete at `soft`.
+- **Goal complete.** At `soft`, the event is a status mark plus an overlay toast. No OS notification is sent.
+
+These defaults are configurable under `[notifications]`. [Configuration](11-configuration.md#notification-keys) owns the key for each event and the table of what `loud`, `soft`, and `silent` do on each surface.
+
+### Detecting a permission prompt
+
+Kiki cannot see a permission prompt by looking at the terminal. It learns of one only from the harness.
+
+- The harness adapter must declare the capability `attention_events`. The capability names the harness event that fires when the agent waits on a permission prompt.
+- The capability counts only after a proof step shows that the named event fires for a real prompt.
+- For a harness without that proof, permission-prompt detection is v1.x. Kiki then raises no "permission prompt" event for that harness.
+- Crash detection does not depend on this. A harness that exits or crashes under a live launcher still shows `blocked`, on every harness.
+
+See [Harness adapter](13-architecture/harness-adapter.md#capabilities).
 
 ## Notification transport
 
@@ -55,7 +80,7 @@ Once UI surfaces ship, kiki's own transient [toasts](appendix-a-glossary.md#toas
 - They reflect lifecycle and cascade changes.
 - They never host kiki toasts or toast actions.
 
-If no overlay is open, an [attention event](appendix-a-glossary.md#attention-event) still uses the configured transport.
+If no overlay is open, a `loud` [attention event](appendix-a-glossary.md#attention-event) still uses the configured transport. A `soft` event then shows only its status mark.
 
 ### Choosing a provider
 
@@ -92,6 +117,12 @@ The `herdr` provider has these semantics, and kiki does not present it as more:
 ### Per-event behavior
 
 Per-event behavior (`loud | soft | silent`) is independent of transport. It is configured per-event under `[notifications]`.
+
+- `loud` sends the event through the configured transport, shows an overlay toast, and sets the status mark.
+- `soft` shows an overlay toast and sets the status mark. It sends nothing through the transport.
+- `silent` sets the status mark only.
+
+The status mark is durable state, so no level turns it off. See [Configuration](11-configuration.md#notification-keys) for the full table.
 
 ## Herdr sidebar projection
 
@@ -160,7 +191,7 @@ If the parent's live head or owned revisions are abandoned, kiki surfaces topolo
 
 ## Audit
 
-The audit record is kiki's log of every request made to its daemon and what happened to each one.
+The audit record is kiki's log of every attempt to call its daemon that kiki can parse, and what happened to each one.
 
 kiki inserts every parseable daemon transport attempt into exactly one authoritative [SQLite](https://www.sqlite.org/) audit table. Each row records:
 

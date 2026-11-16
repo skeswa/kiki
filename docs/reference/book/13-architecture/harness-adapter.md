@@ -16,8 +16,13 @@ trait Harness {
     fn name(&self) -> &str;
     fn capabilities(&self) -> Capabilities;
     fn launch_spec(&self, opts: SpawnOpts) -> Result<LaunchSpec>;
+    fn audit_exclusivity(&self, spec: &LaunchSpec) -> Result<ExclusivityProof>;
+    fn map_event(&self, event: &HookEvent) -> Result<BoundaryIdentity>;
+    fn delivery_receipt(&self, session: &HarnessSessionId, batch: &ToolBatchId) -> Result<ReceiptOutcome>;
+    fn status_inputs(&self, event: &HookEvent) -> Vec<StatusInput>;
 }
 
+// A `kkd` type. It is not part of `kiki-core`.
 struct RunningAgent {
     thread_id: ThreadId,
     agent_session_id: AgentSessionId,
@@ -33,6 +38,20 @@ impl RunningAgent {
     fn status(&self) -> AgentStatus;
 }
 ```
+
+### What each part is for
+
+The `Harness` trait lives in `kiki-core`. It does no I/O of its own beyond reading the harness's files. Its methods are:
+
+- **`launch_spec`** turns spawn options into the exact command to run (see the next section).
+- **`audit_exclusivity`** reads the effective settings of one planned launch. It proves that kiki's hook is the only matching pre-tool hook, or it fails. See [Exclusive hook boundary](#exclusive-hook-boundary-and-settings-ownership).
+- **`map_event`** maps one harness hook event onto kiki's protocol terms. It returns the incarnation, the [model turn](../appendix-a-glossary.md#model-turn) identity, and the [tool batch](../appendix-a-glossary.md#tool-batch) identity. It also says which protocol entry point the event is: session start, `PreToolUse`, `PostToolBatch`, or turn completion. An event the adapter cannot map with proof returns an error, and the caller treats the batch as unknown.
+- **`delivery_receipt`** looks up what the model actually received for one blocked batch. It returns matching, contrary, or not yet readable. An adapter whose harness needs no receipt returns "not required". See [The delivery receipt](#the-delivery-receipt).
+- **`status_inputs`** turns a harness event into the facts that feed [`AgentStatus`](../appendix-a-glossary.md#agentstatus) and the display states: a turn started, a turn completed, or an attention event such as a permission prompt.
+
+`HookEvent`, `BoundaryIdentity`, `ExclusivityProof`, `ReceiptOutcome`, and `StatusInput` are this chapter's names for those inputs and results.
+
+`RunningAgent` is a `kkd` type, not a `kiki-core` type. It needs the database, the pane launcher's stream, and `ProcessSupervisor`, and `kiki-core` does no I/O.
 
 ### The adapter never starts a process
 
@@ -53,15 +72,17 @@ This split is required for delivery safety:
 
 - Starting a replacement process retires the previous incarnation and clears its `delivered_intent_id` without acknowledging it.
 - A pending payload is rebound through [`RestartStartup`](../appendix-a-glossary.md#restartstartup-delivery-proof) to the new incarnation and a one-use `startup_delivery_id`.
-- The first [model turn](../appendix-a-glossary.md#model-turn) must causally echo that id before it can acknowledge delivery.
+- The first [model turn](../appendix-a-glossary.md#model-turn) of the new incarnation must prove it came from that startup input before it can acknowledge delivery.
 
-`restart_with_message` implements that proof-carrying path rather than an untracked prepend. Kiki persists the replacement incarnation and startup id before launch. The harness then has to supply three proofs:
+`restart_with_message` implements that proof-carrying path rather than an untracked prepend. Kiki persists the replacement incarnation and startup id before launch. The mechanism is the same for both harnesses:
 
-1. The adapter makes the tagged message the mandatory first harness input.
-2. The adapter reports an acceptance handshake for that exact id.
-3. The adapter includes the id in the hook metadata of the resulting first model turn.
+1. The [launch specification](../appendix-a-glossary.md#launch-specification) makes the saved payload the mandatory first harness input. It also carries the `startup_delivery_id` in the launcher environment that the harness and its hooks inherit.
+2. The session-start hook reports that exact id with `ReportHarnessReady`. This is the acceptance handshake.
+3. The first pre-tool hook call of a model turn in that incarnation is the acknowledgement. `kkd` ties it to the startup id through the incarnation, so no tool batch is made up for the startup input.
 
-If the harness cannot supply all three proofs, `restart_startup_delivery` is false.
+Each harness must prove all three facts for its pinned version, in its own proof-of-concept step (see [Build Sequencing](../15-build-sequencing.md#proof-of-concept)). The proof is required for both adapters. It is not an optional extra.
+
+If the proof fails for a harness, `restart_startup_delivery` is false for it. That harness then ships managed sessions without cascade delivery, so its threads cannot follow other threads. That scope cut is recorded as a new decision record.
 
 ### Process identities
 
@@ -71,6 +92,12 @@ If the harness cannot supply all three proofs, `restart_startup_delivery` is fal
 2. The launcher reports the child's pid ([process id](https://en.wikipedia.org/wiki/Process_identifier)) through `ReportHarnessStarted`.
 3. `kkd` verifies through the OS that it is the launcher's child, and records its identity on `agent_sessions`.
 4. Only then does the launcher release it.
+
+`ReportHarnessStarted` is [idempotent](https://en.wikipedia.org/wiki/Idempotence) (safe to repeat).
+
+- A repeat from the same launcher, for the same incarnation and the same child identity, is accepted as a no-op and gets the same answer. So a launcher whose reply was lost can simply send the report again.
+- A launcher that already holds a recorded child ignores a re-delivered gate specification. It does not create a second child. It reports the existing child again.
+- A report that names a different child for an incarnation that already has one is refused.
 
 The harness identity is therefore recorded before the harness runs. The [ready handshake](../appendix-a-glossary.md#ready-handshake) records readiness, not the pid.
 
@@ -85,7 +112,13 @@ The launcher's own identity is recorded on `terminal_panes`. Neither identity st
 - `restart_with_message` does that, then records a replacement `agent_sessions` row, and activates a new one-use gate that the same accepted launcher awaits.
 - A replacement incarnation needs no terminal provisioning.
 
-Before a replacement incarnation's gate is activated, kiki takes an inventory rooted at the `agent` launcher. The inventory must show no process other than the launcher itself in its descendant, session, and [process-group](https://en.wikipedia.org/wiki/Process_group) sets. A surviving tool child of the retired harness raises [`OrphanedProcess`](../appendix-a-glossary.md#orphanedprocess) with harness-remnant evidence. It blocks both the gate and workspace [materialization](../appendix-a-glossary.md#materialization).
+A hard pause is journaled, so a crash in the middle of one cannot be misread.
+
+- `agent_sessions` carries `pause_state: None | Stopping | Stopped | Killed`.
+- `kkd` writes `Stopping` before it signals anything, `Stopped` once the whole recorded tree is stopped and re-verified, and `Killed` once every recorded identity is verified gone.
+- Recovery after a `kkd` crash rolls a hard pause forward to the kill. It never resumes a harness that was being retired.
+
+Before a replacement incarnation's gate is activated, kiki takes an inventory rooted at the `agent` launcher. The inventory must show no process other than the launcher itself in its descendant, session, and [process-group](https://en.wikipedia.org/wiki/Process_group) sets. A surviving tool child of the retired harness raises [`OrphanedProcess`](../appendix-a-glossary.md#orphanedprocess) with harness-remnant evidence. It blocks replacement, [materialization](../appendix-a-glossary.md#materialization), and deletion: the gate is not activated, nothing is written into the workspace, and nothing is deleted.
 
 ### The launcher outlives incarnations
 
@@ -109,13 +142,15 @@ The thread credential (see [`ThreadScoped<T>` credential](../appendix-a-glossary
 - The launcher re-reads it after `ReportHarnessExit`.
 - `kk` and [`kk-hook`](../appendix-a-glossary.md#kk-hook) read it on every invocation.
 
+The launcher's own calls do not depend on that credential staying the same. After `kkd` accepts a launcher's claim, it authenticates that launcher's calls by the accepted peer process identity `(pid, start_time)`. So rotating the thread credential when an incarnation ends does not close `SuperviseLauncher`, and it does not reject `ReportHarnessExit`.
+
 ### Agent status
 
 [`AgentStatus`](../appendix-a-glossary.md#agentstatus) is `Running | Quiescent | Stuck(duration) | Crashed`. The cascade orchestrator uses `status` and `capabilities` to decide two things: whether soft-pause is viable, and whether pending reconciliation may materialize the managed workspace.
 
 `AgentStatus` is derived only from these sources:
 
-- the harness's own hooks and lifecycle events;
+- the harness's own hooks and lifecycle events, mapped by the adapter's `status_inputs`;
 - the pane launcher's exit report;
 - `ProcessSupervisor`.
 
@@ -134,9 +169,24 @@ The terminal runtime never feeds it.
 | `working`     | `Running`                                                                                                                                                              |
 | `idle`        | `Quiescent`, most recent turn not completed (or no turn yet)                                                                                                           |
 | `finished`    | `Quiescent`, most recent turn completed (the harness's turn-completion signal: Codex's `Stop` lifecycle event; for Claude Code, the proof named as an open gate below) |
-| `blocked`     | `Crashed`, or an unacknowledged attention event such as a permission prompt (see [Observability](../12-observability.md))                                              |
+| `blocked`     | `Crashed`, or an unacknowledged attention event such as a permission prompt, where `attention_events` is proved (see [Observability](../12-observability.md))          |
 
 `Stuck(duration)` alone is not `blocked`. A silent agent keeps its `working` or `idle` state and is rendered dim. The silence threshold is a deferred `[notifications]` key.
+
+### Without a quiescence proof
+
+A harness version with `quiescence_detection: false` never reports `Quiescent`. For such a version:
+
+- `kk ls` shows `working` whenever the harness is alive and not `blocked`.
+- It never shows `idle` or `finished`.
+- When a parent thread closes, an idle child's [boundary snapshot](../appendix-a-glossary.md#boundary-snapshot) uses the warned rule, the same as close preflight: the snapshot is taken with a warning, and a working agent shows up later as [approval drift](../appendix-a-glossary.md#approval-drift).
+
+### The permission-prompt signal
+
+A permission prompt can show `blocked` only when the adapter proves the `attention_events` capability.
+
+- The capability names the exact harness event that says "the agent is waiting on a person", and a proof step shows that event fires for the pinned version.
+- For a harness version without that proof, permission-prompt detection is v1.x. Crash detection still gives `blocked` for that version.
 
 ### The open gate for Claude Code
 
@@ -145,7 +195,7 @@ Kiki installs no Claude Code stop hook unless that hook is promoted with specifi
 A Claude Code version without the proof:
 
 - reports `quiescence_detection: false`;
-- never shows `finished`;
+- shows `working` whenever the harness is alive and not blocked, and never `idle` or `finished`;
 - cannot use [agent quiescence](../appendix-a-glossary.md#agent-quiescence) as a cascade boundary.
 
 Lifecycle preflights do not depend on it. `kk close` preflight proceeds for such a version and warns that a working agent will make the [approval drift](../appendix-a-glossary.md#approval-drift).
@@ -171,10 +221,17 @@ struct Capabilities {
     restart_startup_delivery: bool,
     mcp_client: bool,
     quiescence_detection: bool,
+    attention_events: bool,
 }
 ```
 
-These fields describe behavioral proof, not a particular settings mechanism.
+These fields describe behavioral proof, not a particular settings mechanism. Each one is true only when the adapter has proved the behavior for the pinned harness version.
+
+- **`soft_pause`** is true when the harness can be held at a tool boundary without ending its process. The pre-tool hook can block a tool call, return kiki's payload to the model as that call's result, and let the model carry on in the same process.
+- **`session_resume`** is true when a new process can continue an earlier harness conversation from its `harness_session_id`. A replacement incarnation then keeps the conversation. When it is false, every replacement starts a new conversation.
+- **`mcp_client`** is true when the harness can connect to an [MCP](https://modelcontextprotocol.io/) server named in its launch-scoped configuration. Only the v1.x same-thread transcript tools need it. Nothing in the acceptance slice depends on it.
+- **`quiescence_detection`** is true when the adapter can prove the agent is idle between turns (see [agent quiescence](../appendix-a-glossary.md#agent-quiescence)).
+- **`attention_events`** is true when the adapter names a harness event that reports a permission prompt, and a proof step shows it fires. See [The permission-prompt signal](#the-permission-prompt-signal).
 
 - **`exclusive_pre_tool_use`** may be satisfied by isolated launch settings (Claude Code), a launch-scoped harness home (Codex), or the ownership-tracked fallback. A managed v1 process cannot start when it is false.
 - **`structured_tool_hooks`** is true only when one of these holds:
@@ -184,14 +241,15 @@ These fields describe behavioral proof, not a particular settings mechanism.
   A harness whose file-touching tools can bypass the pre-tool boundary has no safe soft barrier.
 
 - **`parallel_batch_boundary`.** Without it, soft delivery is disabled.
-  - Kiki may then fall back only when `restart_startup_delivery` proves two things: that a tagged payload is the mandatory first input, and that the resulting [model turn](../appendix-a-glossary.md#model-turn) echoes its one-use id.
-  - Otherwise cascade-capable managed execution is unsupported.
-- **`soft_pause`.** For a harness without `soft_pause`, `enqueue_context` leaves the prepared payload on its intent for this restart path.
+  - Kiki may then fall back only when `restart_startup_delivery` is proved. That proof shows the tagged payload is the mandatory first input, the session-start hook reports its one-use id, and the first pre-tool hook call of a [model turn](../appendix-a-glossary.md#model-turn) in that incarnation acknowledges it.
+  - Otherwise the harness ships managed sessions without cascade delivery, and its threads cannot follow.
+- **`restart_startup_delivery`** is true when the harness passes the [`RestartStartup`](../appendix-a-glossary.md#restartstartup-delivery-proof) proof described under [Two session ids](#two-session-ids).
+- **`enqueue_context`** is the `RunningAgent` method that hands a prepared payload to the delivery protocol. With `soft_pause` true, the payload waits on its intent and the pre-tool hook delivers it at the next tool boundary. For a harness without `soft_pause`, `enqueue_context` leaves the prepared payload on its intent. The `RestartStartup` fallback described above then delivers it.
 - The daemon checks `capabilities` for every new incarnation. It does not assume a prior process's result remains valid.
 
 ### What `parallel_batch_boundary` requires
 
-A [tool batch](../appendix-a-glossary.md#tool-batch) is the group of tool calls a model asks for in one step. `parallel_batch_boundary` does not require that the harness dispatches tools in parallel. It requires that the batch boundary is unambiguous.
+A [tool batch](../appendix-a-glossary.md#tool-batch) is the group of tool calls a model sends out together in one model turn (one model response). `parallel_batch_boundary` does not require that the harness dispatches tools in parallel. It requires that the batch boundary is unambiguous.
 
 - **Claude Code** satisfies it with an explicit batch-completion signal over concurrently dispatched calls.
 - **A serial dispatcher** satisfies it degenerately (as the simplest special case). This holds when the integration gate proves the pinned version never runs two tool calls of one model turn concurrently. Each batch then contains exactly one call and closes when that call resolves.
@@ -232,8 +290,16 @@ A hook is a command the harness runs at a set moment, such as just before a tool
 
 The sidecar stays small for latency reasons:
 
+- `kk-hook` is a stateless one-call client. Each run connects to `kkd`, makes one call, prints the answer, and exits. It keeps nothing between runs. There is no separate hook-side helper process.
 - Fast-path round-trip target: <5ms typical, imperceptible to agents.
-- Slow path (rebase + payload compose) is bounded by `jj rebase` plus a small constant.
+- The slow path (rebase plus payload compose) holds the tool batch for at most the [slow-path bound](../appendix-a-glossary.md#slow-path-bound), `[timeouts] slow_path` (default `30s`).
+
+The hook has two separate time limits:
+
+- **`[timeouts] hook_connect` (default `1s`)** covers only connecting to `kkd` and being admitted. If it expires, the hook checks the thread's [barrier marker](../appendix-a-glossary.md#barrier-marker). With the marker present it answers with the generic blocking deny. With the marker absent it returns the harness's non-blocking decision. See [Hook degradation](#hook-degradation).
+- **`[timeouts] slow_path` (default `30s`)** applies once `kkd` has admitted the call into a reconciliation. The hook waits up to that long. If it expires, or the reconciliation's owner crashes, the answer is a generic blocking deny ("kiki is reconciling; try again"). It is never "continue".
+
+Each adapter pins the harness-side hook timeout in its generated configuration above `slow_path` plus a margin. So the harness cannot time out a healthy hook in the middle of a reconciliation. Because the pin is written at launch, a changed `slow_path` reaches a running harness only with its next incarnation.
 
 The hook's exact behavior lives in [Cascade](../05-cascade.md). That covers unresolved-intent lookup, boundary probe, batch barrier, decision step, and post-stdout `MarkDelivered`.
 
@@ -244,7 +310,7 @@ The adapter's obligations for soft delivery ([`SoftBatch`](../appendix-a-glossar
 - Concurrent `PreToolUse` calls in one batch all receive a blocking response when any member triggers reconciliation.
 - Only a matching `PostToolBatch` can complete `SoftBatch`. Only a later [model turn](../appendix-a-glossary.md#model-turn) can acknowledge it.
 
-`RestartStartup` works differently. It requires the first replacement-process model turn to echo its exact `startup_delivery_id`. It never fabricates a tool batch for startup input.
+`RestartStartup` works differently. The session-start hook reports the exact `startup_delivery_id`, and the first pre-tool hook call of a model turn in the replacement incarnation acknowledges it. It never fabricates a tool batch for startup input.
 
 ## Hook degradation
 
@@ -253,27 +319,40 @@ This section says what the hook does when it cannot reach `kkd`.
 The hook degrades to pass-through when both of these hold:
 
 - `kkd` is unreachable (socket missing, connection refused, daemon mid-restart); and
-- no [cascade barrier](../appendix-a-glossary.md#delivery-barrier) has been activated for the current batch.
+- no [cascade barrier](../appendix-a-glossary.md#delivery-barrier) is bound for the thread.
+
+The hook is stateless and cannot read the database, so it learns the second fact from a file: the [barrier marker](../appendix-a-glossary.md#barrier-marker).
+
+- When `kkd` binds a `Block` for a thread, it first writes the marker durably at `~/.config/kiki/repos/<repo_id>/barriers/<thread_id>`. It does this before it changes any workspace file.
+- `kkd` removes the marker when the barrier lifts. After a crash, recovery removes it only after the reconciliation it guards is resolved.
+- The hook learns the marker's absolute path the same way it learns the error-log path: `kkd` writes it into the per-thread harness config at thread-spawn time.
+- The hook only checks whether the file exists. It never writes or removes it.
 
 The limits are:
 
-- The connect timeout is 200ms.
-- The overall hook budget is 1s.
-- On expiry, the hook returns the harness's non-blocking decision (Claude Code's `continue`, Codex's `allow`), so the agent's tool call is not blocked.
-- The hook then appends one structured record to `~/.config/kiki/repos/<repo_id>/errors/<thread_id>.log`.
+- `[timeouts] hook_connect` (default `1s`) covers connecting to `kkd` and being admitted. It covers nothing else.
+- On expiry, the hook checks the marker.
+  - **Marker present.** The hook answers with the generic blocking deny ("kiki is reconciling; try again"). The tool call does not run.
+  - **Marker absent.** The hook returns the harness's non-blocking decision (Claude Code's `continue`, Codex's `allow`), so the agent's tool call is not blocked.
+- Either way, the hook then appends one structured record to `~/.config/kiki/repos/<repo_id>/errors/<thread_id>.log`.
 
-### The hook launcher's cache
+**A hook process that dies before answering.** The marker cannot cover a `kk-hook` process that is killed or crashes before it prints an answer. That case is covered by a proof for each pinned harness version: the harness must not run the tool as if the hook had allowed it. If the proof fails, that harness version is unsupported for cascade delivery.
 
-The per-thread [hook launcher](../appendix-a-glossary.md#hook-launcher) is the hook-side process. It is distinct from the [pane launcher](terminal-runtime.md#provisioning). It caches the first admission decision for the lifetime of each batch, so every sibling hook observes the same result.
+Pass-through ends at admission. Once `kkd` has admitted a call into a reconciliation, the hook waits up to `[timeouts] slow_path`. If that expires, or the reconciliation's owner crashes, the hook answers with a generic blocking deny ("kiki is reconciling; try again"). It never answers "continue" for an admitted call.
+
+### The admission cache
+
+`kkd` caches the first admission decision for the lifetime of each batch, so every sibling hook call observes the same result. `kkd` owns that cache. It lives in `kkd`'s memory and is keyed by incarnation and batch. `kk-hook` holds no cache, and no other hook-side process exists.
 
 - A cached [`PassThrough`](../appendix-a-glossary.md#batch-admission) defers intents discovered later in that batch.
-- A cached `Block(intent_id)` [fails closed](../appendix-a-glossary.md#fail-closed) (the call stays blocked).
-- If a `PassThrough` cache entry is lost, the hook launcher can no longer prove that reconciliation is safe in that batch. It then does three things in order:
-  1. It blocks the unknown call.
+- A `Block(intent_id)` decision is also durable on the intent, so it [fails closed](../appendix-a-glossary.md#fail-closed) (the call stays blocked) even after a restart. While `kkd` is down, the [barrier marker](../appendix-a-glossary.md#barrier-marker) keeps the call blocked.
+- After a `kkd` restart the in-memory cache is gone. The rule is then: the first pre-tool call from an incarnation that was already running before this `kkd` start is an unknown in-flight batch. The one exception is a hook payload that proves the call is the first call of a new model turn.
+- For an unknown in-flight batch, `kkd` can no longer prove that reconciliation is safe in that batch. `kkd`, not the hook, then does three things in order:
+  1. It answers the unknown call with a block.
   2. It hard-pauses the old incarnation without mutating the workspace.
   3. It starts a replacement before reconsidering pending work.
 - The blocked decision's durable `SoftBatch` proof remains embedded in `sync_intents`. It is authoritative after reconnect.
-- If neither the daemon nor the hook launcher's token can prove a blocked batch completed, the adapter blocks the call and requests `RestartStartup` recovery. It does not pass through a tool against newly materialized files.
+- If `kkd` cannot prove that a blocked batch completed, it blocks the call and takes `RestartStartup` recovery. It does not pass through a tool against newly materialized files.
 
 ### The error log
 
@@ -289,6 +368,7 @@ Pass-through is not a violation of the cascade safety invariant. It is the expli
 
 - The cascade invariant in [Invariants](../02-invariants.md) requires `kkd` to be reachable for kiki to materialize a desired state at a [safe boundary](../appendix-a-glossary.md#safe-boundary).
 - When the daemon is unreachable, jj repository state may already contain native descendant evolution. Even so, kiki leaves the workspace files untouched and preserves or reconstructs the pending intent.
+- Pass-through happens only with the [barrier marker](../appendix-a-glossary.md#barrier-marker) absent. An absent marker means `kkd` has not started changing this thread's files for a reconciliation that is still unresolved.
 
 Two cases:
 
@@ -337,13 +417,26 @@ The harness [launch specification](../appendix-a-glossary.md#launch-specificatio
 - Herdr's own hook scripts do nothing without those variables.
 - Like the rest of the model, this is cooperative hygiene, not a security boundary. The harness still runs as the same user.
 
-A harness version that provides exclusive hook control but no unambiguous batch boundary may run only when it also proves `restart_startup_delivery`.
+A harness version that provides exclusive hook control but no unambiguous batch boundary delivers cascades only when it also proves `restart_startup_delivery`.
+
+### The session-start hook
+
+Both generated harness configurations declare a session-start hook that runs `kk-hook`. It carries the [ready handshake](../appendix-a-glossary.md#ready-handshake) (`ReportHarnessReady`), so no thread can reach `Active` without it.
+
+A proof step for each pinned harness version shows that the hook fires:
+
+- exactly once per incarnation;
+- before any tool runs;
+- on a fresh start and on a resume.
+
+If the proof fails for a harness version, that version is unsupported. There is no fallback for it.
 
 ### Claude Code
 
 The preferred mechanism is a launch-scoped generated settings file under `~/.config/kiki/repos/<repo_id>/harness/<thread_id>/`. Kiki passes it with harness arguments that isolate the managed process from project, local-project, and user `PreToolUse` definitions.
 
-- The generated file declares kiki's `PreToolUse`, its batch-completion entry point where supported, and absolute credential/error-log paths.
+- The generated file declares kiki's `PreToolUse`, its session-start hook, its batch-completion entry point where supported, and absolute credential/error-log paths.
+- It pins the harness-side hook timeout above `[timeouts] slow_path` plus a margin.
 - An adapter/version combination is accepted only after an integration test proves that no independently discovered user or project `PreToolUse` hook runs in that managed process.
 - Unrelated hook events may remain enabled only when the same test proves two things: they cannot race workspace reconciliation, and they cannot reintroduce a matching `PreToolUse` hook.
 
@@ -367,7 +460,8 @@ Codex resolves its configuration, hooks, trust store, sessions, and authenticati
 - The adapter launches every managed incarnation with `CODEX_HOME` pointed at the same launch-scoped directory, `~/.config/kiki/repos/<repo_id>/harness/<thread_id>/`.
 - Kiki generates that home per incarnation. It contains a `config.toml` ([TOML](https://toml.io/) is a configuration file format) that:
   - enables the lifecycle-hook feature;
-  - declares kiki's `PreToolUse` and turn-lifecycle hooks with absolute credential/error-log paths;
+  - declares kiki's `PreToolUse`, session-start (`SessionStart`), and turn-lifecycle hooks with absolute credential/error-log paths;
+  - pins the harness-side hook timeout above `[timeouts] slow_path` plus a margin;
   - pre-trusts exactly those hooks in the generated trust store.
 - The launch-scoped home _is_ the user layer for that process. So the user's real `~/.codex/` configuration and hooks are structurally excluded rather than merely overridden.
 
@@ -450,11 +544,11 @@ What happens for each receipt outcome:
    - `RestartStartup` delivery is the mandatory first input of a replacement process. It does not ride the hook output at all.
 4. **A receipt not yet readable.**
    - When no further delivery is pending, acknowledgement is deferred to a later boundary.
-   - Otherwise the intent [fails closed](../appendix-a-glossary.md#fail-closed) into `RestartStartup` within the hook budget. This prefers a rare duplicate delivery over a wrong acknowledgement.
+   - Otherwise the intent [fails closed](../appendix-a-glossary.md#fail-closed) into `RestartStartup` within `[timeouts] slow_path`. This prefers a rare duplicate delivery over a wrong acknowledgement.
 
 Delivery failure never loops silently past that ladder.
 
-- `RestartStartup` attempts are bounded. If they keep failing their handshake or echo, kiki records exhaustion on the intent, in the same transaction that abandons the last attempt. It then:
+- Delivery retries are bounded by `[cascade] delivery_attempts` (default `3`). If `RestartStartup` attempts keep failing their handshake or their first-turn acknowledgement, kiki records exhaustion on the intent, in the same transaction that abandons the last attempt. It then:
   - leaves the intent unacknowledged;
   - keeps the agent hard-paused;
   - raises a loud [attention event](../appendix-a-glossary.md#attention-event) for the human.
@@ -467,8 +561,8 @@ Delivery failure never loops silently past that ladder.
 
 Three supporting properties are version proofs at the gate:
 
-1. The per-thread hook launcher answers for a dead sidecar under an active barrier with a generic blocking deny. So a barrier-covered call never fails open into tool execution.
-2. The generated config pins the harness-side hook timeout above the slow path's bound. So a healthy hook cannot be timed out mid-reconciliation.
+1. A barrier-covered call never fails open into tool execution. `kk-hook` answers an admitted call with a generic blocking deny when `slow_path` expires or the reconciliation's owner crashes. The proof also covers a `kk-hook` process that dies before it writes an answer: the pinned version must not run the tool as if the hook had allowed it.
+2. The generated config pins the harness-side hook timeout above `[timeouts] slow_path` plus a margin. So a healthy hook cannot be timed out mid-reconciliation.
 3. The pinned version's session record durably contains each tool result as returned to the model, deny results included. So receipts exist to be read.
 
 A payload delivered on a turn's final tool call stays `Delivered` until the next turn's first `PreToolUse`. `Stop` completes the batch but never acknowledges.
@@ -477,10 +571,11 @@ A payload delivered on a turn's final tool call stays `Delivered` until the next
 
 The `Stop` lifecycle event is the turn-completion signal behind the `finished` display state and quiescence detection.
 
-`SessionStart` distinguishes fresh starts from resumes. The adapter uses it, together with the mandatory tagged first input, for the `RestartStartup` acceptance handshake:
+`SessionStart` is Codex's session-start hook. It fires on fresh starts and on resumes, and it tells them apart. The adapter uses it for the ready handshake and, together with the mandatory tagged first input, for the `RestartStartup` acceptance handshake:
 
-1. Kiki starts or resumes the harness session (`codex resume <harness_session_id>`) with the saved payload as the first input. That input carries the one-use `startup_delivery_id`.
-2. The first [model turn](../appendix-a-glossary.md#model-turn) generated from that input must echo the id through its turn-scoped hook metadata before acknowledgement.
+1. Kiki starts or resumes the harness session (`codex resume <harness_session_id>`) with the saved payload as the first input. The launch specification carries the one-use `startup_delivery_id` in the launcher environment.
+2. The `SessionStart` hook reports that id with `ReportHarnessReady`.
+3. The first pre-tool hook call of a [model turn](../appendix-a-glossary.md#model-turn) in that incarnation is the acknowledgement.
 
 This is exactly what the protocol requires of every adapter.
 
@@ -552,17 +647,22 @@ The creation order is:
    - The layout appends a new tab with new ids rather than reusing the old ones.
 9. Each launcher reports its Herdr ids, then blocks on its gate.
    - `kkd` accepts a report only from a process whose parent is the current server instance and which a fresh per-pane process query shows to be the reported pane's root.
-   - In one transaction `kkd` accepts exactly one launcher per `(provision_id, role)`, records its OS-read process identity, and marks the [terminal binding](../appendix-a-glossary.md#terminal-binding) `Bound`.
-   - A duplicate launcher from a repeated create call is refused and exits without starting anything.
+   - Each report is handled when it arrives, in one transaction per report. There is no table of pending reports. The transaction accepts that launcher for `(provision_id, role)` and records its OS-read process identity.
+   - The [terminal binding](../appendix-a-glossary.md#terminal-binding) becomes `Bound` in the transaction that accepts the `agent` claim. `agent` is the only [required role](../appendix-a-glossary.md#required-role).
+   - `kkd` waits up to `[timeouts] launcher_report` (default `10s`) for the reports. A `shell` or `ui` launcher that has not reported by then is recorded as absent and raises a warning. It does not fail provisioning. A missing `agent` report does.
+   - Reports are idempotent. A repeat of an accepted report from the same peer process identity `(pid, start_time)` gets the same answer again.
+   - A different process presenting for a consumed role is refused and must exit. That covers a duplicate launcher from a repeated create call, which exits without starting anything.
    - A group whose launchers are all refused removes itself, because Herdr drops a workspace when its last pane's command exits.
 10. In a second transaction, which requires the `Bound` binding, record the process incarnation and activate its one-use launch gate while the thread remains `Creating`.
     - `kkd` resolves `SpawnOpts { thread_id, resume_harness_session_id: Option<HarnessSessionId>, initial_prompt: Option<String>, harness_args }` through `Harness::launch_spec` and delivers the result on the launcher's supervision stream.
     - The launcher creates the harness child held before exec, and reports its pid through `ReportHarnessStarted`. It releases the child only after `kkd` has verified and recorded the child's identity on `agent_sessions`.
+    - A repeated `ReportHarnessStarted` for the same incarnation and child is a no-op. A launcher that already holds a recorded child ignores a re-delivered gate specification and reports the existing child.
     - The harness then runs in the pane's foreground.
     - The launcher does not replace itself. It stays alive across incarnations, because Herdr removes a pane when its direct command exits. It reports the harness's exit.
     - `kk-hook` sends the ready handshake from the harness's session-start hook event, with the incarnation id and the settings and hook fingerprints.
     - The transaction that commits the handshake re-reads the launcher's OS identity and the open `terminal_servers` row. Only that transaction completes the saga and enters `Active`.
-    - Launch or handshake failure becomes `CreateFailed`.
+    - The handshake must arrive within `[timeouts] ready_handshake` (default `60s`), counted from the launch. Expiry is `CreateFailed`. In a restart it is that restart's failure instead.
+    - Any other launch or handshake failure also becomes `CreateFailed`.
 
 ### Journaling and idempotence
 
@@ -570,7 +670,7 @@ Every step is journaled.
 
 - Steps 1–7 are [idempotent](https://en.wikipedia.org/wiki/Idempotence) (safe to repeat).
 - Step 8 is not idempotent at the runtime, because a lost reply may have created a terminal group. So recovery reads a fresh snapshot and launcher reports before it issues any new call.
-- The single gate claim in step 9 guarantees that a duplicate group can never yield a duplicate harness.
+- The single accepted `agent` launcher per `(provision_id, role)` in step 9, and its one gate claim, guarantee that a duplicate group can never yield a duplicate harness.
 - Failure before step 10 cannot expose a partially configured agent.
 - Failure afterward leaves a recoverable creation state rather than claiming cross-system atomicity.
 

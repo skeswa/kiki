@@ -18,25 +18,27 @@ The proto (the Protocol Buffers file) is partitioned by capability class. A [cap
 
 - Every operational method declares its `ThreadScoped<T>` scope. (A [`ThreadScoped<T>` credential](../appendix-a-glossary.md#threadscoped-credential) is bound to one thread.)
 - Every operational method also declares whether it additionally consumes a `HumanApproval`. That [approval](../appendix-a-glossary.md#human-approval) is bound to the method, the target, and the argument digest (a [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the arguments).
-- Admin is accepted only by bootstrap and approval-presenter enrollment endpoints. It is never ambient operational authority.
+- Admin is accepted only by bootstrap and approval-presenter enrollment endpoints, and by `BeginApproval` for the approvals of `kk init` and first run, when no thread or registration credential exists yet. It is also accepted by the two user-scoped `replace-terminal-server` calls, `DiagnoseServerRepair` and the `BeginApproval` for that plan, so they work from any directory. It is never ambient operational authority. `kkd` checks the [Admin credential](../appendix-a-glossary.md#bootstrap-admin-credential) against its record in the user-level database, `~/.config/kiki/state.db`, because Admin belongs to no one repo.
 
-| Surface                 | Methods (illustrative)                                                                                                                      | Capability                                                                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Bootstrap               | `EnrollApprovalPresenter`, `RecoverApprovalPresenter`                                                                                       | explicit Admin bootstrap                                                                                                        |
-| Approval                | `BeginApproval`, `ConfirmApproval`, `CancelApproval`                                                                                        | caller credential begins; enrolled foreground presenter confirms/cancels                                                        |
-| Repo registry           | `RegisterRepo`, `UnregisterRepo`, `ListRepos`                                                                                               | summary registration capability; mutations consume `HumanApproval`                                                              |
-| Thread lifecycle        | `NewThread`, `Close`, `Reopen`, `Destroy` (v1.x), `DiagnoseRepair`, `ApplyRepair`                                                           | `ThreadScoped<T>` where available; consequential plans consume `HumanApproval`                                                  |
-| Thread reads (own)      | `GetThreadState`, `StreamThreadEvents`, `GetCascadeStatus`                                                                                  | `ThreadScoped<T>`                                                                                                               |
-| Repo summaries          | `RepoThreadSummaries` (server-streaming)                                                                                                    | least-privilege same-repo summary capability                                                                                    |
-| Cascade hook            | `PreToolUseDecision`, `MarkDelivered`, `MarkToolBatchComplete`                                                                              | `ThreadScoped<T>` plus exact incarnation/turn/batch identities                                                                  |
-| Terminal server         | `EnsureTerminalServer`                                                                                                                      | `RegistrationScoped<repo_id>` or `ThreadScoped<T>`; no approval; starts no agent                                                |
-| Pane launcher           | `ReportLauncherStarted`, `SuperviseLauncher` (bidirectional stream carrying `AwaitLaunchGate`), `ReportHarnessStarted`, `ReportHarnessExit` | `ThreadScoped<T>` plus the provision nonce, one claim per `(terminal_binding_id, role)`, bound to the caller's peer credentials |
-| Harness startup         | `ReportHarnessReady`, `AcceptStartupDelivery`                                                                                               | thread scope plus the incarnation id and, for a replacement, its one-use `startup_delivery_id`                                  |
-| Transcript (v1.x)       | `ReadTranscript`, `SearchTranscript`                                                                                                        | same-thread `ThreadScoped<T>`; cross-thread read consumes `HumanApproval`                                                       |
-| Provider consent (v1.x) | `ListEgressConsents`, `GrantEgressConsent`, `RevokeEgressConsent`                                                                           | reads use caller scope; grant/revoke require the foreground presenter                                                           |
-| Publish (v1.x)          | `Publish`                                                                                                                                   | `ThreadScoped<T>` plus a one-shot approval bound to the exact remote plan                                                       |
-| Audit                   | `GetAuditLog`, `GetThreadAudit`                                                                                                             | non-sensitive same-thread slice; detailed or cross-thread read consumes `HumanApproval`                                         |
-| Config                  | `GetConfig`, later `SetConfig`                                                                                                              | least privilege for reads; consequential scope changes consume approval                                                         |
+| Surface                 | Methods (illustrative)                                                                                                                      | Capability                                                                                                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bootstrap               | `EnrollApprovalPresenter`, `RecoverApprovalPresenter`                                                                                       | explicit Admin bootstrap                                                                                                                                                                                              |
+| Approval                | `BeginApproval`, `ConfirmApproval`, `CancelApproval`                                                                                        | caller credential begins; enrolled foreground presenter confirms/cancels                                                                                                                                              |
+| Repo registry           | `RegisterRepo`, `UnregisterRepo`, `ListRepos`                                                                                               | summary registration capability; mutations consume `HumanApproval`                                                                                                                                                    |
+| Thread lifecycle        | `NewThread`, `Close`, `Reopen`, `Destroy` (v1.x), `DiagnoseRepair`, `ApplyRepair`                                                           | `ThreadScoped<T>` where available; consequential plans consume `HumanApproval`                                                                                                                                        |
+| Repo repair             | `DiagnoseRepoRepair`, `ApplyRepoRepair`                                                                                                     | `RegistrationScoped<repo_id>` or `ThreadScoped<T>` to diagnose; apply consumes a one-shot `HumanApproval` with repo scope                                                                                             |
+| Thread reads (own)      | `GetThreadState`, `StreamThreadEvents`, `GetCascadeStatus`                                                                                  | `ThreadScoped<T>`                                                                                                                                                                                                     |
+| Repo summaries          | `RepoThreadSummaries` (server-streaming)                                                                                                    | least-privilege same-repo summary capability                                                                                                                                                                          |
+| Cascade hook            | `PreToolUseDecision`, `MarkDelivered`, `MarkToolBatchComplete`                                                                              | `ThreadScoped<T>` plus exact incarnation/turn/batch identities                                                                                                                                                        |
+| Terminal server         | `EnsureTerminalServer`                                                                                                                      | `RegistrationScoped<repo_id>` or `ThreadScoped<T>`; no approval; starts no agent                                                                                                                                      |
+| Terminal server repair  | `DiagnoseServerRepair`, `ApplyServerRepair`                                                                                                 | `RegistrationScoped<repo_id>`, `ThreadScoped<T>`, or the Admin bootstrap credential to diagnose and to begin the approval, so both work from any directory; apply consumes a one-shot `HumanApproval` with user scope |
+| Pane launcher           | `ReportLauncherStarted`, `SuperviseLauncher` (bidirectional stream carrying `AwaitLaunchGate`), `ReportHarnessStarted`, `ReportHarnessExit` | `ThreadScoped<T>` plus the provision nonce for the first claim, one claim per `(provision_id, role)`, bound to the caller's peer credentials; after the claim is accepted, the accepted peer process identity         |
+| Harness startup         | `ReportHarnessReady`                                                                                                                        | thread scope plus the incarnation id and, for a replacement, its one-use `startup_delivery_id`                                                                                                                        |
+| Transcript (v1.x)       | `ReadTranscript`, `SearchTranscript`                                                                                                        | same-thread `ThreadScoped<T>`; cross-thread read consumes `HumanApproval`                                                                                                                                             |
+| Provider consent (v1.x) | `ListEgressConsents`, `GrantEgressConsent`, `RevokeEgressConsent`                                                                           | reads use caller scope; grant/revoke require the foreground presenter                                                                                                                                                 |
+| Publish (v1.x)          | `Publish`                                                                                                                                   | `ThreadScoped<T>` plus a one-shot approval bound to the exact remote plan                                                                                                                                             |
+| Audit                   | `GetAuditLog`, `GetThreadAudit`                                                                                                             | non-sensitive same-thread slice; detailed or cross-thread read consumes `HumanApproval`                                                                                                                               |
+| Config                  | `GetConfig`, later `SetConfig`                                                                                                              | least privilege for reads; consequential scope changes consume approval                                                                                                                                               |
 
 The rest of this section explains the surfaces that need more than one line.
 
@@ -57,6 +59,31 @@ An approval is how a human agrees to a consequential operation. It has separate 
 - The consequential method later claims the issued approval and its operation journal atomically (in one indivisible step).
 - Operational methods reject presenter and Admin credentials.
 
+### Repair
+
+Repair has a diagnose step and an apply step at each of three scopes. Diagnose changes nothing and returns the offered [repair plans](../appendix-a-glossary.md#repair-plan), each with a plan id. Apply runs one plan by its id. [Commands](../09-commands.md) owns the table of issues, plans, and approvals.
+
+| Scope                      | Methods                                     | CLI                                                          | Plans                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------- | ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One thread                 | `DiagnoseRepair`, `ApplyRepair`             | `kk repair`, `kk repair --apply <plan-id>`                   | every per-thread plan, such as [`restart-terminal`](../appendix-a-glossary.md#restart-terminal), [`close-without-terminal`](../appendix-a-glossary.md#close-without-terminal), [`terminate-orphans`](../appendix-a-glossary.md#terminate-orphans), [`cleanup-failed-restart`](../appendix-a-glossary.md#cleanup-failed-restart), and the bookmark plans |
+| One repo                   | `DiagnoseRepoRepair`, `ApplyRepoRepair`     | `kk repair --repo`, `kk repair --repo --apply <plan-id>`     | repo-level plans; in v1 that is [`reanchor-history`](../appendix-a-glossary.md#reanchor-history)                                                                                                                                                                                                                                                        |
+| The user's terminal server | `DiagnoseServerRepair`, `ApplyServerRepair` | `kk repair --server`, `kk repair --server --apply <plan-id>` | [`replace-terminal-server`](../appendix-a-glossary.md#replace-terminal-server)                                                                                                                                                                                                                                                                          |
+
+- `kk repair --all` calls `DiagnoseRepair` for every thread in the caller's repo. It never crosses repos.
+- `ApplyRepoRepair` needs a one-shot approval with repo scope. The repo is the caller's repo.
+- `DiagnoseServerRepair` returns the `replace-terminal-server` plan. The plan lists every thread and every process that the replacement stops.
+- `ApplyServerRepair` needs a one-shot approval. The plan is user-scoped, not thread-scoped, so no thread credential can authorize it alone. It stops the old server with [verified exit](../appendix-a-glossary.md#verified-exit) and then starts a new one.
+- Every apply method claims its approval together with its operation journal, like any other consequential method.
+
+### Cascade hook
+
+[`kk-hook`](../appendix-a-glossary.md#kk-hook) is a stateless client. Each run makes one call and exits. There is no separate hook-side process.
+
+- `kkd` owns the [`PassThrough`](../appendix-a-glossary.md#batch-admission) cache. It lives in `kkd`'s memory, keyed by incarnation and batch. So every `PreToolUseDecision` in one [tool batch](../appendix-a-glossary.md#tool-batch) gets the same answer from `kkd` itself.
+- After a `kkd` restart the cache is gone. The first `PreToolUseDecision` from an incarnation that was already running before this `kkd` start is an unknown in-flight batch, unless the hook payload proves it is the first call of a new [model turn](../appendix-a-glossary.md#model-turn).
+- `kkd`, not the hook, performs the [hard pause](../appendix-a-glossary.md#hard-pause) and the replacement that follow. No RPC lets a client ask for either.
+- The hook has two time limits. `[timeouts] hook_connect` (default `1s`) covers connecting and being admitted. If it expires, the hook makes no RPC. It checks the thread's [barrier marker](../appendix-a-glossary.md#barrier-marker) file: present means a generic blocking deny, and absent means the harness's non-blocking decision. Once `kkd` has admitted the call into a reconciliation, the hook waits up to `[timeouts] slow_path` (default `30s`), the [slow-path bound](../appendix-a-glossary.md#slow-path-bound). If that expires, or the owner crashes, the answer is a generic blocking deny, never continue.
+
 ### Provider-egress consent
 
 [Provider-egress consent](../appendix-a-glossary.md#provider-egress-consent) is the user's permission to send transcript text to a model provider. It is durable privacy policy. It is not reusable operational Admin authority.
@@ -70,13 +97,14 @@ An approval is how a human agrees to a consequential operation. It has separate 
 [`RestartStartup` delivery](../appendix-a-glossary.md#restartstartup-delivery-proof) is distinct from the soft batch barrier. It delivers a saved message to a replacement [incarnation](../appendix-a-glossary.md#incarnation) (a new run of the harness process).
 
 - The launcher is not replaced.
-- The replacement incarnation receives the saved payload through the same `agent` launcher's next [launch specification](../appendix-a-glossary.md#launch-specification), with a one-use `startup_delivery_id`.
+- The replacement incarnation receives the saved payload through the same `agent` launcher's next [launch specification](../appendix-a-glossary.md#launch-specification), with a one-use `startup_delivery_id`. The launch specification carries that id in the launcher environment, and the session-start hook reports it.
 - `ReportHarnessReady(replacement_incarnation_id, startup_delivery_id, payload_sha256)` proves only that the tagged startup message was installed in the ready process. It does not acknowledge the message.
-- The replacement's first `PreToolUseDecision` **must** carry the same tag. At that point `AcceptStartupDelivery` atomically does three things:
+- The acknowledgement is the first `PreToolUseDecision` of a model turn in that same replacement incarnation. `kkd` matches the call to the tag by its incarnation id.
+- Accepting the startup delivery is a side effect of that first `PreToolUseDecision`. It is not a separate method. In one transaction, `kkd` does three things:
   - it consumes the tag;
   - it acknowledges the intent;
   - it admits or blocks that tool according to the next unresolved intent.
-- A ready report, process existence, or an untagged boundary is never acceptance evidence.
+- A ready report, process existence, or a call from any other incarnation is never acceptance evidence.
 
 ### Terminal server
 
@@ -92,7 +120,7 @@ An approval is how a human agrees to a consequential operation. It has separate 
 
 The pane launcher surface carries the provisioning protocol in [Terminal runtime](terminal-runtime.md#provisioning).
 
-**The nonce.** A [nonce](https://en.wikipedia.org/wiki/Cryptographic_nonce) is a random value made to be used once. (See [provision nonce](../appendix-a-glossary.md#provision-nonce).)
+**The nonce.** A [nonce](https://en.wikipedia.org/wiki/Cryptographic_nonce) is a secret random value with a strictly limited use. Here it admits one claim per role. (See [provision nonce](../appendix-a-glossary.md#provision-nonce).)
 
 - `kkd` mints one nonce per provision. It rotates the nonce, which gives a new hash, before any re-issued create call.
 - The nonce reaches each role launcher through its launch environment. It never travels through argv (the command's argument list), because Herdr saves and exposes launch argv.
@@ -109,13 +137,19 @@ The pane launcher surface carries the provisioning protocol in [Terminal runtime
     - the caller's parent process is the current server instance's process; and
     - a fresh per-pane process query on a verified connection shows that the reported pane's root pid is that caller.
   - A report from a launcher whose parent is a previous server instance is refused.
-  - In one [transaction](https://en.wikipedia.org/wiki/Database_transaction), `kkd` accepts exactly one launcher for that `(provision_id, role)`, records its identity on `terminal_panes`, and marks the binding `Bound` once its required roles are claimed.
+  - Each report is handled in one [transaction](https://en.wikipedia.org/wiki/Database_transaction) when it arrives. There is no table of pending reports. The transaction accepts that launcher for `(provision_id, role)` and records its identity on `terminal_panes`. Exactly one launcher is accepted for each `(provision_id, role)`.
+  - The binding becomes `Bound` in the transaction that accepts the `agent` claim. `agent` is the only [required role](../appendix-a-glossary.md#required-role).
+  - A `shell` or `ui` launcher that does not report within `[timeouts] launcher_report` (default `10s`) is recorded as absent. That raises a warning. It does not fail provisioning.
+  - The report is idempotent, which means a repeat is safe. A repeat of an accepted report from the same peer process identity `(pid, start_time)` gets the same answer again.
+  - A different process that presents for a role already claimed is refused.
   - The first accepted launcher fixes the binding's Herdr workspace. A launcher reporting from another Herdr workspace is refused.
   - A unique index over `(server_instance_id, group_ref)` for bindings that are not `Ended` keeps two bindings from naming one group.
   - Every refused caller **must** exit without starting anything.
   - For the `shell` and `ui` roles, this role-claim transaction is also what releases the launcher's gate.
+  - After its claim is accepted, the launcher's later calls are authenticated by the accepted peer process identity.
 - **`SuperviseLauncher`** is the `agent` launcher's long-lived stream to `kkd`. The launcher holds it for its whole life and reopens it after a daemon restart.
   - "The launcher answers" has one meaning everywhere: its OS identity is alive and not stopped, and this stream is open.
+  - The stream is authenticated by the accepted peer process identity. Rotating the thread credential when an incarnation ends does not close it.
   - `AwaitLaunchGate` messages ride the stream.
   - Each gate is one-use. There is one per incarnation, and the same accepted launcher awaits a new one for each replacement incarnation.
   - A second, separate transaction records the incarnation in `agent_sessions` and activates its gate. That transaction requires a `Bound` binding and, for a replacement, a passed harness-remnant check.
@@ -126,9 +160,12 @@ The pane launcher surface carries the provisioning protocol in [Terminal runtime
   - `kkd` verifies through the OS that the process is that launcher's child, records its `(pid, start_time)` on `agent_sessions`, and replies.
   - Only then does the launcher release the child.
   - The launcher reports process facts only.
+  - A repeat from the same launcher, for the same incarnation and the same child identity, is accepted and changes nothing.
+  - A launcher that already holds a recorded child ignores a gate specification that is delivered again. It reports the existing child.
 - **`ReportHarnessExit`** reports the harness child's exit status.
   - It retires the incarnation without acknowledging any delivery and sets [`AgentStatus`](../appendix-a-glossary.md#agentstatus) to `Crashed`.
   - It does not end the `agent` role, and the thread's lifecycle is unchanged.
+  - `kkd` authenticates the report by the launcher's accepted peer process identity. So the credential rotation described next does not reject it.
   - The launcher then re-reads the thread credential file. `kkd` replaced that file's contents atomically, at the same stable path, when the incarnation ended.
   - The launcher then awaits the next gate.
   - `kkd` does not depend on the report. A harness that dies unreported is found by `ProcessSupervisor`.
@@ -139,7 +176,8 @@ The pane launcher surface carries the provisioning protocol in [Terminal runtime
 
 `ReportHarnessReady` is sent by `kk-hook` from the harness's session-start hook event, not by the launcher.
 
-- It carries the incarnation id and the settings and hook fingerprints.
+- It carries the incarnation id and the settings and hook fingerprints. For a replacement started by `RestartStartup`, it also carries the `startup_delivery_id`.
+- `kkd` waits for it up to `[timeouts] ready_handshake` (default `60s`) from launch. On expiry a creation becomes `CreateFailed`, and a restart takes its own failure state.
 - It records readiness, not the pid.
 - The transaction that commits it re-reads the launcher's OS identity and the open `terminal_servers` row. It fails if either no longer matches.
 
@@ -183,6 +221,8 @@ UIs subscribe through server-streaming RPCs rather than polling (asking again an
 - `RepoThreadSummaries(repo_id)` — one-line summaries for sibling threads in the same repo. It is used by `kk ls`, the overlay, and the optional `ui` pane.
 
 On disconnect, clients reconnect and re-subscribe. Events carry a monotonic `seq` (a number that only goes up), so clients can detect gaps.
+
+`StreamThreadEvents.seq` is backed by the `thread_events` table in the repo database. `kkd` writes each event as a row and takes `seq` from that row. So `seq` keeps counting up across a `kkd` restart, and a client that reconnects can tell exactly which events it missed.
 
 **Audit.** Audit interception happens before method dispatch. That is, the audit layer sees every call before the call is routed to a method.
 
