@@ -16,6 +16,20 @@ The original PRD has been folded into the reference book. Treat the book as the 
 
 If something in the code disagrees with the spec or architecture, that is a finding to surface, not silently align with.
 
+## Documentation language
+
+Write **all documentation in clear, high-school-level English**. This applies
+to contributor guides, README files, reference chapters, architecture notes,
+decision records, investigations, plans, tutorials, and documentation in code.
+Technical topics follow the same rule.
+
+Use familiar words, direct sentences, and short paragraphs. Explain unfamiliar
+terms and spell out acronyms on first use. Give enough context for a reader
+who is new to the project, and use concrete examples when they help. Avoid
+unnecessary jargon and complicated wording. Keep technical names and details
+precise; make the explanation easier to read without weakening the contract.
+Review new and edited documentation for this reading level before handoff.
+
 ## What kiki is, in one paragraph
 
 kiki (binary `kk`) is a daemon-backed coordinator that ties jujutsu (jj), the Herdr terminal multiplexer, agent harnesses (Claude Code and Codex in v1), and eventually the GitHub CLI (`gh`) into a workflow for multi-threaded agentic coding. The atom is a **thread** — a themed sequence of jj revisions whose live head is its managed workspace's `@`; its bookmark is an explicit checkpoint/publication projection that kiki tracks through jj's native rewrite successors. Each thread's terminals live in a terminal group — one Herdr workspace on a dedicated kiki Herdr server; Herdr owns the terminal, and its ids, labels, and replies are never authority for identity, readiness, or deletion. Threads can follow other threads. A managed session reserves the pre-tool hook boundary exclusively for kiki, blocks the entire triggering tool batch during reconciliation (Claude Code's parallel batch; a proven-serial Codex version's single-call batch), and acknowledges delivery only from a later model turn. kiki remains an **ambient coordinator** for direct `jj`, `gh`, and native Herdr operations, but ambiguous external projection changes fail loud into repair rather than being guessed through.

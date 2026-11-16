@@ -11,24 +11,26 @@ The tool is named **kiki**. The command is `kk`.
 - User state directory: `~/.config/kiki/`
 - User config: `~/.config/kiki/config.toml`
 - Per-repo state and gitignored config: `~/.config/kiki/repos/<repo_id>/` (centralized; the source repo's filesystem holds no kiki state)
-- Dedicated Herdr server configuration root: `~/.config/kiki/herdr/` (`[paths] herdr_dir`; with the session name, `kiki` by default, it addresses the server, and Herdr derives the socket and saved state beneath it)
+- Generated Herdr configuration: `~/.config/kiki/herdr/config.toml` (`[paths] herdr_dir` holds only this file; the dedicated server is the Herdr session named `kiki` by default, and Herdr keeps that session's socket and saved state under its own directories)
 - Repo-shared committed config: `<repo>/.kiki.toml` (the only kiki file that lives inside the source repo, and only when the team commits one)
 
 ## Command style
 
 Daily-driver verbs should be short and single-word:
 
+- `init`
 - `new`
 - `attach`
 - `switch`
 - `ls`
+- `log`
+- `status`
 - `close`
 - `reopen`
+- `repair`
 - `publish`
-- `status`
-- `interrupt`
 
-Namespaced subcommands such as `thread`, `config`, and `audit` are for management surfaces. `kk attach` opens a terminal view on kiki's Herdr server; the deferred follows-graph command is the namespaced `kk thread attach`, and the two are unrelated.
+Namespaced subcommands such as `thread`, `config`, and `audit` are for management surfaces; `kk thread interrupt` is one. `kk attach` opens a terminal view on kiki's Herdr server; the deferred follows-graph command is the namespaced `kk thread attach`, and the two are unrelated.
 
 ## Why `kk`
 

@@ -10,7 +10,7 @@ The protagonist is unnamed. The work is to port the iOS Kestrel app to Android, 
 
 The storyboard introduces no new commands, flags, glyphs, or screen elements. Every beat in it grounds out in the normative chapters. Where a beat is load-bearing, it cites the chapter that authorizes it. Where it would require behavior the rest of the book does not authorize, that gap is a finding, not a license to extend the surface here.
 
-Transcripts and wireframes in this chapter render the fields the spec commits to in a plausible terminal shape. Exact spacing, column ordering, and any output text the spec does not pin are illustrative — they show what kiki _might_ look like in motion, not what an implementation must emit byte-for-byte. Glyphs and committed output strings (the `in sync` / `pending` / `conflicted` cascade-state words; the empty-state placeholder; the conflict-framing message) are reproduced verbatim from the spec.
+Transcripts and wireframes in this chapter render the fields the spec commits to in a plausible terminal shape. Exact spacing, column ordering, and any output text the spec does not pin are illustrative — they show what kiki _might_ look like in motion, not what an implementation must emit byte-for-byte. Glyphs and the committed cascade-state words (`in sync`, `pending`, `conflicted`) and the empty-state placeholder follow the spec. What kiki says to an agent is defined by [Cascade](../05-cascade.md) and is not quoted here.
 
 Acts are time-stamped (`Day · HH:MM — <repo>`) so the temporal arc is legible: product changes its mind twice, work stacks up, a thread is abandoned in flight, a cascade conflicts and recovers, a laptop reboots overnight, and the week closes with a stack of merged PRs and a quiet TUI.
 
@@ -68,29 +68,28 @@ $ kk new android-skel -m "Scaffold Android navigation: gradle module,
 $ kk attach android-skel
 ```
 
-`kk attach` asks `kkd` to ensure the dedicated server is running and addresses it by kiki's configuration root plus the session name, so this client can only land on kiki's server, never on a Herdr server the developer uses for other work (see [Commands · `kk attach`](../09-commands.md#kk-attach)). This is the developer's terminal for the rest of the week. Herdr's sidebar is on the left with one row; the agent pane is on top and the shell pane below it.
+`kk attach` asks `kkd` to ensure the dedicated server is running and then runs Herdr's connect-only client for kiki's named session with kiki's generated configuration file, so this client can only land on kiki's server, never on a Herdr server the developer uses for other work (see [Commands · `kk attach`](../09-commands.md#kk-attach)). This is the developer's terminal for the rest of the week. Herdr's sidebar is on the left with one entry — the label on its first row, kiki's tokens on its second; the agent pane is on top and the shell pane below it.
 
 ```text
- ╭─ kiki ─────────────────────────────────────────────────────╮ ╭─ agent · android-skel ─────────────────╮
- │                                                            │ │                                        │
- │ ▸ kestrel-mobile android-skel a41c  ── in sync   ● working │ │ > human                                │
- │                                                            │ │   Scaffold Android navigation: gradle  │
- │                                                            │ │   module, NavHost, Material 3 theme.   │
- │                                                            │ │   Match the iOS app's tab structure    │
- │                                                            │ │   but use a NavigationBar rather than  │
- │                                                            │ │   UITabBarController.                  │
- │                                                            │ │                                        │
- │                                                            │ │ ● working  4s  esc to interrupt        │
- │                                                            │ │                                        │
- │                                                            │ │   reading AndroidManifest.xml ...      │
- │                                                            │ │                                        │
- │                                                            │ ╰────────────────────────────────────────╯
- │                                                            │ ╭─ shell ────────────────────────────────╮
- │                                                            │ │ android-skel $ _                       │
- │                                                            │ │                                        │
- │                                                            │ │                                        │
- │                                                            │ │                                        │
- ╰────────────────────────────────────────────────────────────╯ ╰────────────────────────────────────────╯
+ ╭─ kiki ───────────────────────────────╮ ╭─ agent · android-skel ───────────────────────────╮
+ │                                      │ │                                                  │
+ │ ▸ kestrel-mobile android-skel a41c   │ │ > human                                          │
+ │     ── in sync  ● working            │ │   Scaffold Android navigation: gradle module,    │
+ │                                      │ │   NavHost, Material 3 theme. Match the iOS app's │
+ │                                      │ │   tab structure but use a NavigationBar rather   │
+ │                                      │ │   than UITabBarController.                       │
+ │                                      │ │                                                  │
+ │                                      │ │ ● working   4s   esc to interrupt                │
+ │                                      │ │                                                  │
+ │                                      │ │   reading app/src/main/AndroidManifest.xml ...   │
+ │                                      │ │                                                  │
+ │                                      │ ╰──────────────────────────────────────────────────╯
+ │                                      │ ╭─ shell ──────────────────────────────────────────╮
+ │                                      │ │ android-skel $ _                                 │
+ │                                      │ │                                                  │
+ │                                      │ │                                                  │
+ │                                      │ │                                                  │
+ ╰──────────────────────────────────────╯ ╰──────────────────────────────────────────────────╯
 ```
 
 The sidebar is Herdr's. Kiki publishes the thread's label and tokens into it and never reads them back. No kiki verb is bound there, so nothing done in the sidebar can spawn, publish, close, or interrupt. Consequential verbs use daemon-issued foreground approval cards in the overlay (see [Interface · spec](spec.md#herdr-sidebar-projection)).
@@ -109,7 +108,7 @@ $ kk new auth --follows android-skel -m "Implement password login against the
   scaffolded; wire onSuccess to pop to the home tab."
 ```
 
-`--follows` records a live edge from `auth` to `android-skel`. With a second thread the stack has a shape, so between threads the developer added `[ui] ui_pane = true` to user config: `auth`'s tab comes up with a narrow UI pane showing the Stack tree beside the agent (see [Configuration](../11-configuration.md)). `android-skel`'s live terminal group is not reshaped. Herdr's sidebar now has two rows, and `auth`'s row carries the follows token `←● android-skel`.
+`--follows` records a live edge from `auth` to `android-skel`. With a second thread the stack has a shape, so between threads the developer added `[ui] ui_pane = true` to user config: `auth`'s tab comes up with a narrow UI pane showing the Stack tree beside the agent (see [Configuration](../11-configuration.md)). `android-skel`'s live terminal group is not reshaped. Herdr's sidebar now has two entries, and `auth`'s entry carries the follows token `←● android-skel`.
 
 A bare `kk` in either thread now opens the overlay with both threads in the Stack tree. The follows arrow `←●` marks the auth thread as a child of `android-skel`; `▸` marks whichever thread the cursor is on.
 
@@ -172,7 +171,7 @@ $ kk new copyright-2026 -m "Bump copyright year in the footer to 2026.
   only, do not touch any other footer copy."
 ```
 
-The new thread has no follows link; `kestrel-www` has no other kiki threads, and no parent makes sense. That window is not a Herdr client, so again nobody's view moves. The new thread gets its own terminal group on the same server, and Herdr's sidebar in the developer's client now lists three rows from two repos in one list. The developer selects the new row there — Herdr's own navigation — and works from that thread's shell pane. The agent edits one line. A minute later, the developer reviews the diff in the overlay's preview pane (`d`), is satisfied, and publishes:
+The new thread has no follows link; `kestrel-www` has no other kiki threads, and no parent makes sense. That window is not a Herdr client, so again nobody's view moves. The new thread gets its own terminal group on the same server, and Herdr's sidebar in the developer's client now lists three entries from two repos in one list. The developer selects the new entry there — Herdr's own navigation — and works from that thread's shell pane. The agent edits one line. A minute later, the developer reviews the diff in the overlay's preview pane (`d`), is satisfied, and publishes:
 
 ```console
 $ kk publish --ready -m "Bump copyright year to 2026"
@@ -184,7 +183,7 @@ $ kk publish --ready -m "Bump copyright year to 2026"
 $ kk close
 ```
 
-`kk close` shows its plan in an approval card and waits for the developer's `enter`. It then freezes every process in the terminal group — the agent, the shell, anything else running in its panes — repeats its loss check, and checkpoints the bookmark to the live head. Only then does it close the terminal group, verify by OS process identity that every frozen process has exited and nothing else holds the workspace, forget the jj workspace, delete the materialized directory, and mark the thread `Closed` (see [Threads · close](../03-threads.md#close)). Herdr's reply to the close request is not the proof; the verified exit is. If the final check failed, the same processes would resume instead of the thread becoming a dead `Active` row. The thread's row leaves Herdr's sidebar, and Herdr places the developer's client on one of the remaining terminal groups.
+`kk close` needs a quiet agent; this one finished minutes ago. Preflight takes its boundary snapshot, builds the plan, and shows it in an approval card that lists the terminal group's processes and says the approval covers every process in that group at freeze time. On the developer's `enter` it freezes every process in the terminal group — the agent, the shell, anything else running in its panes — repeats its loss check, checkpoints the bookmark, and runs its final proof. Kiki then terminates the frozen processes itself and verifies each exit by OS process identity. Only after that does it ask Herdr to close the terminal group, recheck the filesystem, forget the jj workspace, delete the materialized directory, and mark the thread `Closed` (see [Threads · close](../03-threads.md#close)). Herdr's reply to the close request is cleanup, not proof; the verified exit is. If a check had failed before the termination, the same processes would resume instead of the thread becoming a dead `Active` row. The developer typed `kk close` in the thread's own shell pane, so that `kk` process ends with the group; `kk ls` carries the result. The thread's entry leaves Herdr's sidebar, and Herdr places the developer's client on one of the remaining terminal groups.
 
 Total wall time on the copyright bump: about twelve minutes. Nothing in `kestrel-mobile` was perturbed. The two `kestrel-mobile` threads remain active; `kestrel-www` now has one closed thread.
 
@@ -212,7 +211,7 @@ The developer keeps moving between threads with `kk switch`, and sometimes by se
 
 Mid-afternoon, product Slacks: scrap the password-first auth flow. Sales has been hearing repeated requests for biometric-first login from enterprise pilots, and the team wants to ship the Android beta with that posture from day one. Password is now a fallback, not the front door.
 
-The auth thread's direction is wrong. Not in detail — fully. Closing it and starting a new one is cleaner than re-prompting the agent and watching it patch its way to a different posture. The developer opens the overlay, cursors to `auth` in the Stack, and presses `x`. The overlay requests a daemon-canonical close challenge and displays its approval card (see [Interface · forms](spec.md#forms)):
+The auth thread's direction is wrong. Not in detail — fully. Closing it and starting a new one is cleaner than re-prompting the agent and watching it patch its way to a different posture. The `auth` agent is mid-task, and close needs a quiet agent, so the developer first stops it in its own pane with the harness's `esc`. Then they open the overlay, cursor to `auth` in the Stack, and press `x`. The overlay requests a daemon-canonical close challenge and displays its approval card (see [Interface · forms](spec.md#forms)):
 
 ```text
  kiki · NAVIGATE · kestrel-mobile/auth                                         ?  esc
@@ -221,9 +220,9 @@ The auth thread's direction is wrong. Not in detail — fully. Closing it and st
                                     │
  ● main             ──    in        │   ╭─ Close kestrel-mobile/auth? ───────────────╮
  │                                  │   │                                            │
- ●─android-skel     ──    wrk       │   │  Stops the agent and every process in      │
- │                                  │   │  the terminal group: agent, shell, ui      │
- ●─auth          ▸  ──    ←●        │   │  (3 processes).                            │
+ ●─android-skel     ──    wrk       │   │  Stops every process in the listed         │
+ │                                  │   │  terminal group at freeze time: agent,     │
+ ●─auth          ▸  ──    ←●        │   │  shell, ui (3 found now).                  │
                                     │   │  Forgets the jj workspace and removes      │
                                     │   │  ~/code/kestrel-mobile-kiki-auth.          │
                                     │   │  Tracked jj revisions are kept.            │
@@ -236,7 +235,7 @@ The auth thread's direction is wrong. Not in detail — fully. Closing it and st
  kestrel-mobile  auth  ── in sync  claude-opus-4-7  ctx ●●●○○ 41%  last op 12s
 ```
 
-The developer presses `enter`. `kk close` freezes and rechecks every process in the terminal group, checkpoints the bookmark without snapshotting or changing the frozen workspace, then closes the terminal group, verifies that the frozen processes have exited, forgets the workspace, and marks the thread `Closed`. The developer specifically did not run `kk thread destroy`: that irreversible deletion of kiki's thread record requires a one-use human approval and still preserves jj revisions unless a separate `--abandon-revisions` plan is approved (see [Threads · destroy](../03-threads.md#destroy)).
+The developer presses `enter`. `kk close` freezes and rechecks every process in the terminal group, checkpoints the bookmark without snapshotting or changing the frozen workspace, terminates the frozen processes with verified exit, then closes the terminal group, forgets the workspace, and marks the thread `Closed`. The developer specifically did not run `kk thread destroy`: that irreversible deletion of kiki's thread record requires a one-use human approval and still preserves jj revisions unless a separate `--abandon-revisions` plan is approved (see [Threads · destroy](../03-threads.md#destroy)).
 
 Then the developer spawns the replacement:
 
@@ -256,16 +255,14 @@ The Stack tree's shape is unchanged — there is still one thread following `and
 
 Thursday morning, the `android-skel` thread's agent adds a new navigation-refactor revision: it moves the auth-related destinations out of the root `NavHost` into a nested `loginGraph`. The new parent tip is not yet in `auth-biometric`'s ancestry, so the watcher classifies `ParentAdvance`. At `auth-biometric`'s next safe boundary, the explicit advance onto that exact parent commit exposes textual conflicts in the same files the child changed.
 
-`auth-biometric` transitions to the cascade `conflicted` projection. The orchestrator interrupts the agent and resumes it with conflict framing (see [Cascade · conflicts and escalation](../05-cascade.md#conflicts-and-escalation)):
-
-> Cascade reconciliation produced conflicts in auth-biometric. Resolve before continuing.
+The reconciliation's result contains jj conflicts, so `auth-biometric`'s cascade status reads `conflicted`, and it stays `conflicted` for as long as the result does. Kiki tells the agent about the reconciliation through the delivery protocol, as [Cascade · conflicts and escalation](../05-cascade.md#conflicts-and-escalation) defines.
 
 A loud notification fires, and the cascade token on `auth-biometric`'s row in Herdr's sidebar changes to `◐ conflicted` in both of the developer's attached clients. The developer happens to have the overlay focused on `android-skel`; from that vantage, `auth-biometric` is a non-current thread, so the conflict surfaces as a toast — toasts for cascade conflicts only fire on non-current threads (see [Interface · toasts](spec.md#toasts)). The conflicted thread's row also turns red:
 
 ```text
  kiki · NAVIGATE · kestrel-mobile/android-skel      ┌────────────────────────────────┐
                                                     │ ◐ auth-biometric conflicted    │
- STACK                              │               │   tap T to request transcript  │
+ STACK                              │               │   tap T to read transcript     │
                                                     └────────────────────────────────┘
  ● main             ──    in        │
  │                                  │
@@ -277,14 +274,14 @@ A loud notification fires, and the cascade token on `auth-biometric`'s row in He
 
 Because the overlay credential is contextual to `android-skel`, activating `T` here would first display an exact sibling-read plan and require a one-use foreground approval. The developer does not request it; switching into `auth-biometric` makes subsequent same-thread inspection contextual instead.
 
-The developer cursors to `auth-biometric` and presses `enter`, which moves that client to the thread's agent pane. They move focus to the shell pane below the agent (which is paused) and resolve the conflict by hand. jj's conflict markup makes the merge tractable; the resolution touches three lines.
+The developer cursors to `auth-biometric` and presses `enter`, which moves that client to the thread's agent pane. They move focus to the shell pane below the agent and resolve the conflict by hand, rather than leave it to the agent. jj's conflict markup makes the merge tractable; the resolution touches three lines.
 
 ```console
 $ cd ~/code/kestrel-mobile-kiki-auth-biometric
 $ jj resolve
 ```
 
-> kkd: the op-log watcher sees the resolve op like any other external op. Once the working-copy commit is no longer conflicted, the thread leaves cascade `conflicted` and reconciliation resumes (see [Cascade · conflicts and escalation](../05-cascade.md#conflicts-and-escalation)). The agent is resumed with a synthetic context message describing the parent advance and what the human resolved, and continues.
+> kkd: the op-log watcher sees the resolve op like any other external op. Once a later operation shows the thread's chain free of conflicts, its status leaves `conflicted` (see [Cascade · conflicts and escalation](../05-cascade.md#conflicts-and-escalation)). What the agent is told next is the delivery protocol's business, not the storyboard's.
 
 The cascade glyph on `auth-biometric` returns to `──`. The conflict cost the developer about eight minutes of focused attention and zero corrupted state.
 
@@ -319,23 +316,23 @@ The `auth-biometric` row in the Stack updates after the parent-merge transition:
 
 ### Fri 09:00 — across repos
 
-The laptop installed an update and rebooted overnight. No process survives a reboot: the Herdr server, every agent, and every shell are gone. `kkd` comes back through its user service. The developer opens a terminal and runs `kk attach`, which asks `kkd` to ensure the dedicated server is running; `kkd` starts it again. Herdr restores the layout it saved — three Herdr workspaces with their labels and working directories — and starts a plain shell in each pane. Each label still reads repo, thread, provisioning tag.
+The laptop installed an update and rebooted overnight. No process survives a reboot: the Herdr server, every agent, and every shell are gone. `kkd` comes back through its user service — it runs as a launchd user agent, not as a child of any terminal, and it starts the Herdr server from there. The developer opens a terminal and runs `kk attach`, which asks `kkd` to ensure the dedicated server is running; `kkd` starts it again. Herdr restores the layout it saved — three Herdr workspaces with their labels and working directories — and starts a plain shell in each pane. Each label still reads repo, thread, provisioning tag.
 
 ```text
- ╭─ kiki ───────────────────────────────────────────╮
- │                                                  │
- │   kestrel-mobile android-skel a41c               │
- │   kestrel-mobile auth-biometric e90b             │
- │   kestrel-docs android-docs 5c12                 │
- │                                                  │
- ╰──────────────────────────────────────────────────╯
+ ╭─ kiki ───────────────────────────────╮
+ │                                      │
+ │   kestrel-mobile android-skel a41c   │
+ │   kestrel-mobile auth-biometric e90b │
+ │   kestrel-docs android-docs 5c12     │
+ │                                      │
+ ╰──────────────────────────────────────╯
 ```
 
 The rows look like Thursday's, minus kiki's tokens. They are not threads coming back. Kiki disabled Herdr's agent auto-resume in the configuration it generated, so no harness was restarted, and a restored pane has no launcher, no credential, no launch settings, and no ready handshake. `kk ls --all-repos` says what is true: `android-skel`, `auth-biometric`, and `android-docs` are each listed as `ProjectionDiverged` with the reason `TerminalMissing`. None is `Active`.
 
 > kkd: the server it now talks to has a different `server_instance_id`. Every binding from the old instance is ended and every incarnation retired without acknowledgement. The orphan scan finds none of the recorded process identities alive — a reboot leaves nothing — and no stray holder of any workspace. It does find the restored shells, whose working directories are inside the jj workspaces. Those are remnant panes: the current snapshot names each one's pane and root process, so they are accounted terminal members, not orphans. No `OrphanedProcess` issue is raised. Each thread gets `TerminalMissing` (see [Terminal runtime · runtime changes are reconciliation](../13-architecture/terminal-runtime.md#runtime-changes-are-reconciliation)).
 
-All three threads' work has merged, so the developer does not restart agents just to stop them. `kk repair` diagnoses a thread and names its plans: restart the terminal and agent, or `close-without-terminal` (see [Commands · `kk repair`](../09-commands.md#kk-repair)). The developer takes the second.
+The mobile work has merged and the docs draft is committed and waiting on product, so the developer does not restart agents just to stop them. `kk repair` diagnoses a thread and names its plans: restart the terminal and agent, or `close-without-terminal` (see [Commands · `kk repair`](../09-commands.md#kk-repair)). The developer takes the second.
 
 ```console
 $ kk repair auth-biometric                  # read-only: prints the diagnosis and plan ids
@@ -344,19 +341,19 @@ $ kk repair android-skel --apply <repair-id>
 $ cd ~/code/kestrel-docs && kk repair android-docs --apply <repair-id>
 ```
 
-Each apply shows its approval card first. The card lists the remnant containers whose shells hold that thread's jj workspace. Kiki matched them to the thread by that OS evidence, not by the labels in the sidebar. The developer does not have to close the restored shells by hand: the approved plan closes each listed container and verifies that its processes exited. The loss inventory already ran in preflight, before the card. After the containers are closed and nothing holds the workspace, it checkpoints exactly as an ordinary close does, forgets the jj workspace, removes the materialized directory, and transitions the thread to `Closed` (see [Threads · projection divergence and repair](../03-threads.md#projection-divergence-and-repair)). Tracked revisions live on `main`; PRs remain untouched.
+Each apply shows its approval card first. The card lists the remnant containers whose shells hold that thread's jj workspace, with those processes, and says the approval covers every process in the listed containers at freeze time. Kiki matched the containers to the thread by that OS evidence, not by the labels in the sidebar. The developer does not have to close the restored shells by hand. The loss inventory already ran in preflight, before the card. On approval the plan freezes each listed container, terminates its processes with verified exit, and closes it. Once nothing holds the workspace, it checkpoints exactly as an ordinary close does, forgets the jj workspace, removes the materialized directory, and transitions the thread to `Closed` (see [Threads · projection divergence and repair](../03-threads.md#projection-divergence-and-repair)). Merged revisions live on `main`; the docs thread's revisions stay under its checkpoint bookmark; PRs remain untouched.
 
-Had a thread still been in flight, the developer would have applied the restart plan instead. Under its own approval, it reuses or closes the remnant container, provisions fresh role panes, and starts a new incarnation with a fresh credential, launch gate, and ready handshake, and only that handshake makes the thread `Active` again.
+Had a thread still been in flight, the developer would have applied the restart plan instead. Under its own approval, it closes the listed remnant containers the same way — kiki never reuses one — provisions a fresh terminal group with role panes, and starts a new incarnation with a fresh credential, launch gate, and ready handshake, and only that handshake makes the thread `Active` again.
 
 A final `kk ls --all-repos --all` (the `--all` flag includes closed threads, the `--all-repos` flag widens repo scope — they are independent, see [Commands · `kk ls`](../09-commands.md#kk-ls)) shows the week as a flat list across the three repos:
 
 - `kestrel-mobile/android-skel` — closed
 - `kestrel-mobile/auth` — closed (the password-first version, abandoned mid-week)
 - `kestrel-mobile/auth-biometric` — closed (the biometric-first replacement, merged)
-- `kestrel-docs/android-docs` — closed
+- `kestrel-docs/android-docs` — closed (not yet published; its revisions are kept under its bookmark)
 - `kestrel-www/copyright-2026` — closed
 
-Bare `kk` from `kestrel-mobile` opens the overlay with no active work remaining; the closed threads are reachable through `kk ls --all` and `kk reopen <thread>` if anything from the week needs revisiting. Five threads were spawned, one was abandoned, four merged. The follows DAG is empty; no sync intents are unresolved; the daemon is idle.
+Bare `kk` from `kestrel-mobile` opens the overlay with no active work remaining; the closed threads are reachable through `kk ls --all` and `kk reopen <thread>` if anything from the week needs revisiting. Five threads were spawned, one was abandoned, three merged, and one was archived with its work kept for later. The follows DAG is empty; no sync intents are unresolved; the daemon is idle.
 
 ## Epilogue
 

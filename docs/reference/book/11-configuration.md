@@ -12,7 +12,7 @@ From lowest to highest:
 
 1. hardcoded defaults
 2. user config: `~/.config/kiki/config.toml`
-3. repo-local gitignored config: `~/.config/kiki/repos/<repo_id>/config.toml`
+3. repo-local config: `~/.config/kiki/repos/<repo_id>/config.toml` (it lives outside the repository, so it is never committed)
 4. `KIKI_*` environment
 5. CLI flags
 
@@ -49,7 +49,7 @@ Acceptance-slice sections:
 
 - `[agent]` — the default harness (`default_harness = "claude-code" | "codex"`, initially `claude-code`) and harness-specific args. Args are keyed per harness, so one repo can default to Claude Code while a thread spawns with `--harness codex`.
 - `[notifications]` — per-event `loud | soft | silent` behavior for acceptance-slice attention events, plus `os_provider` (`auto | notify-rust | osascript | herdr | off`). Per-event keys hot-reload; `os_provider` resolves at the next dispatch. See [Observability](12-observability.md).
-- `[paths]` — overrides for state, socket, Herdr-state, and workspace-root paths.
+- `[paths]` — overrides for state, socket, generated-Herdr-configuration, and workspace-root paths.
 - `[terminal]` — where the Herdr executable is and which named Herdr server kiki owns. See [Terminal keys](#terminal-keys).
 
 Deferred v1.x sections:
@@ -75,13 +75,13 @@ Remembered transcript-egress consent is durable privacy state, not a configurati
 | `herdr_dir`       | string | `<user_state_dir>/herdr/`           | structural — daemon restart |
 | `workspaces_root` | string | `<parent-of-repo>/`                 | structural — next `kk new`  |
 
-`kkd_mcp_socket` is a deferred MCP-substrate path key. There is no `audit_log` path key. Attempts resolved to a repo write to that repo database's SQLite `audit_log`. Bootstrap, registry-wide, unknown-repo, and pre-resolution attempts write to the per-user database's SQLite `user_audit_log`. Each attempt has exactly one authoritative row; neither table is mirrored to a file.
+`kkd_mcp_socket` (default `<user_state_dir>/kkd-mcp.sock`) is the path of the separate socket for the deferred MCP transcript surface; the key ships with that surface and is ignored with a warning until then. There is no `audit_log` path key. Attempts resolved to a repo write to that repo database's SQLite `audit_log`. Bootstrap, registry-wide, unknown-repo, and pre-resolution attempts write to the per-user database's SQLite `user_audit_log`. Each attempt has exactly one authoritative row; neither table is mirrored to a file.
 
 `workspaces_root` does not embed `<repo>` or `<slug>`; kiki always materializes the workspace as `<workspaces_root>/<repo>-kiki-<slug>/`. Setting `workspaces_root = ~/work/kk-workspaces/` puts every thread's workspace under that directory instead of next to its source repo.
 
-`repo_state_dir` defaults to a centralized location under `<user_state_dir>`, keyed by the repo's `<repo_id>` (a UUID assigned at `kk init` and recorded in the per-user `repos` table). Per-repo state lives under that directory: the per-repo `state.db` containing audit rows, the gitignored `config.toml`, `errors/<thread_id>.log`, and `credentials/<thread_id>`. The source repo's own filesystem carries no kiki state. The one exception is the deferred optional `<repo>/.kiki.toml` committed config layer, which may live there when a team deliberately adds one.
+`repo_state_dir` defaults to a centralized location under `<user_state_dir>`, keyed by the repo's `<repo_id>` (a UUID assigned at `kk init` and recorded in the per-user `repos` table). Per-repo state lives under that directory: the per-repo `state.db` containing audit rows, the repo-local `config.toml`, `errors/<thread_id>.log`, `credentials/` (one file per thread plus the repo's `registration` credential), `harness/<thread_id>/` (launch-scoped harness settings), and `recovery/` (data kiki needs to restore files it changed). The source repo's own filesystem carries no kiki state. The one exception is the deferred optional `<repo>/.kiki.toml` committed config layer, which may live there when a team deliberately adds one.
 
-`herdr_dir` is kiki's Herdr configuration root. The dedicated server is addressed by this root plus the session name (`terminal.session`); Herdr derives the socket and saved state beneath the root, and kiki names no socket path of its own. The configuration file kiki generates lives here too. Kiki starts the server so that it reads and writes only under this root and never under the user's own Herdr configuration. Changing `herdr_dir` while a dedicated server is running does not move that server; the old server and its terminal groups must be closed first.
+`herdr_dir` holds exactly one thing: the Herdr configuration file kiki generates, `<herdr_dir>/config.toml`. `kkd` passes that file to the dedicated server through `HERDR_CONFIG_PATH`. It is not a root for Herdr's other files. Herdr has no configuration-directory option: it keeps the named session's socket, saved state, and logs under its own directories, keyed by the session name, and it shares its plugin registry and state directory with the user's other Herdr use. Kiki does not redirect `XDG_CONFIG_HOME` or `XDG_STATE_HOME` to change that, because every pane inherits the server's environment and jj, git, gh, and shells in every thread would then read their configuration from the wrong place. What separates kiki's server from the user's default Herdr server is therefore a separate server process, socket, saved session, and configuration file — not a separate directory tree.
 
 ## Terminal keys
 
@@ -92,18 +92,24 @@ Remembered transcript-egress consent is durable privacy state, not a configurati
 | `herdr_bin` | string | `herdr` on `PATH` | structural — daemon restart |
 | `session`   | string | `kiki`            | structural — daemon restart |
 
-`herdr_bin` is the executable `kkd` uses to start the dedicated server and `kk attach` uses to attach a client. `session` is the Herdr session name of that server. A Herdr session is a server namespace, not a per-thread object; kiki runs exactly one.
+`herdr_bin` is the executable `kkd` uses to start the dedicated server and `kk attach` uses to attach a client. `session` is the Herdr session name of that server, and it is the server's address: `kkd` starts the server with `--session <name>` and `HERDR_CONFIG_PATH=<herdr_dir>/config.toml`, and nothing else selects it. A Herdr session is a server namespace, not a per-thread object; kiki runs exactly one. The name must not be `default` or any session name the user already uses, and `kkd` checks that the longest socket name Herdr derives for it fits the platform's socket-path limit.
 
-Kiki pins a supported Herdr version range. When `kkd` starts or connects to the dedicated server, it checks the version, protocol number, and capabilities returned by the ping reply against that range. An unsupported or missing Herdr fails terminal lifecycle commands with an error that names the found and required versions; it does not corrupt recorded thread state. `client_targeted_focus` is a required Herdr extension, not an optional one: until the server advertises it, caller-local `kk switch` fails by naming the capability rather than degrading to a focus change that moves every client. `kkd` never stops a running dedicated server to apply a changed key: stopping it ends every thread's processes.
+Only `kkd` starts the server. It does so from its own service context — a launchd user agent on macOS, a systemd user unit on Linux — with a constructed environment: the user's login baseline of `HOME`, `USER`, `SHELL`, `PATH`, and locale, never the environment of the terminal that invoked `kk`. Panes inherit that environment plus Herdr's own variables and each role pane's explicit ones; `HERDR_CONFIG_PATH` is visible inside panes. `kk attach` uses Herdr's connect-only client mode and never starts a server. A running server `kkd` did not start is unverified, and threads bound to it read `TerminalMissing`.
+
+Kiki pins a supported Herdr version range. When `kkd` starts or connects to the dedicated server, it checks the version, the protocol number, and the object of named capability flags returned by the ping reply against that range. An unsupported or missing Herdr fails terminal lifecycle commands with an error that names the found and required versions; it does not corrupt recorded thread state. `client_targeted_focus` is the one required Herdr extension, and it must arrive as a new flag in that object: until the server advertises it, caller-local `kk switch` fails by naming the capability rather than degrading to a focus change that moves every client. `kkd` never stops a running dedicated server to apply a changed key: stopping it ends every thread's processes.
 
 Kiki generates the dedicated server's Herdr configuration file and owns it. These Herdr settings are fixed by kiki and are not exposed as kiki keys:
 
 - automatic agent resume on restore is off (`[session] resume_agents_on_restore = false`);
+- onboarding is off;
+- Herdr's update, version, and manifest checks are off;
+- toast delivery is set to Herdr's own toasts (`[ui.toast] delivery = "herdr"`), which Herdr leaves off by default;
+- sidebar rows and width are sized for kiki's label;
 - the sidebar row layout that displays the tokens kiki publishes — a v1.x surface; the generated file declares no sidebar tokens until it ships;
 - the keybinding that opens the overlay and the plugin or command entries it invokes (v1.x);
 - Herdr's agent-integration installer is never invoked against a managed harness's settings.
 
-Edits to the generated file are overwritten. Herdr preferences that kiki does not need to control — theme, Herdr's own keybindings, mouse and scrollback behavior — are not kiki configuration keys in v1; kiki's generated file leaves them at Herdr's defaults. The user's default Herdr server and its configuration are never read or changed.
+`kkd` regenerates the file and validates it with its own parser immediately before every server start, and refuses to start the server on any diagnostic. This is not optional tidiness: Herdr's client can rewrite the file from its settings screen, and when Herdr cannot parse the file it silently loads its defaults, which turn agent resume on. Edits to the generated file are therefore overwritten at the next start. Herdr preferences that kiki does not need to control — theme, Herdr's own keybindings, mouse and scrollback behavior — are not kiki configuration keys in v1; kiki's generated file leaves them at Herdr's defaults. The user's default Herdr server and its configuration file are never read or changed.
 
 ## UI keys
 
@@ -129,7 +135,7 @@ All `[ui]` keys are personal preference. They are valid in user and per-thread c
 
 `shell_pane_position` accepts `below` (horizontal split below the agent pane, default) or `right` (vertical split to the right of the agent pane). Unknown values warn and fall back to `below`. The `shell` role pane always lives in the same tab as the `agent` pane; routing it to a separate tab is intentionally omitted.
 
-The `ui_pane*` keys replace the former persistent-sidebar keys. Herdr's native sidebar now carries the cross-thread list and attention state, so the `ui` role pane exists only for users who want a permanently visible Stack (follows) tree. Herdr's own sidebar width and visibility are Herdr preferences, not kiki keys.
+The `ui_pane*` keys replace the former persistent-sidebar keys. Herdr's native sidebar now carries the cross-thread list and attention state, so the `ui` role pane exists only for users who want a permanently visible Stack (follows) tree. Kiki's generated Herdr configuration sizes Herdr's sidebar for kiki's label; that width is not a kiki key, and the user can still hide or collapse the sidebar in Herdr.
 
 Role-pane keys are `lifecycle` keys. They apply when kiki provisions a terminal group: at `kk new`, at `kk reopen`, and when a `kk repair` plan restarts a thread's terminal after a terminal-runtime restart. `kk switch` performs no terminal mutation, so it never applies them and never re-creates a pane the user closed; a user who wants another shell splits natively in Herdr. The full lifecycle, degradation, and authority semantics for the shell pane live in [Interface · Shell pane](10-interface/spec.md#shell-pane).
 

@@ -23,7 +23,15 @@ apart:
    commit, a conflicted bookmark, divergent successors, deletion, or a move
    without predecessor evidence — is a projection issue for `kk repair`.
 4. **Head advance.** `jj new` or `jj commit` moves `@` and leaves the bookmark
-   behind. That is the ordinary `behind` relationship, not an issue.
+   behind. That is an ordinary relationship, not an issue.
+
+Three refinements followed from probes on jj 0.46.0 the same day. `jj undo` of
+a tracked succession pops the expected target back instead of raising an
+issue. A `jj bookmark rename` proven in one local operation is normalized, not
+reported as a deletion. And a checkpoint targets the live head or, when that
+head is the empty commit jj leaves after `jj commit`, its parent; it refuses
+to move the bookmark backward or sideways, and the relationship vocabulary is
+`current | behind | ahead | diverged`.
 
 For an active thread, a successor in a different change (the result of
 `jj split` or of squashing the bookmarked commit into its parent) is accepted

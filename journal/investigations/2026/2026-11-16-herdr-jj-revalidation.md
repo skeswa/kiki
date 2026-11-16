@@ -23,7 +23,7 @@ against one named revision and the pinned jj.
 
 ## Findings
 
-**Herdr.** Source reading at `ee5bfb5041bbc3e4a49d591c72308aae3c81ecdde`
+**Herdr.** Source reading at `ee5bfb5041bb3e4a49d591c72308aae3c81ecdde`
 (package 0.9.5, clean tree) and headless runs of the released 0.9.5 binary
 (tag commit `2ecf19a`) with disposable state, no agents, and no attached
 clients. Source-only facts are marked.
@@ -77,7 +77,32 @@ clients. Source-only facts are marked.
 - Most read-looking commands snapshot a dirty working copy unless told to
   ignore it.
 
-**Not established.** Server identity from socket peer credentials; the launcher
+**Later the same day**, adversarial reviews of the redesign added facts, again
+from source at the candidate commit and headless runs of 0.9.5:
+
+- The API socket is served by the server process itself; on macOS the socket
+  peer pid equalled the server pid across two lifetimes (run).
+- Panes inherit the server's whole environment, including redirected XDG
+  variables (run). Herdr has no option to relocate session state.
+- A Herdr workspace disappears when its last pane's command exits, with only a
+  pane-exit event (run). Layout application over a tab appends a new tab with
+  new ids (run). The first workspace on an empty server takes focus (run).
+- Workspace ids resume above the highest surviving id: after `w1` and `w4` were
+  closed, the next lifetime issued `w6`. An id recurs only when it was the
+  highest, as in the earlier `w4` observation.
+- Toasts are off by default and the reply is not a display receipt. The ping
+  capabilities are an object of flags, and the live-handoff flag is already
+  true. A parse failure of the configuration loads defaults (source).
+- The macOS terminal-quit fix applies only to servers Herdr auto-spawns
+  (source).
+- A launch environment value is absent from every Herdr API and saved file but
+  readable through `ps` by the same user (run).
+- jj: `jj undo` returns a bookmark to the pre-succession commit; a pinned
+  mutation racing another operation leaves two heads; `jj workspace add` and
+  `forget` can be pinned; `jj op abandon` rewrites recorded operation ids; a
+  backward bookmark move needs `--allow-backwards` (all run).
+
+**Not established.** Server identity from socket peer credentials on Linux; the launcher
 under real Claude Code or Codex; anything on Linux or Windows; live handoff;
 terminal-application quit; timing races between jj writers; predecessor
 records after `jj op abandon` or from older jj versions.
@@ -85,8 +110,9 @@ records after `jj op abandon` or from older jj versions.
 ## Conclusion and follow-up
 
 The findings support the contracts recorded in D-0004 and D-0005 and correct
-two earlier statements: workspace ids do recur, not merely can; and an exiting
-pane closes, with no configurable respawn. The open proofs are the gates in
+two earlier statements: a workspace id can be issued again by a later server
+lifetime; and an exiting pane closes, with no configurable respawn outside
+live-handoff imports. The open proofs are the gates in
 [Build sequencing](../../../docs/reference/book/15-build-sequencing.md) and the
 capability table in
 [Terminal runtime](../../../docs/reference/book/13-architecture/terminal-runtime.md).

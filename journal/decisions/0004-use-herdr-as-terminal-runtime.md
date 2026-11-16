@@ -9,7 +9,9 @@
 ## Decision
 
 Herdr is kiki's terminal runtime. Kiki runs one dedicated, named Herdr server per
-user, separate from the user's default Herdr server. Each thread gets one Herdr
+user, separate from the user's default Herdr server in process, socket, saved
+session, and configuration file. `kkd` alone starts it, under the user's
+service manager. Each thread gets one Herdr
 workspace, called a terminal group, with role panes for the managed agent, the
 human shell, and an optional kiki UI.
 
@@ -37,8 +39,13 @@ reasons to keep tmux. The 2026-11-16 revalidation against Herdr commit
 `ee5bfb5041bb` confirmed each gap and the available seams.
 
 Adoption is a contract change, not a validation claim. The Herdr-backed
-acceptance gate is unproven; it depends on client-targeted focus and on a Herdr
-release that contains the macOS terminal-application-quit fix.
+acceptance gate is unproven, and one part of it depends on an upstream change:
+client-targeted focus. Two adversarial reviews on 2026-11-16 corrected earlier
+wording: Herdr's macOS terminal-quit fix covers only servers Herdr spawns
+itself, so kiki places `kkd` and the server under the service manager instead
+of requiring a Herdr release; and Herdr cannot relocate its state without
+leaking environment into panes, so isolation is by session name and
+configuration file, not by directory.
 
 ## Alternatives and consequences
 

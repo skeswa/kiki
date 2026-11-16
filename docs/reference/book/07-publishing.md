@@ -22,7 +22,7 @@ Stack publish:
 
 Publishing is manual by default. Configurable eager modes may later push or open draft PRs automatically. Even then, exploratory threads should not become reviewer-facing merely because they exist.
 
-Before presenting the publish plan for approval, kiki pins the current operation view and the exact `thread_head_commit_id` — the commit at the thread's live head. It validates the v1 linear owned stack. It includes that head in the plan digest. After approval, and immediately before pushing, kiki proves the head is unchanged. It then checkpoints the thread bookmark to that exact commit. That checkpoint is an explicit placement: it records the placement and resets the expected bookmark target to the pushed commit. An unresolved bookmark projection issue (`BookmarkMissing`, `BookmarkMoved`, or `BookmarkConflicted`) blocks it, so kiki never pushes through a bookmark whose target it cannot explain. If the head has changed, the approval is invalid and kiki regenerates the plan. kiki never pushes whichever older commit the bookmark happened to retain.
+Before presenting the publish plan for approval, kiki takes the boundary snapshot under the same rule as close preflight, then pins the current operation view and the exact `thread_head_commit_id` — the commit at the thread's live head. It validates the v1 linear owned stack. It includes that head in the plan digest. After approval, and immediately before pushing, kiki proves the head is unchanged. It then checkpoints the thread bookmark to the checkpoint target for that head: the head itself, or its parent when the head is the empty, undescribed working-copy commit jj leaves after `jj commit` (see [Threads](03-threads.md#thread-identity)). jj refuses to push an undescribed commit, and an empty one has nothing to publish. That checkpoint is an explicit placement: it records the placement and resets the expected bookmark target to the pushed commit. An unresolved bookmark projection issue (`BookmarkMissing`, `BookmarkMoved`, or `BookmarkConflicted`) blocks it, so kiki never pushes through a bookmark whose target it cannot explain. If the head has changed, the approval is invalid and kiki regenerates the plan. kiki never pushes whichever older commit the bookmark happened to retain.
 
 ## PR text
 
@@ -36,7 +36,7 @@ After PR creation, the title and body are human territory. kiki does not silentl
 
 Polling, comments, CI presentation, and automatic merge handling are later v1.x work, after manual publishing.
 
-- merged PR: kiki notifies and updates thread/PR state. Still later, auto-archive may add close/archive with a 5000ms (5-second) undo grace, shown in the overlay as an actionable toast with an `undo` action.
+- merged PR: kiki notifies and updates thread/PR state. Still later, auto-archive may propose closing the merged thread: a toast whose `review` action opens the ordinary close approval card. Auto-archive never closes a thread by itself; a close always consumes a one-shot approval.
 - closed without merge: kiki notifies only.
 - CI state change: kiki notifies only.
 - review comment: kiki exposes it read-only through `kk thread comments`.

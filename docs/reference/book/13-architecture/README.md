@@ -24,6 +24,7 @@ flowchart LR
         UiPane["kk ui role pane\n(v1.x, optional)"]
         Launcher["pane launcher\nhidden kk subcommand\ndirect child of every role pane"]
         Hook["kk-hook\nexclusive PreToolUse + PostToolBatch sidecar"]
+        HookLauncher["hook launcher\nper thread, hook side\nbatch admission cache"]
         AgentMcp["Agent MCP client\nread-only transcript tools\n(v1.x polish)"]
         FutureUI["future native / web UI"]
     end
@@ -48,6 +49,8 @@ flowchart LR
     UiPane --> GrpcSock
     Launcher --> GrpcSock
     Hook --> GrpcSock
+    HookLauncher --> GrpcSock
+    HookLauncher -. answers for a dead sidecar .-> Hook
     FutureUI --> GrpcSock
     AgentMcp --> McpSock
 
@@ -57,7 +60,7 @@ flowchart LR
         McpApi["MCP server\nthread-scoped transcript reads\n(v1.x polish)"]
         Events["server-streaming events"]
         ThreadCtl["ThreadController per thread\nworkspace + terminal group + harness lifecycle"]
-        TermRt["TerminalRuntime\nprovision / observe / close / publish"]
+        TermRt["TerminalRuntime\nensure server / provision / observe / close / publish / notify"]
         ProcSup["ProcessSupervisor\nidentity, freeze, verified resume and exit,\nholder inventory, orphan scan"]
         Cascade["CascadeOrchestrator\nclassify / reconcile / batch barrier / acknowledge"]
         Watcher["jj op-log watcher\nexternal op detection"]
@@ -99,7 +102,7 @@ flowchart LR
 
     subgraph Tools["External tools kk coordinates"]
         Jj["jj / git repo\nworkspaces, bookmarks, op log"]
-        Herdr["dedicated Herdr server (session: kiki)\none terminal group per thread\nrole panes, native sidebar, toasts"]
+        Herdr["dedicated Herdr server (session: kiki)\nstarted only by kkd, outside the terminal application\none terminal group per thread\nrole panes, native sidebar, toasts"]
         OsProc["local OS\nprocesses and workspace holders"]
         Harnesses["Claude Code / Codex\nagent sessions + JSONL"]
         Gh["gh / GitHub\nPRs, CI, review comments"]

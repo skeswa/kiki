@@ -19,7 +19,7 @@ This conservative rule applies to human edits and to agent-authored edits alike.
 Auto-describe, when enabled, may run after:
 
 - thread creation;
-- an agent quiescence window — a quiet stretch with no agent tool calls — defaulting to 30 seconds;
+- a quiet window — a stretch with no agent tool calls — defaulting to 30 seconds;
 - `jj split`;
 - `jj squash`;
 - explicit `kk thread describe --refresh`.
@@ -39,7 +39,7 @@ It must not read the thread transcript.
 
 Auto-rename, when enabled, may propose slugs — short, dash-separated names — for kiki-owned thread bookmarks. (A jj bookmark is roughly a git branch name.) The prompt includes sibling bookmark names so the model can choose a distinct slug.
 
-An external `jj bookmark rename` marks the bookmark human-owned for the rest of the thread's life. Kiki follows the rename to the new name only when one exact operation proves it, under the rename rule in [Op-log watcher](13-architecture/op-log-watcher.md#the-classifier); a rename it cannot prove is `BookmarkMissing` and goes to `kk repair`. kiki does not rename it again unless an explicit future command opts it back in.
+An external `jj bookmark rename` marks the bookmark human-owned for the rest of the thread's life. Kiki follows the rename to the new name only when one exact operation proves it, under the rename rule in [Op-log watcher](13-architecture/op-log-watcher.md#the-classifier); a rename it cannot prove is `BookmarkMissing` and goes to `kk repair`. A rename of a published thread always goes to repair, because jj leaves the tracked remote bookmark under the old name. kiki does not rename it again unless an explicit future command opts it back in.
 
 ## Squash and merge ownership
 
@@ -53,7 +53,7 @@ Setting `[autorename] trailer = true` may add an opt-in `Kk-Auto: true` trailer 
 
 ## Race control
 
-Metadata writes require a per-thread advisory lock, a lock that cooperating writers agree to check before writing. Auto-describe and auto-rename wait for snapshot quiescence: no in-flight agent tool call touching files, and no in-progress jj operation.
+Metadata writes require a per-thread advisory lock, a lock that cooperating writers agree to check before writing. Auto-describe and auto-rename wait until nothing is changing the files or the repository: no in-flight agent tool call touching files, and no in-progress jj operation.
 
 If kiki cannot acquire the lock within 5 seconds, it abandons the attempt and re-queues it. kiki may spend a model call and still discard the result. That waste is better than writing stale prose.
 

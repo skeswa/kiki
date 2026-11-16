@@ -6,6 +6,12 @@
 It owns the repository context, reference-book reading order, and the
 Swingset-derived practices used by all agents:
 
+- **Documentation language:** write **all documentation in clear,
+  high-school-level English**, including technical references, architecture
+  notes, decisions, investigations, and documentation in code. Use familiar
+  words, direct sentences, and short paragraphs; explain unfamiliar terms and
+  acronyms while preserving technical precision. Follow the shared
+  [documentation language rule](AGENTS.md#documentation-language).
 - **Journal and decisions:** follow the [journal workflow](AGENTS.md#keep-the-project-journal-current).
   Record consequential choices, identify the actual decider, link reversals,
   and keep the current reference chapters consistent with the choice.

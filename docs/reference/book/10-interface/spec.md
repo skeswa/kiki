@@ -2,7 +2,7 @@
 
 The interface surfaces in this chapter are v1.x polish unless [Orientation](../01-orientation.md) says otherwise; that chapter is the only scope ledger. This is the v1 contract for each surface when it ships.
 
-Kiki's threads live in a dedicated Herdr server (see [Terminal runtime](../13-architecture/terminal-runtime.md)). A human looks at them through a Herdr client. Herdr draws the panes, the tabs, and its own sidebar. Kiki draws only what is specific to kiki: the overlay, approval cards, and an optional Stack pane. The custom UI is a ratatui-rendered `kk` process. Kiki always shows the real agent PTY; it never re-renders or proxies the harness's screen.
+Kiki's threads live in a dedicated Herdr server (see [Terminal runtime](../13-architecture/terminal-runtime.md)). A human looks at them through a Herdr client. Herdr draws the panes, the tabs, and its own native sidebar. Kiki draws only what is specific to kiki: the overlay, approval cards, and an optional Stack pane. The custom UI is a ratatui-rendered `kk` process. Kiki always shows the real agent PTY; it never re-renders or proxies the harness's screen.
 
 ## Vocabulary
 
@@ -10,7 +10,8 @@ Kiki's threads live in a dedicated Herdr server (see [Terminal runtime](../13-ar
 - **Terminal group** — the thread's terminal home: one Herdr workspace on the dedicated server. In this book an unqualified "workspace" always means a jj workspace.
 - **Role pane** — a pane kiki provisions in the terminal group's first tab: the **agent pane** (`agent`, required), the **shell pane** (`shell`), and the **UI pane** (`ui`). A role is bound to the process identity that claimed it through the kiki pane launcher, and it ends when that process ends; it never comes from a pane's position, title, or label.
 - **User pane** — any pane or tab the user adds natively in Herdr. `user` is not a role; it is the absence of one. Kiki never recreates one. Close accounts for every process in it.
-- **Herdr sidebar** — Herdr's native sidebar at the left of every client. It lists the server's Herdr workspaces, so it lists every thread's terminal group across all registered repos. Kiki feeds it a label and tokens; see [Herdr sidebar projection](#herdr-sidebar-projection).
+- **Herdr sidebar** — Herdr's native sidebar at the left of a client. It lists the server's Herdr workspaces, so it lists every thread's terminal group across all registered repos. The user can hide or collapse it; it is Herdr's, not kiki's. Kiki feeds it a label and tokens; see [Herdr sidebar projection](#herdr-sidebar-projection).
+- **Thread list** — the left column of the overlay, holding the Stack and Activity sections. It is part of the overlay's own drawing. It is not the Herdr sidebar and not the UI pane.
 - **Overlay** — kiki's custom TUI, opened by bare `kk` (inside a registered repo) or by the overlay keybinding. Transient. Dismissed on switch, on `q` or `esc`, or on completing a verb. Outside a registered repo, bare `kk` falls back to the command summary plus `kk ls` (see [Commands](../09-commands.md)).
 - **Shell pane** — the `shell` role pane: the user's `$SHELL` at the jj workspace path, beside the agent pane in the same tab (default position: below; configurable to the right). On by default. Detailed semantics in [Shell pane](#shell-pane).
 - **UI pane** — the optional `ui` role pane: a narrow, navigation-only pane that keeps the Stack tree permanently visible. Off by default. Detailed semantics in [UI pane](#ui-pane).
@@ -19,9 +20,9 @@ Kiki's threads live in a dedicated Herdr server (see [Terminal runtime](../13-ar
 - **Preview pane** — the right two-thirds of the overlay. Renders one of: transcript tail, working-copy diff, PR comments. Toggled by `t` / `d` / `c`. It is a region of the overlay, not a Herdr pane.
 - **Chord ribbon** — a one-line keybinding hint at the bottom edge of the overlay. Toggled by `?`. Adapts to current selection (e.g. hides `c` for a thread without a PR).
 - **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's bookmark line. Reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](../09-commands.md)). Single source of truth.
-- **Checkpoint lag** — a normal active-thread condition in which the tracked checkpoint target trails the workspace's persisted live head. Detailed status labels it `checkpoint behind head`; compact TUI surfaces append `↑` to the bookmark. This is not dirty state or cascade conflict.
+- **Checkpoint lag** — a normal active-thread condition in which the tracked checkpoint target trails the jj workspace's persisted live head: the `behind` relationship of `kk status`. Detailed status labels it `checkpoint behind head`; compact TUI surfaces append `↑` to the bookmark. The other relationships (`current`, `ahead`, `diverged`) are spelled out in the inlined status; a freshly reopened thread, or one whose head is an empty commit on top of the checkpoint, reads `current` and shows no `↑`. This is not dirty state or cascade conflict.
 - **Context strip** — the bottom-most line of the overlay or the UI pane. One compressed sentence with TUI-specific content. Two forms by context: the overlay form carries repo + bookmark + cascade glyph + agent model + ctx % + last op age; the UI-pane form is shorter (bookmark + cascade glyph + agent glyph) because the agent pane next to it already surfaces model and ctx. This is a TUI footer, separate from the `StatusRenderer`-backed inlined status.
-- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, auto-archive-on-PR-merge undo prompts, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000) or its trigger-specific TTL (e.g., the auto-archive undo grace is 5000ms, overriding the default — see [Publishing](../07-publishing.md)). Carries at most one optional named action (e.g., `undo`); never opens an approval card. A **Herdr toast** is a different thing: Herdr's own notification, used as one attention transport (see [Toasts](#toasts)).
+- **Toast** — a non-modal floating pill in the overlay's top-right corner. Used for cascade events, agent finish/error notifications, the close proposal after a PR merge, and config-set warnings. Auto-dismisses after `[ui] toast_ttl_ms` (default 4000). Carries at most one optional named action; the action never performs or confirms anything consequential. A **Herdr toast** is a different thing: Herdr's own notification, used as one attention transport (see [Toasts](#toasts)).
 - **Card** — a centered modal panel with title, body, and one or two action buttons. Used for spawn input and foreground approval.
 
 The overlay authenticates ordinary current-thread reads with the contextual thread credential and consumes the repo-summary stream for every other row. It never treats cursor position as authority. Opening transcript, diff, PR-comment, or detailed-audit content for a non-current thread enters the foreground approval flow before fetching content. The approved response is one immutable snapshot bound to the method, target, query, and repository observation; refreshing it, changing tabs, expanding its range, or opening the full reader requires a new challenge. No sensitive bytes are fetched speculatively behind an approval card.
@@ -40,7 +41,7 @@ Kiki reuses Herdr's UI where it already answers the need and builds UI only wher
 | Approval cards                                                             | the enrolled `ApprovalPresenter`, in its own foreground terminal | kiki, always                          |
 | A permanently visible Stack tree                                           | the optional UI pane                                             | kiki                                  |
 
-Several Herdr behaviors this chapter relies on are known from reading Herdr's source at the candidate revision and have not yet been exercised against a running candidate build: popups, keybinding commands and the ids they receive, plugin panes, and toast delivery and rate limiting. Each is an acceptance gate recorded in [Terminal runtime](../13-architecture/terminal-runtime.md#what-exists-what-kiki-builds-what-herdr-must-add), not an established fact. Where a gate fails, the surface that depends on it changes; the rules below do not.
+Several Herdr behaviors this chapter relies on are known from reading Herdr's source at the candidate revision and have not yet been exercised against a running candidate build: popups (one per server, shown to every client viewing the owning tab), keybinding commands and the `HERDR_ACTIVE_*` ids they receive, plugin panes, and toast delivery and its one-per-second limit. Each is an acceptance gate recorded in [Terminal runtime](../13-architecture/terminal-runtime.md#what-exists-what-kiki-builds-what-herdr-must-add), not an established fact. Where a gate fails, the surface that depends on it changes; the rules below do not.
 
 Three rules follow:
 
@@ -78,9 +79,15 @@ Every state in this table must be distinguishable by glyph alone, not by color. 
 The overlay opens in `NAVIGATE` mode in one of two ways:
 
 - **Bare `kk`** typed in a pane, or in any other terminal inside a registered repo, runs the overlay inline, filling that pane or terminal.
-- **The overlay keybinding** opens the same `kk` process as a Herdr popup over the current view. Kiki writes this binding into the `keys.command[]` table of its generated Herdr configuration; the user does not hand-edit Herdr's keymap to get it. Herdr passes the binding the active workspace, tab, and pane ids, and `kk` resolves the current thread from them.
+- **The overlay keybinding** opens the same `kk` process as a Herdr popup over the current view. Kiki writes this binding into the `keys.command[]` table of its generated Herdr configuration; the user does not hand-edit Herdr's keymap to get it. Herdr gives the popup process `HERDR_ACTIVE_WORKSPACE_ID`, `HERDR_ACTIVE_TAB_ID`, and `HERDR_ACTIVE_PANE_ID` (and no `HERDR_PANE_ID`), and `kkd` verifies them before `kk` uses them to locate the current thread. That locator serves reading and navigation only; every mutation the overlay starts still needs the thread credential and, where required, approval.
 
 Either way the overlay is an ordinary `kk` process with its own terminal. It holds no authority the same command typed in a shell would not hold.
+
+A popup has consequences the inline form does not, all from source reading and inside the gate named above:
+
+- Herdr shows one popup per server. While one client has the overlay open as a popup, another client's overlay keybinding cannot open a second one; bare `kk` in a pane still works.
+- A popup is visible to every client viewing the tab it was opened over, and it closes when that tab goes away.
+- A popup's process appears in no Herdr pane listing. The overlay therefore changes its working directory out of the jj workspace as soon as it starts, so it is never an unlisted holder of the workspace, and holder scans do not count the invoking `kk` process.
 
 The overlay is focused on the current thread (resolved via the standard CLI [context-resolution](../09-commands.md#context-resolution) chain). If no current thread resolves but the repo is registered, the cursor lands on the most-recently-active thread in the repo. If the repo has no threads, the overlay shows an empty-state placeholder ("no threads — press `n` to create one") with `n` and `?` as the only active verbs.
 
@@ -89,7 +96,7 @@ The overlay is focused on the current thread (resolved via the standard CLI [con
 The overlay is one screen, three regions stacked vertically:
 
 1. Top: a single-line breadcrumb — `kiki · NAVIGATE · <repo>/<thread>`.
-2. Middle: a fixed-width left sidebar (Stack on top, Activity on bottom) and a flexible-width right preview pane.
+2. Middle: a fixed-width thread list on the left (Stack on top, Activity on bottom) and a flexible-width preview pane on the right.
 3. Bottom: a one-line context strip; an optional chord ribbon hovers above it when `?` is held.
 
 ### Wireframe — bare overlay open
@@ -115,7 +122,7 @@ The overlay is one screen, three regions stacked vertically:
  ○ agent-tui      idle     1h12m    │
  ✓ minimal-foot   finished   8m     │
  ─────────────────────────────────────────────────────────────────────────────────────
- pi-extensions  master ✻  ── in sync  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
+ pi-extensions  pi/codex-conv*  ↻ pending  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
 ### Wireframe — `t` opens transcript tail in the preview pane
@@ -141,12 +148,12 @@ The overlay is one screen, three regions stacked vertically:
  ○ agent-tui      idle     1h12m    │
  ✓ minimal-foot   finished   8m     │  ── more above (T to open full reader) ─────────
  ─────────────────────────────────────────────────────────────────────────────────────
- pi-extensions  master ✻  ── in sync  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
+ pi-extensions  pi/codex-conv*  ↻ pending  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
 `T` (shift-t) escalates from preview-tail to a full-screen `kk thread transcript` reader. `esc` returns to overlay.
 
-The `d` preview below has two sources. For the contextual thread, pressing `d` is the same explicit, human-invoked passthrough as `kk status --diff`: the overlay's `kk` process runs it in the caller's own jj workspace, and it may snapshot the working copy (see [Commands](../09-commands.md#kk-status)). It runs only on that keypress, never on a timer or on cursor movement. For any other thread, `d` keeps its approval rule and renders from a pinned read that ignores the working copy. Everything else the overlay and the UI pane poll uses pinned reads only.
+The `d` preview below has two sources. For the contextual thread, pressing `d` is an explicit, human-invoked passthrough: the overlay's `kk` process runs the diff in the caller's own jj workspace, exactly as `kk status --diff` does, and it may snapshot the working copy (see [Commands](../09-commands.md#kk-status)). Those two — the `kk status` body and this `d` diff — are the only human-invoked CLI passthroughs. It runs only on that keypress, never on a timer or on cursor movement. For any other thread, `d` keeps its approval rule and renders from a pinned read that ignores the working copy. Everything else the overlay and the UI pane poll uses pinned reads only.
 
 ### Wireframe — `d` shows working-copy diff
 
@@ -170,7 +177,7 @@ The `d` preview below has two sources. For the contextual thread, pressing `d` i
  ○ agent-tui      idle     1h12m    │
  ✓ minimal-foot   finished   8m     │  ── jj st --diff (use `kk status --diff` to script)
  ─────────────────────────────────────────────────────────────────────────────────────
- pi-extensions  master ✻  ── in sync  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
+ pi-extensions  pi/codex-conv*  ↻ pending  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
 ### Wireframe — `c` shows PR comments
@@ -196,7 +203,7 @@ The `d` preview below has two sources. For the contextual thread, pressing `d` i
  ○ agent-tui      idle     1h12m    │  (no transcript leakage — comments are gh,
  ✓ minimal-foot   finished   8m     │   not the local transcript store)
  ─────────────────────────────────────────────────────────────────────────────────────
- pi-extensions  master ✻  ── in sync  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
+ pi-extensions  pi/codex-conv*  ↻ pending  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
 ### Wireframe — chord ribbon visible (`?` toggled)
@@ -223,7 +230,7 @@ The `d` preview below has two sources. For the contextual thread, pressing `d` i
  ✓ minimal-foot   finished   8m     │
  ── nav ↑↓ · ⏎ switch · space preview · t/d/c view · n new · N child · p publish · x
     close · i interrupt · T transcript reader · ? help · esc dismiss
- pi-extensions  master ✻  ── in sync  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
+ pi-extensions  pi/codex-conv*  ↻ pending  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
 The ribbon adapts to selection. For a closed thread, `i`, `p`, and `x` drop out and `r` (reopen — see keymap below) appears. For a thread without a PR, `c` (preview comments) drops out independently.
@@ -239,9 +246,9 @@ The ribbon adapts to selection. For a closed thread, `i`, `p`, and `x` drop out 
  │                                  │
  ●─pi/refactor      ↻   wrk       │   ╭─ Close pi-extensions/codex-conv-tui? ───╮
  │                                  │   │                                          │
- ●─pi/codex-conv ▸  ↻   ←●        │   │  Stops the agent and every process in    │
- │                                  │   │  the terminal group: agent, shell, and   │
- ●─pi/agent-tui     ○     idle      │   │  1 user pane (5 processes).              │
+ ●─pi/codex-conv ▸  ↻   ←●        │   │  Stops every process in the listed       │
+ │                                  │   │  terminal group at freeze time: agent,   │
+ ●─pi/agent-tui     ○     idle      │   │  shell, 1 user pane (5 found now).       │
                                     │   │  Forgets the jj workspace and removes    │
  ACTIVITY                           │   │  ~/code/pi-extensions-kiki-codex-conv.   │
                                     │   │  Tracked jj revisions are kept.          │
@@ -252,12 +259,14 @@ The ribbon adapts to selection. For a closed thread, `i`, `p`, and `x` drop out 
  ○ agent-tui      idle     1h12m    │   ╰──────────────────────────────────────────╯
  ✓ minimal-foot   finished   8m     │
  ─────────────────────────────────────────────────────────────────────────────────────
- pi-extensions  master ✻  ── in sync  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
+ pi-extensions  pi/codex-conv*  ↻ pending  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
 `i` (interrupt) shows the same shape; the body changes. `enter` confirms the daemon-issued challenge through the enrolled presenter, then the exact operation retries with its one-use approval. There is no chord that fires destructive verbs in one keystroke.
 
-Approval cards are always custom and always foreground-bound. The card is drawn by the `kk` process that is the enrolled `ApprovalPresenter`, in the terminal that process owns: the pane where `kk` was typed, or the popup the overlay keybinding opened. A Herdr toast, sidebar row, plugin popup that is not that `kk` process, or keybinding can never display or confirm an approval. A close card names the whole terminal group, because close stops every process in every pane of it, including panes the user added.
+Approval cards are always custom and always foreground-bound. The card is drawn by the `kk` process that is the enrolled `ApprovalPresenter`, in the terminal that process owns: the pane where `kk` was typed, or the popup the overlay keybinding opened. A Herdr toast, sidebar row, plugin popup that is not that `kk` process, or keybinding can never display or confirm an approval. A close, destroy, or terminal-restart card lists the terminal containers it covers and the process inventory found at preflight, and states its scope: the approval covers every process in the listed terminal containers at freeze time. A process that appears in a listed container after the card was drawn is covered by that statement. The card also names any outside holder of the workspace that the human is asked to accept.
+
+An approval card needs a terminal its `kk` process owns in the foreground. A pane's PTY is the controlling terminal of its child, so a `kk` typed in a pane qualifies. Whether a popup's terminal qualifies is part of the popup gate; where it does not, the approval flow fails closed and the same verb is available from `kk` in a pane.
 
 ### Wireframe — spawn card (`n` for new thread, `N` for new-as-child-of-cursored)
 
@@ -277,14 +286,14 @@ Approval cards are always custom and always foreground-bound. The card is drawn 
 
 `n` opens this with `follows` set to "── no follow" by default. `N` opens it with `follows` set to the cursored thread.
 
-Submitting the spawn form begins, but does not itself satisfy, the one-shot approval flow required by `kk new`. The daemon returns a canonical plan naming the base/head, follows choice, workspace, harness, and initial-input digest; the overlay displays that plan in an approval card and confirms it through its enrolled foreground presenter. The same two-phase shape applies to publish, close, interrupt, reopen, and any cross-thread or consequential repair action.
+Submitting the spawn form begins, but does not itself satisfy, the one-shot approval flow required by `kk new`. The daemon returns a canonical plan naming the base/head, follows choice, workspace, harness, and initial-input digest; the overlay displays that plan in an approval card and confirms it through its enrolled foreground presenter. The same two-phase shape applies to publish, close, interrupt, reopen, and any cross-thread or consequential repair action. `kk thread destroy` has no overlay verb; it is CLI-only.
 
 ## Herdr sidebar projection
 
-Herdr's native sidebar is the always-visible thread list. It replaces a kiki-drawn status strip and takes the ambient Activity and attention role. Kiki does not draw it. Kiki publishes into it:
+Herdr's native sidebar is the ambient thread list. It replaces a kiki-drawn status strip and takes the ambient Activity and attention role. Kiki does not draw it, and the user can hide or collapse it like any other Herdr UI. Kiki publishes into it:
 
 - **Label.** `kkd` sets each terminal group's Herdr workspace label to the repo's directory name, the thread's display name, and a short provisioning tag. It is for people and for discovery hints only.
-- **Tokens (v1.x).** `kkd` publishes metadata tokens on each terminal group's Herdr workspace, and kiki's generated Herdr configuration composes them into the sidebar row after the label with style rules:
+- **Tokens (v1.x).** `kkd` publishes metadata tokens on each terminal group's Herdr workspace. Kiki's generated Herdr configuration lays the sidebar entry out in two rows — the label on the first, the tokens on the second — with style rules, and sets a sidebar width that fits kiki's label within Herdr's allowed range. Token keys and values stay within Herdr's limits (a key of at most 32 characters from `[A-Za-z0-9_-]`, a value of at most 80 characters). The generated configuration declares these tokens only when this surface ships.
 
 | token             | content                                                                                                                     | example                                          |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
@@ -297,7 +306,7 @@ Every token carries its glyph and a word, so a row reads correctly with `NO_COLO
 
 The projection is one-way, and it is never authority:
 
-- `kkd` republishes the label and every token after each state change and after every resync with the server. A token that was overwritten, expired, or lost in a server restart heals on the next publish.
+- `kkd` republishes the label and every token after each state change and after every resync with the server. A token that was overwritten or lost in a server restart heals on the next publish.
 - Kiki never reads a label or token back. Any process on the server's socket can change them. A row is not evidence that a thread is `Active`, that an agent is ready, or that a cascade was delivered. `kk ls` and `kk status` report kiki's state.
 - Kiki publishes the label and tokens only to a terminal group with a current binding. A Herdr workspace that Herdr restored after a server restart is a remnant container, and one the user created by hand is the user's; neither has kiki tokens. Its row shows whatever label Herdr kept and nothing from kiki. A kept label does not tie a remnant to a thread.
 - The row is not a kiki control. Selecting a row is Herdr's own navigation for that client. No kiki verb is bound in the sidebar, so it cannot spawn, publish, close, interrupt, or approve.
@@ -307,40 +316,40 @@ The sidebar lists terminal groups from every registered repo in one list. The la
 ### Wireframe — a Herdr client on the kiki server (Herdr sidebar · agent pane · shell pane)
 
 ```
- ╭─ kiki ──────────────────────────────────────────────────────────────╮ ╭─ agent · codex-conv ───────────────────╮
- │                                                                     │ │                                        │
- │   pi-extensions refactor 2c81               ↻ pending    ● working  │ │ > human                                │
- │ ▸ pi-extensions codex-conv 7f3a ←● refactor ↻ pending    ● working  │ │   could you check whether a            │
- │   pi-extensions agent-tui b0d4              ── in sync   ○ idle     │ │   materialized intent is dropped on a  │
- │   pi-extensions session-recall 9d1e         ◐ conflicted ◐ blocked  │ │   hook crash before MarkDelivered?     │
- │   pi-extensions minimal-foot 51aa           ── in sync   ✓ finished │ │                                        │
- │   kiki-docs api-guide 3b7e                  ── in sync   ● working  │ │ ● working  2m 18s  esc to interrupt    │
- │   kiki-www footer-year c02d                 ── in sync   … Creating │ │                                        │
- │                                                                     │ │   reading kiki-core/cascade/           │
- │                                                                     │ │   intent_store.rs ...                  │
- │                                                                     │ │                                        │
- │                                                                     │ ╰────────────────────────────────────────╯
- │                                                                     │ ╭─ shell ────────────────────────────────╮
- │                                                                     │ │ codex-conv $ jj st                     │
- │                                                                     │ │ M kiki-core/src/cascade/intent_store.rs│
- │                                                                     │ │ Working copy : qxnopkyl 8a3c2d1e       │
- │                                                                     │ │ codex-conv $ _                         │
- │                                                                     │ │                                        │
- │                                                                     │ │                                        │
- │                                                                     │ │                                        │
- │                                                                     │ │                                        │
- ╰─────────────────────────────────────────────────────────────────────╯ ╰────────────────────────────────────────╯
+ ╭─ kiki ───────────────────────────────╮ ╭─ agent · codex-conv ─────────────────────────────╮
+ │                                      │ │                                                  │
+ │   pi-extensions refactor 2c81        │ │ > human                                          │
+ │     ↻ pending  ● working             │ │   could you check whether a materialized intent  │
+ │ ▸ pi-extensions codex-conv 7f3a      │ │   is dropped on a hook crash before              │
+ │     ↻ pending  ● working  ←● refactor│ │   MarkDelivered?                                 │
+ │   pi-extensions agent-tui b0d4       │ │                                                  │
+ │     ── in sync  ○ idle               │ │ ● working   2m 18s   esc to interrupt            │
+ │   pi-extensions session-recall 9d1e  │ │                                                  │
+ │     ◐ conflicted  ◐ blocked          │ │   reading kiki-core/cascade/intent_store.rs ...  │
+ │   pi-extensions minimal-foot 51aa    │ │                                                  │
+ │     ── in sync  ✓ finished           │ │                                                  │
+ │   kiki-docs api-guide 3b7e           │ ╰──────────────────────────────────────────────────╯
+ │     ── in sync  ● working            │ ╭─ shell ──────────────────────────────────────────╮
+ │   kiki-www footer-year c02d          │ │ codex-conv $ jj st                               │
+ │     ── in sync  … Creating           │ │ M  kiki-core/src/cascade/intent_store.rs         │
+ │                                      │ │ Working copy : qxnopkyl 8a3c2d1e                 │
+ │                                      │ │ codex-conv $ _                                   │
+ │                                      │ │                                                  │
+ │                                      │ │                                                  │
+ │                                      │ │                                                  │
+ │                                      │ │                                                  │
+ ╰──────────────────────────────────────╯ ╰──────────────────────────────────────────────────╯
 ```
 
-The left region is Herdr's sidebar, one row per terminal group, with the label (repo, thread, provisioning tag) followed by kiki's tokens. The last two rows belong to other repos. `▸` here stands for however Herdr marks the row a client is viewing. The right region is the thread's first tab: the agent pane on top, hosting the harness's PTY, and the shell pane below. The last row shows a thread that is still `Creating`: its lifecycle token stands where the agent token would be.
+The left region is Herdr's sidebar when it is shown: one entry per terminal group, with the label (repo, thread, provisioning tag) on the first row and kiki's tokens on the second. `▸` here stands for however Herdr marks the entry a client is viewing. The right region is the thread's first tab: the agent pane on top, hosting the harness's PTY, and the shell pane below. The last entry shows a thread that is still `Creating`: its lifecycle token stands where the agent token would be. The last two entries belong to other repos.
 
 ## UI pane
 
-The UI pane is the optional `ui` role pane. It keeps the Stack tree permanently visible beside the agent. It is opt-in via `[ui] ui_pane = true` in user config, or per thread via `kk new --sidebar` / `--no-sidebar` (see [Commands](../09-commands.md#kk-new)). Herdr's sidebar is always present and is not controlled by these settings.
+The UI pane is the optional `ui` role pane. It keeps the Stack tree permanently visible beside the agent. It is opt-in via `[ui] ui_pane = true` in user config, or per thread via `kk new --sidebar` / `--no-sidebar` (see [Commands](../09-commands.md#kk-new)). Herdr's sidebar is separate and is not controlled by these settings.
 
-Its direct PTY child is the kiki pane launcher, which claims the `ui` role and then replaces itself with the kiki UI process. The pane is provisioned with an explicit working directory and environment, as every role pane is.
+Its direct PTY child is the kiki pane launcher, which claims the `ui` role and then replaces itself with the kiki UI process, `kk sidebar`. That process reads through pinned reads only and never snapshots a working copy. The pane is provisioned with an explicit working directory and environment, as every role pane is.
 
-It renders the overlay's Stack section, with the inlined status under the current thread, in a narrow fixed-width pane (`[ui] ui_pane_width`, default 32 columns). It has no Activity section and no preview; the Herdr sidebar and the overlay cover those. It is **navigation-only**: `j` / `k` / `↑` / `↓` move the cursor, `enter` switches the caller's client to the cursored thread under the `kk switch` contract, and `?` toggles the chord ribbon (showing only the navigation verbs). Mouse click on a row moves the cursor; scroll-wheel scrolls the tree. Spawn, publish, close, destroy, interrupt, reopen, and preview-toggle are not bound — accidental focus on the UI pane cannot mutate state. Moving focus between panes is Herdr's own pane navigation.
+It renders the overlay's Stack section, with the inlined status under the current thread, in a narrow fixed-width pane (`[ui] ui_pane_width`, default 32 columns). It has no Activity section and no preview; the Herdr sidebar and the overlay cover those. It is **navigation-only**: `j` / `k` / `↑` / `↓` move the cursor, `enter` switches the caller's client to the cursored thread under the `kk switch` contract, and `?` toggles the chord ribbon (showing only the navigation verbs). Mouse click on a row moves the cursor; scroll-wheel scrolls the tree. Spawn, publish, close, interrupt, reopen, and preview-toggle are not bound — accidental focus on the UI pane cannot mutate state. Moving focus between panes is Herdr's own pane navigation.
 
 The UI pane is ensured when the terminal group is provisioned: at `kk new`, at `kk reopen`, and by a `kk repair` terminal restart. `kk switch` never creates it. If the user closes the pane, or the UI process exits and Herdr removes the pane, kiki does not put it back until one of those events.
 
@@ -361,7 +370,7 @@ The UI pane is ensured when the terminal group is provisioned: at `kk new`, at `
  │                             │ │                                                  │
  │ ─────────────────────────── │ │                                                  │
  │ ↑↓ ⏎ switch · ?             │ │                                                  │
- │ master ✻  ── in sync  ●     │ │                                                  │
+ │ pi/codex*  ↻ pending  ●     │ │                                                  │
  ╰─────────────────────────────╯ ╰──────────────────────────────────────────────────╯
 ```
 
@@ -379,13 +388,15 @@ In kiki's vocabulary, **the** shell pane is the singular `shell` role pane kiki 
 
 The shell pane is created by Herdr layout application with a direct argv command, never by typing into another shell. Its direct PTY child is the kiki pane launcher. The launcher reports to `kkd`, claims the `shell` role for the thread's terminal binding, and then replaces itself with the user's shell, taken from `$SHELL` (fallback `/bin/sh`).
 
-Kiki passes the pane's working directory and environment explicitly in the provisioning call:
+Kiki passes the pane's working directory and its thread-specific variables explicitly in the provisioning call:
 
 - the working directory is the jj workspace path;
-- the environment includes `KIKI_THREAD_ID` and the thread's other context variables, so `kk` typed in the pane resolves the thread at the environment step of [context resolution](../09-commands.md#context-resolution);
-- the environment never includes the `ApprovalPresenter` credential, a reusable Admin credential, or the bytes of any credential.
+- the explicit variables include `KIKI_THREAD_ID` and the thread's other context variables, so `kk` typed in the pane resolves the thread at the environment step of [context resolution](../09-commands.md#context-resolution);
+- no `ApprovalPresenter` credential, reusable Admin credential, or credential bytes of any kind are placed in it.
 
-The shell does not inherit the environment of whichever terminal ran `kk new`. Herdr starts the pane; kiki's explicit variables are the only thread-specific ones in it.
+Everything else in the shell's environment comes from the Herdr server. Every pane inherits the server's whole environment, plus Herdr's own `HERDR_*` variables and terminal settings. `kkd` starts the server with a deliberately constructed environment — the user's login baseline (`HOME`, `USER`, `SHELL`, `PATH`, locale) — not the environment of whichever terminal first ran `kk`. So the shell does not inherit the environment of the terminal that ran `kk new`, and a variable exported there is not in the pane. `HERDR_CONFIG_PATH`, which points at kiki's generated configuration file, is visible inside every pane; it is a path, not a secret.
+
+The agent pane differs in one respect: the harness's launch specification removes every `HERDR_*` variable from the harness's environment and keeps `KIKI_THREAD_ID`.
 
 ### Layout
 
@@ -414,14 +425,14 @@ The default layout (`ui_pane = false`, `shell_pane = true`) is the wireframe und
 - **`kk reopen <thread>`**: as `kk new` — the pane is provisioned fresh in a new terminal group. Shell history, scrollback, and any processes that were running before close are not preserved; the user's shell starts cold.
 - **`kk repair` terminal restart**: the restart plan for a `TerminalMissing` thread ensures the shell pane as at creation, with its explicit working directory and environment.
 - **`kk switch <thread>`**: does nothing to the shell pane. Switch performs no terminal mutation and never re-creates a pane.
-- **The shell exits or the user closes the pane**: Herdr removes a pane when its direct command exits, so typing `exit` removes the shell pane. Its role binding ends. Kiki raises no issue and does not put the pane back until the next reopen or terminal restart. A user who wants another shell splits one natively in Herdr.
-- **A natively split pane** is a user pane. It does not inherit the shell pane's explicit environment, so it has no `KIKI_THREAD_ID`; `kk` typed there resolves the thread through its Herdr pane identity instead.
-- **After a Herdr server restart**: a restored pane is a remnant pane — a plain shell with no role and none of kiki's variables. It is not the shell pane. `kk` typed there resolves the thread, if at all, from the working directory. The restart plan either reuses the remnant container, replacing its first tab with the role layout, or closes it; either way it provisions real role panes.
-- **`kk close`**: closes the whole terminal group, and the shell pane goes with it. Any process running in the shell pane is stopped alongside the agent. See [Threads · close](../03-threads.md#close).
+- **The shell exits or the user closes the pane**: Herdr removes a pane when its direct command exits, so typing `exit` removes the shell pane. The role is bound to that shell process, so it ends with it. Kiki raises no issue and does not put the pane back until the next reopen or terminal restart. A user who wants another shell splits one natively in Herdr.
+- **A natively split pane** is a user pane. It inherits the server's environment like every pane, but not the shell pane's explicit variables. So it has no `KIKI_THREAD_ID`; `kk` typed there resolves the thread through its Herdr pane identity instead.
+- **After a Herdr server restart**: a restored pane is a remnant pane — a plain shell with no role and none of kiki's explicit variables. It is not the shell pane. `kk` typed there resolves the thread, if at all, from the working directory. Kiki never reuses a remnant container: the restart plan closes each listed one with verified exit and provisions a fresh terminal group with real role panes.
+- **`kk close`**: ends the whole terminal group, and the shell pane goes with it. Every process running in the shell pane is terminated by kiki alongside the agent, under the approved plan, before the group is closed. See [Threads · close](../03-threads.md#close).
 
 `kkd` does not manage what runs in the shell pane. It does not track which commands run there, does not surface the pane's state in the overlay or the Herdr sidebar, and does not log audit rows for activity in it. Anything kiki cares about that the user does there — direct jj operations, gh interactions — routes through the existing op-log watcher and GitHub polling paths as if the user had run it anywhere else. This is the ambient-coordinator stance applied to the shell pane: kiki sets it up, then gets out of the way.
 
-`kkd` does observe the shell pane's processes when it must prove something about the workspace. At `kk close` and `kk thread destroy`, `ProcessSupervisor` takes the direct child of every pane in the terminal group — the shell pane and user panes included — as a root, freezes it with its descendants, and verifies exit by OS process identity before the jj workspace is forgotten or deleted. A background job started from the shell pane is therefore part of the close plan. A job that cannot be accounted for stops the deletion; it is never silently abandoned or silently killed outside the approved set.
+`kkd` does observe the shell pane's processes when it must prove something about the workspace. At `kk close` and `kk thread destroy`, `ProcessSupervisor` takes the direct child of every pane in the terminal group — the shell pane and user panes included — as a root, freezes it with its descendants, and verifies exit by OS process identity before the jj workspace is forgotten or deleted. A background job started from the shell pane is therefore part of the close plan. A job that cannot be accounted for stops the deletion; it is never silently abandoned or silently killed outside the approved scope. When that happens kiki reports the pid, the command line, and the step that clears it.
 
 ### Authority
 
@@ -434,14 +445,14 @@ Toasts are non-modal pills in the overlay's top-right corner, stacking downward.
 Two subtypes share the surface:
 
 - **Notification toast** — no interactive action. The body may include hint text naming an overlay verb (e.g., "tap T to read transcript"); the verb is fielded by the overlay's normal keymap, the toast does not intercept it.
-- **Actionable toast** — carries exactly one named action (e.g., `undo`). The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action is never destructive — it is restorative (`undo` of a kiki-initiated mutation, e.g., auto-archive on PR-merge — see [Publishing](../07-publishing.md)). Toasts never open an approval card.
+- **Actionable toast** — carries exactly one named action. The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast (this is the _only_ keystroke a toast intercepts; everything else passes through to the overlay). The action never performs or confirms a consequential operation. At most it opens the overlay's approval card for a plan the daemon proposed, where the ordinary two-phase approval applies; dismissing or ignoring the toast changes nothing.
 
 Dismissal rules (apply to both subtypes):
 
-- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms; specific triggers may override, e.g., auto-archive undo grace = 5000ms — see [Publishing](../07-publishing.md))
+- auto-dismiss after the toast's TTL elapses (default `[ui] toast_ttl_ms` = 4000ms)
 - click anywhere on the toast pill (excluding the action label, which runs the action) dismisses it
 - moving the keyboard cursor onto the row that issued the toast, or clicking that row, dismisses the toast (treated as "user acknowledged")
-- invoking the toast's action (actionable toasts only) dismisses the toast on completion
+- invoking the toast's action (actionable toasts only) dismisses the toast
 
 Toast triggers (v1):
 
@@ -450,7 +461,7 @@ Toast triggers (v1):
 - cascade conflict on a non-current thread (`◐`) — notification
 - cascade materialized for a child thread (`──`, only when ≥ 2 child reconciliations coalesce) — notification
 - config-set warning that won't take effect until next `kk new` / `kk reopen` — notification
-- auto-archive on PR-merge (`✓`) with `undo` action (v1.x polish; 5s grace — see [Publishing](../07-publishing.md)) — actionable
+- close proposed after a PR merge (`✓`), with a `review` action that opens the close plan's approval card (v1.x, with the GitHub integration — see [Publishing](../07-publishing.md)) — actionable. Kiki never closes a thread by itself, and there is no undo grace: nothing happens until the human approves the card.
 
 Overlay toasts are drawn only by the overlay. The UI pane hosts none, and kiki draws nothing over the live agent pane.
 
@@ -458,12 +469,12 @@ Overlay toasts are drawn only by the overlay. The UI pane hosts none, and kiki d
 
 When no overlay is open, attention events travel on two channels:
 
-- **The Herdr sidebar.** The thread's tokens change, so the row shows the new glyph and word. This is passive: it needs a client to be attached and looking.
+- **The Herdr sidebar.** The thread's tokens change, so the entry shows the new glyph and word. This is passive: it needs a client to be attached, with the sidebar shown, and someone looking.
 - **The configured notification transport**, `[notifications] os_provider` (`auto | notify-rust | osascript | herdr | off` — see [Configuration](../11-configuration.md) and [Observability](../12-observability.md)).
 
-`os_provider = herdr` sends the event as a Herdr toast. A Herdr toast is shown to every client attached to the kiki server. It is global, best-effort, and rate-limited, and it reaches nobody when no client is attached. That is acceptable because kiki's attention events are not caller-scoped: a cascade conflict or a blocked agent concerns the thread, not whoever ran a command. Nothing that must reach one specific person travels by Herdr toast.
+`os_provider = herdr` sends the event as a Herdr toast. Herdr's toasts are off by default; kiki's generated configuration turns them on for the dedicated server. A Herdr toast is offered to every client attached to the kiki server, and each client applies its own display policy. It is global and best-effort: Herdr's reply to the request is not a display receipt, it reaches nobody when no client is attached, and at the candidate revision Herdr accepts one such toast per second; kiki does not queue or retry a dropped one. That is acceptable because kiki's attention events are not caller-scoped: a cascade conflict or a blocked agent concerns the thread, not whoever ran a command. Nothing that must reach one specific person travels by Herdr toast.
 
-A Herdr toast or an OS notification carries the same one-line summary as an overlay toast, with its glyph and words. It carries no action, intercepts no key, and never displays or confirms an approval. The actionable `undo` toast exists only in the overlay; outside it, the notification names the event and the user acts through `kk`.
+A Herdr toast or an OS notification carries the same one-line summary as an overlay toast, with its glyph and words. It carries no action, intercepts no key, and never displays or confirms an approval. Actionable toasts exist only in the overlay; outside it, the notification names the event and the user acts through `kk`.
 
 ### Wireframe — conflicted-thread toast in overlay
 
@@ -500,10 +511,10 @@ Forms are pure ratatui widgets drawn by the overlay's `kk` process; they are nev
 
 The overlay is a small state machine:
 
-- `NAVIGATE`: default state. Sidebar cursor moves through Stack and Activity rows.
+- `NAVIGATE`: default state. The thread-list cursor moves through Stack and Activity rows.
 - `PREVIEW`: right pane is pinned to transcript tail, diff, or PR comments for the cursored thread.
 - `APPROVE`: a sensitive read, spawn, or consequential verb waits on a daemon-issued foreground approval challenge.
-- `SPAWN`: spawn form collects thread name, follows target, and harness fields.
+- `SPAWN`: spawn form collects the thread name, follows target, harness, and UI-pane choice.
 - `VIEWER`: full-screen transcript reader opened by `T`.
 
 `q` and `esc` leave the overlay from `NAVIGATE` and return to the prior overlay state from sub-states. `enter` only switches threads from `NAVIGATE` on a bookmark row. Destructive actions are unavailable from the UI pane and from the Herdr sidebar.
@@ -535,7 +546,7 @@ Overlay (`NAVIGATE` mode):
 | `q`       | dismiss overlay                                                                 |
 | `esc`     | dismiss overlay                                                                 |
 | click     | (mouse) move cursor to clicked row, or switch preview tab                       |
-| scroll    | (mouse) scroll the focused pane (sidebar list or preview)                       |
+| scroll    | (mouse) scroll the focused region (thread list or preview)                      |
 
 Note: `c` previews PR comments. Close is `x`. The binding favors the frequent read action and keeps closing behind a distinct key.
 
@@ -549,7 +560,7 @@ UI pane:
 | click           | move cursor to clicked row                        |
 | scroll          | scroll the tree                                   |
 
-The UI pane binds **no** verb that mutates state. Spawn, publish, close, destroy, interrupt, and preview-toggle are unbound. It binds no key for moving between panes; that is Herdr's own navigation.
+The UI pane binds **no** verb that mutates state. Spawn, publish, close, interrupt, reopen, and preview-toggle are unbound. It binds no key for moving between panes; that is Herdr's own navigation.
 
 The overlay keybinding is the only key kiki binds in Herdr's own keymap. The Herdr sidebar carries no kiki bindings. Every other Herdr key keeps Herdr's meaning.
 
@@ -559,11 +570,11 @@ One line at the bottom of the overlay. Order, left to right:
 
 `<repo>  <bookmark>[*][↑]  <cascade-glyph cascade-state>  <agent-model>  ctx ●●●●○ <pct>%  last op <duration>`
 
-`*` is the dirty marker for the current working copy; `↑` means its tracked checkpoint target trails the persisted live head. `<cascade-glyph cascade-state>` is the kiki-CLI-shared three-valued indicator. `<agent-model>` is the harness-reported model name. `ctx` is the harness-reported context-window utilization. `last op` is the duration since the last jj op on the current thread.
+`*` is the dirty marker for the current working copy, as of the last pinned observation — the strip never snapshots to compute it; `↑` means its tracked checkpoint target trails the persisted live head. `<cascade-glyph cascade-state>` is the kiki-CLI-shared three-valued indicator. `<agent-model>` is the harness-reported model name. `ctx` is the harness-reported context-window utilization. `last op` is the duration since the last jj op on the current thread.
 
 The UI pane's context strip is a shortened form: `<bookmark>[*][↑]  <cascade-glyph cascade-state>  <agent-glyph>`. Model and ctx are omitted because the agent pane next to it already surfaces them.
 
-The context strip is a TUI-specific footer and is **not** a `StatusRenderer` projection. The `StatusRenderer`-fed artifact is the _inlined status_ under the current thread's bookmark line in the Stack section; that artifact is byte-identical with `kk status --no-jj` per `testing.md` (`StatusRenderer` shared-renderer test).
+The context strip is a TUI-specific footer and is **not** a `StatusRenderer` projection. The `StatusRenderer`-fed artifact is the _inlined status_ under the current thread's bookmark line in the Stack section; that artifact must be byte-identical with `kk status --no-jj` for the same thread and operation, and [Testing](../14-testing.md) must hold a test that asserts it.
 
 ## Degradation
 
@@ -573,17 +584,20 @@ Role panes are not skipped for size. `kkd` provisions a terminal group whether o
 
 Each surface degrades on its own, and none of them changes thread state:
 
+- **Herdr sidebar hidden or collapsed.** That is the user's choice in Herdr. Kiki still publishes; the overlay, `kk ls`, and notifications are unaffected.
+- **Agent-only terminal group.** With the shell and UI panes off, the agent pane is the group's only pane. If its launcher exits, Herdr removes the whole Herdr workspace and moves the viewing clients elsewhere. The thread reads `TerminalMissing`, as for any ended `agent` role.
+- **Popup unavailable.** If another client already has a popup open, the overlay keybinding cannot open one. Bare `kk` in a pane still opens the overlay.
 - **No client attached.** Nothing is drawn. Threads keep running, tokens are still published, and the configured OS notification transport still fires. `kk ls`, `kk status`, and `kk log` work from any terminal.
 - **No `client_targeted_focus`.** This is a required Herdr extension. `kk switch`, the overlay's `enter`, and the UI pane's `enter` fail with a message that names the capability. Kiki never substitutes a focus change that moves every client. Herdr's own navigation still works, and so does the explicit `kk switch --all-clients`.
 - **Tokens not shipped, lost, or overwritten.** The sidebar row shows the label alone, or a stale token, until the next publish. `kk ls` is the truthful list.
-- **Herdr server restarted.** Restored panes are remnant panes in containers without kiki tokens. Affected threads show `!` with their lifecycle label in the overlay and `kk ls`, with the reason `TerminalMissing`, until `kk repair` restarts them. No surface shows an agent state for a thread that has no ready incarnation.
+- **Herdr server restarted.** Restored panes are remnant panes in containers without kiki's label updates or tokens. Affected threads show `!` with their lifecycle label in the overlay and `kk ls`, with the reason `TerminalMissing`, until `kk repair` restarts them. No surface shows an agent state for a thread that has no ready incarnation.
 - **A row too narrow** to render the full glyph + name + status in the overlay or UI pane truncates the name with a single-character ellipsis (no multi-character `…` wrap). Collapsed-summary lines from `kk log` follow the existing CLI rules. Truncation inside the Herdr sidebar is Herdr's.
 
 ## Mouse
 
 Mouse capture is on by default (`[ui] mouse_enabled = true`). The following events are honored in v1:
 
-- click on an overlay sidebar row → moves the cursor and dismisses any overlay toast issued by that row; the UI pane has no toast surface
+- click on an overlay thread-list row → moves the cursor and dismisses any overlay toast issued by that row; the UI pane has no toast surface
 - click on a UI pane row → moves the cursor
 - click on a preview-tab letter (`t` / `d` / `c`) in the preview pane header → switches preview mode, equivalent to pressing the corresponding key
 - click on a toast pill, anywhere except the action label → dismisses that toast (notification toasts have no action label and dismiss on any click; actionable toasts dismiss everywhere except the labeled action)
@@ -618,5 +632,5 @@ All `[ui]` keys are personal preference: valid in user and per-thread config, in
 
 Outside `[ui]`:
 
-- `[notifications] os_provider` selects the attention transport, including `herdr`; see [Toasts](#toasts).
-- `[terminal]` and `[paths] herdr_dir` locate the Herdr executable, the dedicated server's session name, and its state. Kiki generates the dedicated server's Herdr configuration from them, including the sidebar row composition and the overlay keybinding. That generated file is kiki's; the user's own Herdr configuration is never read or changed.
+- `[notifications] os_provider` selects the attention transport, including `herdr`; see [Notifications outside the overlay](#notifications-outside-the-overlay).
+- `[terminal]` names the Herdr executable and the dedicated server's session name. `[paths] herdr_dir` holds kiki's generated Herdr configuration file and nothing else; Herdr keeps the session's socket and saved state under its own directories. `kkd` regenerates and validates that file before every server start. It sets, among other things, the sidebar rows and width, the overlay keybinding, Herdr toast delivery, and `resume_agents_on_restore = false`. That generated file is kiki's; the user's own Herdr configuration is never read or changed.

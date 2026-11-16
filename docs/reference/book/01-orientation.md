@@ -49,7 +49,7 @@ kiki's move is to register the hand-maintained tuple — workspace, terminal, ag
 | Where is that work?                   | Threads are named and listed from anywhere. `kk ls` works across every registered repo; the TUI shows the same tree interactively.                                                                                                                                                                                                                                                                                                                                                                                                    | [Commands](09-commands.md), [Interface](10-interface/)           |
 | Who needs me right now?               | Every thread's agent projects a display state — `idle`, `working`, `finished`, `blocked` — surfaced in listings, Herdr's sidebar, the overlay's Activity section, and OS notifications.                                                                                                                                                                                                                                                                                                                                               | [Interface](10-interface/), [Observability](12-observability.md) |
 | What is in flight?                    | `kk log` renders your thread and its follows-ancestors in full and collapses everything else to one line each; `--wide` adds PR, CI, and agent state for a one-screen bird's-eye view.                                                                                                                                                                                                                                                                                                                                                | [Commands](09-commands.md#kk-log)                                |
-| Another one is a ritual               | `kk new <name>` runs the whole ritual — workspace, initial change, bookmark checkpoint, terminal group, hooks, agent — as one durable, crash-recoverable saga. Inside a thread, branching off the current thread is the default.                                                                                                                                                                                                                                                                                                      | [Threads](03-threads.md)                                         |
+| Another one is a ritual               | `kk new <name>` runs the whole ritual — workspace, initial change, bookmark checkpoint, hooks, terminal group, agent — as one durable, crash-recoverable saga. Inside a thread, branching off the current thread is the default.                                                                                                                                                                                                                                                                                                      | [Threads](03-threads.md)                                         |
 | Staleness is homework                 | A thread can follow another thread. kiki classifies every parent change, rebases or materializes the child at a safe agent boundary, and interrupts the human only for genuine ambiguity — textual conflicts or topology it refuses to guess through. A root thread does not follow the moving trunk in v1: catching it up to `main` remains a direct `jj rebase`, which kiki then cascades through every following descendant. When a parent lands, the v1.x GitHub integration moves each child onto the exact merged trunk commit. | [Cascade](05-cascade.md)                                         |
 | `jj log` stops scaling                | Stack-aware collapse. The chain you are working on renders revision by revision; sibling and unrelated threads compress to one summary line apiece.                                                                                                                                                                                                                                                                                                                                                                                   | [Commands](09-commands.md#kk-log)                                |
 | Naming work that keeps changing shape | `kk new` without a name derives a placeholder, and v1.x metadata evolution lets kiki rename threads and describe revisions as the work reveals its shape — never overwriting prose a human wrote.                                                                                                                                                                                                                                                                                                                                     | [Metadata Evolution](08-metadata.md)                             |
@@ -85,7 +85,7 @@ The point is to make parallel work cheap. Today, switching between agent-led lin
 - Threads keep each other out of the way, not out. Separate workspaces prevent accidents between parallel agents; they are not a security sandbox against processes running as your user.
 - Your words are yours. kiki may draft names, descriptions, and PR text, but it must not silently overwrite something a human wrote.
 - Transcript data, when transcript capture ships, is stored locally and never feeds anything kiki publishes. The one exception is explicit: a reopen catch-up you ask for may send selected rows to the configured model provider, and only after you consent.
-- Safety beats eagerness. jj may rewrite a child thread's commits in the repository immediately, but kiki changes the child's files — and informs its agent — only at a safe moment: an agent tool boundary or a quiet period, never mid-edit. Explicit rebases for a parent's new commits wait for the same moment.
+- Safety beats eagerness. jj may rewrite a child thread's commits in the repository immediately, but kiki changes the child's files — and informs its agent — only at a safe moment: an agent tool boundary or a moment the harness proves the agent idle, never mid-edit. Explicit rebases for a parent's new commits wait for the same moment.
 
 ## v1 contract
 
@@ -97,22 +97,22 @@ The acceptance slice includes:
 
 - `kk init`, `kk repo unregister`, `kk new`, `kk attach`, `kk switch`, `kk ls`, `kk close`, `kk reopen`, and `kk repair`
 - `kk log`, `kk status`, `kk thread detach`, `kk thread audit`, and approval-gated `kk audit log`
-- the minimum `kk config get|show` inspection surface and configuration needed to select the harness, select the Herdr executable and server name, and relocate state or workspaces
-- a per-user daemon, per-repo registration, durable lifecycle sagas, and restart recovery
+- the minimum `kk config get|show` inspection surface and configuration needed to select the harness, select the Herdr executable and server name, relocate state or workspaces, and set per-event notification behavior
+- a per-user daemon started under the user's service manager, per-repo registration, durable lifecycle sagas, and restart recovery
 - stable thread identity, a workspace `@` as the live thread head, and a bookmark as a checkpoint/publication projection tracked through jj's native rewrite successors
 - a deliberately linear owned-stack contract that stops at ambiguous topology
 - jj workspace lifecycle and terminal-group lifecycle on one dedicated Herdr server, including recoverable close and creation failure states
 - journaled terminal provisioning through the gated pane launcher, so a lost reply or crash never yields two agents
 - terminal restore as reconciliation: server-instance tracking, snapshot resync after event loss, and no thread reported `Active` from a restored pane
 - process supervision: fixed-point quiescence proof, verified resume, verified exit before deletion, and orphan detection before replacement or deletion
-- the thread's label in Herdr's sidebar and critical attention notifications
+- the thread's label in Herdr's sidebar, and attention notifications for the events the acceptance slice can raise: a blocked or crashed agent, a conflicted cascade, a failed lifecycle operation, and a projection issue
 - caller-local `kk switch`, which requires Herdr's client-targeted focus capability, plus the explicitly global `kk switch --all-clients`
 - the pluggable harness boundary, with the `claude-code` and `codex` adapters implemented
 - exclusive managed-hook setup, batch-aware cascade delivery, reconciliation/materialization, acknowledgement, and conflict recovery
 - broad projection-divergence detection, narrow automatic repair, and explicit human-directed repair for ambiguous cases
 - SQLite-backed scoped and unscoped operational audit and the two-phase one-shot human-approval path needed by consequential operations
 
-The Herdr-backed items above are adopted as contract, not yet proven. Two of them wait on Herdr itself: caller-local switching needs the client-targeted focus extension, and macOS needs a Herdr release that survives the terminal application quitting. [Terminal runtime](13-architecture/terminal-runtime.md#what-exists-what-kiki-builds-what-herdr-must-add) separates what Herdr provides today, what kiki's adapter builds, what must land upstream, and which gates are still open; [Build Sequencing](15-build-sequencing.md) orders the proofs.
+The Herdr-backed items above are adopted as contract, not yet proven. One of them waits on Herdr itself: caller-local switching needs the client-targeted focus extension. [Terminal runtime](13-architecture/terminal-runtime.md#what-exists-what-kiki-builds-what-herdr-must-add) separates what Herdr provides today, what kiki's adapter builds, what must land upstream, and which gates are still open; [Build Sequencing](15-build-sequencing.md) orders the proofs.
 
 ## v1.x polish
 
@@ -125,7 +125,9 @@ These deepen v1 but must not block the acceptance slice unless explicitly promot
 - PR merge polling, comments, CI presentation, and auto-archive
 - narrow same-thread read-only transcript MCP reads, after the human transcript surface is stable
 - full layered configuration mutation through `set|unset|edit`, repo-shared and per-thread layers, and feature-specific sections
-- additional harness/version diagnostics, non-core op-log compatibility cases, and additional `kk thread` management commands
+- additional harness/version diagnostics and non-core op-log compatibility cases
+- additional commands: `kk thread destroy`, `kk thread interrupt`, `kk thread restart --harness`, `kk thread describe --refresh`, `kk doctor`, and `kk privacy consent`
+- keybinding-invoked navigation and the overlay entry point
 
 ## Out of scope for v1
 
@@ -136,6 +138,7 @@ These deepen v1 but must not block the acceptance slice unless explicitly promot
 - webhooks; later GitHub integration may poll instead
 - terminal multiplexing itself: Herdr owns panes, layout, input, and rendering, and kiki does not fork it or embed its code
 - terminal runtimes other than Herdr
+- follows graph surgery: `kk thread attach` and `kk thread reparent`
 - remote terminal hosting, Windows, and live terminal-server handoff, each gated on evidence in the [Roadmap](16-roadmap.md)
 
 ## Non-goals

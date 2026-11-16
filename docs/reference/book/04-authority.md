@@ -6,15 +6,22 @@ The important v1 property is narrower: a normal `kk` subprocess does not get reu
 
 ## Credential and capability classes
 
-A credential is a secret that proves who a caller is. A capability is a grant to do one specific thing. kiki has four classes.
+A credential is a secret that proves who a caller is. A capability is a grant to do one specific thing. kiki has five classes.
 
 `ThreadScoped<thread_id>`:
 
 - is bound to one thread — one themed line of work with its own workspace;
 - is written to `~/.config/kiki/repos/<repo_id>/credentials/<thread_id>` with mode `0600` (readable only by the owning user);
 - is read by `kk-hook`, by the thread's pane launcher, and by any `kk` command whose discovered context is that thread;
-- is rotated — replaced with a fresh secret — when an incarnation (one live agent session for the thread) ends, and when a thread reopens;
+- is rotated — replaced with a fresh secret — when an incarnation (one live agent session for the thread) ends, when a terminal group is restarted, and when a thread reopens. The file's path is stable and its contents are replaced atomically; the pane launcher re-reads it after reporting a harness exit, and `kk` and `kk-hook` read it on every invocation;
 - authorizes ordinary reads and mutations of that same thread only.
+
+`RegistrationScoped<repo_id>`:
+
+- is issued when `kk init` registers a repo, and revoked by `kk repo unregister`;
+- is written to `~/.config/kiki/repos/<repo_id>/credentials/registration` with mode `0600`;
+- is read by `kk` when no thread context resolves;
+- authorizes the repo-summary read and `BeginApproval` for that repo, and nothing else. `kk ls --all-repos` presents each repo's own registration credential.
 
 `HumanApproval`:
 
@@ -73,8 +80,10 @@ The following require a `HumanApproval` bound to the exact method and target, ev
 - destructive operations, including thread destroy, repo unregister, discarding pending reconciliation, and any repair that deletes or rewrites state;
 - sensitive reads, including another thread's transcript or diff, and repo-wide detailed audit arguments;
 - externally visible actions, including publish, remote branch rewriting, PR mutation, and comments;
-- process-destructive operations, such as interrupting or closing a live agent session;
+- process-destructive operations a human requests, such as interrupting or closing a live agent session. The approval covers every process in the listed terminal containers at freeze time, and the rendered plan says so;
 - topology surgery whose result cannot be derived unambiguously from already recorded intent.
+
+Kiki's own protocol restarts are not on this list. When the cascade's delivery protocol retires an incarnation and starts a replacement to deliver a saved payload, that is a daemon-initiated step of a contract the human already accepted by following a thread; it consumes no approval. Applying `restart-agent` in the thread's own context to a harness that has already exited destroys nothing and needs none either.
 
 The CLI displays the exact method, target, and consequential arguments before it asks the foreground user to approve. Non-interactive invocations fail closed — they stop rather than proceed. v1 provides no unattended destructive automation, no approval-by-config, no blanket `--yes`, and no reusable approval token.
 
@@ -87,11 +96,11 @@ Same-thread transcript reads, once transcript capture ships, use `ThreadScoped<T
 The repo summary is the only cross-thread read available without approval. Its complete field set is:
 
 - repo and thread id, display name, bookmark display name, and the followed parent's id/name;
-- lifecycle state, three-valued cascade state, agent display state, and checkpoint relationship (`current | behind | diverged`);
+- lifecycle state, three-valued cascade state, agent display state, and checkpoint relationship (`current | behind | ahead | diverged`);
 - terminal target (the dedicated server's address and instance, and the current binding's terminal-group and agent-pane refs), one-line revision description, and the last-agent-event category and timestamp that Activity ordering uses;
 - after GitHub integration ships: PR number, PR state, and CI roll-up.
 
-It contains no transcript text, no diff content or paths, no sync-intent payloads or internals, no audit arguments, no prompts, no tool content, no model/context-window telemetry, and no write methods. `kk ls`, `kk switch`, `kk log`, and future read-only renderers all consume this same row set. Adding a field is an authority-model change, not a renderer convenience.
+It contains no transcript text, no diff content or paths, no sync-intent payloads or internals, no audit arguments, no prompts, no tool content, no model/context-window telemetry, and no write methods. `kk ls`, `kk switch`, `kk log`, and future read-only renderers all consume this same row set for everything they say about a thread. The revision lines `kk log` prints are a different kind of data: they come from the shared jj repository, which every workspace of the repo can already read with `jj log`, and they expose nothing that the shared repository does not. Adding a field is an authority-model change, not a renderer convenience.
 
 ## Command context and switch
 
@@ -112,6 +121,7 @@ Kiki therefore draws the line on its own side:
 - Nothing read from the runtime is authority. Labels, metadata tokens, working directories, pane placement, and Herdr ids never authorize a mutation, substitute for a credential, or prove that a directory may be deleted. A Herdr ref observed under the current server instance and matching a current binding may _locate_ the caller's contextual thread, as [Commands](09-commands.md#context-resolution) describes; what then authorizes the call is that thread's own credential.
 - A Herdr keybinding, plugin action, or sidebar click may start a `kk` process or request navigation. It is never a `HumanApproval`, and it gives that process no authority beyond its own credential. Approval still requires an enrolled `ApprovalPresenter` that owns its foreground terminal.
 - Kiki never places an `ApprovalPresenter` or Admin credential in a pane's launch environment, a metadata token, or the generated Herdr configuration.
+- The harness is started with every `HERDR_*` variable removed from its environment, and `kkd` refuses a confirmation from a presenter process that is a descendant or session member of any `agent` launcher. An agent that goes looking can still find the socket; these close the accidental path, not the deliberate one.
 
 This is the cooperative model again, not enforcement against a same-UID adversary.
 

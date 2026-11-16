@@ -78,7 +78,7 @@ An intent in `Detected` may absorb later compatible parent transitions. Absorbin
 
 Repository evolution is not forced to proceed one follows edge at a time. Take a chain A→B→C. A single jj rewrite may logically evolve both B and C. kiki records one base-transition intent for each affected follows edge. Each workspace then reconciles independently, at its own safe boundary.
 
-An explicit `ParentAdvance` on B may cause jj to evolve C. In that case, the initiating handler compares its starting and result operation views and records C's resulting `NativeRewrite` itself. The watcher does not classify that attributed operation a second time.
+An explicit `ParentAdvance` on B may cause jj to evolve C. In that case, the initiating handler compares its starting and result operation views and records C's resulting `NativeRewrite` itself. The watcher opens no second intent for that attributed operation. It still classifies the operation for workspace heads and checkpoint tracking, as it does every operation.
 
 ## Synchronization intent: the sole protocol authority
 
@@ -86,16 +86,17 @@ Each reconciliation is one durable row in `sync_intents`. The row holds:
 
 - `intent_id`, `thread_id`, and a monotonic per-thread `seq`;
 - `kind: NativeRewrite | ParentAdvance`;
-- `from_base_commit` and the exact `to_base_commit`;
+- `from_base_commit_id` and the exact `to_base_commit_id`;
 - `classification_op_id`, naming the exact repository view used for the latest classification, plus normalized trigger-operation rows;
 - `state: Detected | Reconciling | Materialized | Delivered | Acknowledged | RecoveryRequired | TopologyDiverged | Superseded`;
 - optional planned and result operation ids, plus the actual result workspace commit;
 - embedded outbox fields: the byte-stable payload, a pinned transcript anchor, preparation/delivery/acknowledgement timestamps, a transcript row id, `delivery_mode: SoftBatch | RestartStartup`, that mode's exact proof fields, and the durable delivery-attempt history with its optional exhaustion timestamp;
-- optional recovery metadata naming preserved files or divergent commits.
+- optional recovery metadata naming preserved files or divergent commits;
+- `result_has_conflicts`, a flag set when the reconciliation result contains jj conflicts, and the operation that later cleared it.
 
-The intent row is the only authority for cascade progress and delivery. There are no mirrored pending/materialized/acknowledged counters. There is no separate context queue. There is no separate cascade-outbox table. The thread's three-valued UI status is derived from all unresolved intents, and blocking state takes precedence:
+The intent row is the only authority for cascade progress and delivery. There are no mirrored pending/materialized/acknowledged counters. There is no separate context queue. There is no separate cascade-outbox table. The thread's three-valued UI status is derived from all unresolved intents, plus any intent whose result still has uncleared conflicts, and blocking state takes precedence:
 
-- any `RecoveryRequired | TopologyDiverged` intent, or any intent whose delivery attempts are exhausted → `conflicted`;
+- any `RecoveryRequired | TopologyDiverged` intent, any intent whose delivery attempts are exhausted, or any intent with `result_has_conflicts` set and not yet cleared → `conflicted`;
 - otherwise, any `Detected | Reconciling | Materialized | Delivered` intent → `pending`;
 - no unresolved intent → `in sync`.
 
@@ -121,6 +122,17 @@ Before changing any files, kiki runs a workspace probe. The probe is read-only: 
 
 The fingerprint covers the path inventory and the byte hashes used to classify edits. kiki rechecks the fingerprint immediately before mutation. If it drifted, kiki aborts to recovery. The `JjCli` proof of concept must demonstrate a lossless implementation. If it cannot distinguish a clean state from a dirty one without mutation, v1 must return `Unknown`. Optimistic materialization is not permitted.
 
+## Boundary snapshot
+
+The probe never snapshots. One kiki-run command does: the **boundary snapshot**. It is a jj snapshot of one managed workspace that `kkd` takes on purpose, and only under all of these conditions: the agent is at agent quiescence or its tool batch is held at a harness boundary — or, in a lifecycle preflight for a harness that cannot prove quiescence, the human has been warned that the agent may be working; the thread's reconciliation lock is held; a frontier sample shows exactly one operation head; and the resulting operation is attributed. Kiki samples the frontier again afterward and reads the result from the exact resulting operation. It is one of the working-copy commands listed in [Invariants](02-invariants.md), and it is never taken while a tool may be writing.
+
+A boundary snapshot records the workspace's tracked edits in its working-copy commit. It rewrites that commit, so a checkpoint bookmark on it follows under [checkpoint tracking](13-architecture/op-log-watcher.md#checkpoint-tracking). It is used in two places:
+
+- **Lifecycle preflight.** Close, detach, and publish take it in preflight, so the head they pin already contains every tracked edit.
+- **`ParentAdvance` with fresh edits.** An explicit rebase must not run over unsnapshotted edits. When the probe returns `FreshDirty` at a held boundary, kiki takes the boundary snapshot, probes again, and proceeds only on `FreshClean`.
+
+It is not used for `NativeRewrite`: a `FreshDirty` workspace needs no update there, and a stale workspace cannot be snapshotted in place. `StaleDirty` and `Unknown` always go to recovery.
+
 ## `NativeRewrite` reconciliation
 
 At the child's safe boundary:
@@ -130,7 +142,7 @@ At the child's safe boundary:
 3. Run the non-materializing workspace probe.
 4. For `FreshClean | FreshDirty`: verify actual ancestry, then continue to result persistence without rewriting files. Once the base was already materialized, a `NativeRewrite` does not need to disturb later edits.
 5. For `StaleClean`: run `jj workspace update-stale`, then verify the actual resulting workspace commit and ancestry from the exact resulting operation. The command's exit status is not that verification.
-6. For `StaleDirty | Unknown`: transition to `RecoveryRequired`, hard-pause the agent, and enter the recovery path below. Do not soft-materialize and resume.
+6. For `StaleDirty | Unknown`: hard-pause the agent and enter the recovery path below, which records `RecoveryRequired` in the same transaction as the recovery bundle it creates first. Do not soft-materialize and resume.
 7. Compose the byte-stable payload from the base transition and the actual result. Then, in one SQLite transaction: store the result commit, payload, anchor, and `state=Materialized`; update the thread's cached live head from the exact result operation view; and advance the follows edge's last synchronized base.
 
 `jj workspace update-stale` has no exact-target argument. If an external operation lands concurrently, it may reconcile to a newer compatible repository view. The actual result is authoritative. If that result covers a coherent later base transition, kiki records or supersedes the covered intents accordingly. If it does not, kiki stops. It never claims the older target was materialized exactly.
@@ -155,15 +167,15 @@ The recovery payload names all preserved commit ids and recovery paths. "The wor
 At the child's safe boundary:
 
 1. Claim the lock. Transition the oldest intent `Detected → Reconciling`.
-2. Validate the owned chain. The exact revisions after `from_base_commit` up through the current thread head must form the v1 single-parent owned chain: no merge, no multiple roots, no foreign descendant. Otherwise, transition to `TopologyDiverged`. Never synthesize a dynamic descendants revset (a computed jj revision query).
-3. Probe workspace freshness and edits. `FreshClean` may proceed. A preceding native stale state reconciles through the rules above. `FreshDirty | StaleDirty | Unknown` must create an edit-preserving recovery bundle and enter `RecoveryRequired` before the explicit rebase starts.
-4. Persist the planned source revset, the starting operation, and the exact `to_base_commit` on the intent.
-5. Explicitly rebase the exact validated chain through `JjBackend`.
+2. Validate the owned chain. The exact revisions after `from_base_commit_id` up through the current thread head must form the v1 single-parent owned chain: no merge, no multiple roots, no foreign descendant. Otherwise, transition to `TopologyDiverged`. Never synthesize a dynamic descendants revset (a computed jj revision query).
+3. Probe workspace freshness and edits. `FreshClean` may proceed. `FreshDirty` takes the [boundary snapshot](#boundary-snapshot) and probes again; it proceeds only if the second probe returns `FreshClean`, and the snapshot's result becomes the thread head the chain is validated against. A preceding native stale state reconciles through the rules above. `StaleDirty | Unknown`, and a `FreshDirty` that the boundary snapshot did not clear, must create an edit-preserving recovery bundle and enter `RecoveryRequired` before the explicit rebase starts.
+4. Persist the planned source revset, the starting operation, and the exact `to_base_commit_id` on the intent.
+5. Explicitly rebase the exact validated chain through `JjBackend`, pinned to the exact operation head the plan was validated against.
 6. Compare the starting and result operation views. Record `NativeRewrite` intents for any other descendant workspaces jj evolved.
-7. Reconcile the current child's workspace, inspect conflicts, and determine the actual result commit.
+7. Reconcile the current child's workspace, inspect the result for jj conflicts, and determine the actual result commit. A result that contains conflicts sets `result_has_conflicts`; see [Conflicts and escalation](#conflicts-and-escalation).
 8. Compose the payload. Atomically persist the result, anchor, embedded outbox, and `state=Materialized`. Update `thread_head_commit_id` to the actual rebased workspace `@` from the exact result operation view. Then advance the follows edge's last synchronized base.
 
-The CLI PoC must evaluate jj's `--no-integrate-operation` plus `jj op integrate` as the preferred way to inspect a planned result before integrating it. Recovery must use exact operation ids. It must not rerun an ambiguous "rebase onto current parent" command.
+The CLI PoC must evaluate jj's `--no-integrate-operation` plus `jj op integrate` as the preferred way to inspect a planned result before integrating it. `jj op integrate` is a deliberate operation-head integration: it is the integration entry in the closed list of unpinned commands, it runs under the reconciliation lock, and its result is attributed and classified like any other integration. Recovery must use exact operation ids. It must not rerun an ambiguous "rebase onto current parent" command.
 
 ## Delivery protocol
 
@@ -197,7 +209,7 @@ The adapter supplies stable `model_turn_id` and `tool_batch_id` values to `kk-ho
 
 The first `PreToolUse` admitted for a batch fixes that batch's decision under the reconciliation lock. If no intent is ready, the adapter caches `PassThrough` for the batch. Intents detected afterward wait for the next batch; a later sibling hook may not begin reconciliation. If work is ready, kiki writes the complete `SoftBatch` proof and durably fixes `Block(intent_id)` before reconciliation may perform any workspace mutation. kiki retains the reconciliation lock through that decision and mutation. All sibling calls reuse the fixed decision. This avoids an impossible promise: retracting a tool call that was already admitted before a later hook arrived.
 
-`PassThrough` needs no cascade row. But losing that cache means kiki cannot prove whether another call in the batch was already admitted. So the hook launcher blocks the unknown call, hard-pauses the incarnation without changing the workspace, and starts a replacement incarnation. Pending work is reconciled only after the old batch can no longer be running. If reconciliation produces a payload, delivery uses `RestartStartup`. Cache loss may cause a disruptive restart. It never causes a mid-batch mutation, and never an indefinite wait for a completion event that may never arrive. An already durable `Block` is different: it remains fail-closed and follows its intent, not this cache-loss path.
+`PassThrough` needs no cascade row. But losing that cache means kiki cannot prove whether another call in the batch was already admitted. So the hook launcher blocks the unknown call, hard-pauses the incarnation without changing the workspace, and starts a replacement incarnation. A hard-pause retires the incarnation by terminating the harness's whole process tree through `ProcessSupervisor`, by recorded identity, and leaves the `agent` pane launcher alive. The same rule covers a process freeze: if a tool batch was in flight when a close, destroy, or repair freeze began and that operation then takes verified resume, the incarnation's batch state is unknown afterward, and this unknown-batch rule applies — a hard restart to a clean boundary, with files untouched. Pending work is reconciled only after the old batch can no longer be running. If reconciliation produces a payload, delivery uses `RestartStartup`. Cache loss may cause a disruptive restart. It never causes a mid-batch mutation, and never an indefinite wait for a completion event that may never arrive. An already durable `Block` is different: it remains fail-closed and follows its intent, not this cache-loss path.
 
 On every `PreToolUse` call:
 
@@ -217,9 +229,9 @@ An exact completed `SoftBatch`, plus a `PreToolUse` carrying a provably later `m
 
 An adapter whose blocked batch has a single call must additionally prove consumption before recovered delivery. A later arrival alone cannot show whether the model consumed the payload or a substituted result. And `MarkDelivered` proves only that the hook wrote stdout, not that the harness applied it. The Codex adapter therefore reads the delivery receipt from the harness's own session record. A byte-identical deny result for the blocked `tool_use_id` acknowledges. A contrary result redelivers byte-identically on the arriving batch, at most once per intent; the rebinding transaction durably counts the attempt on the intent, so the bound survives daemon restart, and a second contrary receipt abandons the deny channel and fails over to `RestartStartup`. An unreadable receipt defers acknowledgement when no delivery is pending, and fails closed into `RestartStartup` when one is.
 
-The barrier is fail-closed because workspace files may already have changed. If `PostToolBatch` is unavailable, never arrives, or its identity cannot be proved after a hook or daemon crash, kiki hard-pauses and switches the intent to `delivery_mode=RestartStartup`. In one transaction, kiki creates a replacement incarnation and a one-use `startup_delivery_id`. It then starts or resumes the harness with the saved payload as its mandatory first input, carrying that id. The replacement incarnation starts on the same live `agent` pane launcher, through a fresh one-use launch gate, after the orphan scan; it needs no terminal provisioning. The pane launcher cannot start the harness without that input. If the pane launcher itself is gone, there is nothing to open a gate for: the thread has `TerminalMissing`, the intent waits unacknowledged behind that repair, and the incarnation the approved restart plan starts receives the saved payload through this same `RestartStartup` path. A ready handshake proving the harness accepted the tagged startup input marks the intent `Delivered` and sets the replacement incarnation's `delivered_intent_id`. A crash before the handshake retires that attempt without acknowledgement, and kiki retries with a new incarnation and a new id. Those retries are bounded, and the bound is durable: every replacement attempt is already a persisted incarnation row bound to the intent, the bound is evaluated against that durable history rather than an in-memory counter, and exhaustion is recorded on the intent in the same transaction that abandons the final attempt. When attempts for one intent keep failing their handshake or echo, kiki stops retrying. It leaves the intent unacknowledged with its saved payload intact, keeps the agent hard-paused, and raises a loud attention event. Resumption is an explicit human action, never another silent loop. A daemon restart resumes that recorded state and re-surfaces the blocked thread. It does not mint a fresh attempt against an exhausted intent.
+The barrier is fail-closed because workspace files may already have changed. If `PostToolBatch` is unavailable, never arrives, or its identity cannot be proved after a hook or daemon crash, kiki hard-pauses and switches the intent to `delivery_mode=RestartStartup`. In one transaction, kiki creates a replacement incarnation and a one-use `startup_delivery_id`. It then starts or resumes the harness with the saved payload as its mandatory first input, carrying that id. The replacement incarnation starts on the same live `agent` pane launcher, through a fresh one-use launch gate; it needs no terminal provisioning. Before that gate is activated, an inventory rooted at the launcher must show no process other than the launcher itself: no tool child of the retired harness may survive in the launcher's descendant, session, or process-group set. A survivor raises `OrphanedProcess` with harness-remnant evidence, and it blocks the gate and any workspace materialization until it is resolved. These restarts — the cascade hard restart and the `RestartStartup` replacement — are daemon-initiated steps of the delivery protocol and need no human approval; a human-requested interruption or close does. The pane launcher cannot start the harness without that input. If the pane launcher itself is gone, there is nothing to open a gate for: the thread has `TerminalMissing`, the intent waits unacknowledged behind that repair, and the incarnation the approved restart plan starts receives the saved payload through this same `RestartStartup` path. A harness that crashed under a live launcher outside a delivery is restarted by the `kk repair` plan `restart-agent`: it starts a replacement incarnation on the live launcher under the same precondition and a fresh gate, uses `RestartStartup` when an intent is pending, and, being a same-thread action, needs no approval in thread context. A ready handshake proving the harness accepted the tagged startup input marks the intent `Delivered` and sets the replacement incarnation's `delivered_intent_id`. A crash before the handshake retires that attempt without acknowledgement, and kiki retries with a new incarnation and a new id. Those retries are bounded, and the bound is durable: every replacement attempt is already a persisted incarnation row bound to the intent, the bound is evaluated against that durable history rather than an in-memory counter, and exhaustion is recorded on the intent in the same transaction that abandons the final attempt. When attempts for one intent keep failing their handshake or echo, kiki stops retrying. It leaves the intent unacknowledged with its saved payload intact, keeps the agent hard-paused, and raises a loud attention event. Resumption is an explicit human action, never another silent loop. A daemon restart resumes that recorded state and re-surfaces the blocked thread. It does not mint a fresh attempt against an exhausted intent.
 
-The human path out is `kk repair`. It diagnoses an exhausted intent to exactly two named plans. Retry re-arms delivery in one journaled transaction — clearing the exhaustion mark, incrementing the intent's delivery epoch, and resetting the soft-redelivery count — after which one fresh bounded `RestartStartup` cycle is permitted. Every attempt is stamped with the epoch it was created under. Bounds count only current-epoch attempts, by exact id match, never by timestamp comparison. So clock skew cannot smuggle a stale attempt into the fresh cycle, or a fresh one out of it. A re-armed intent that exhausts again returns here. Discard acknowledges the intent without delivery proof, under a one-shot approval bound to the plan. It records that human resolution on the intent and frees the queue behind it. The payload is never delivered, and the plan states that consequence before approval. These two exits are the only writes permitted against an exhausted intent.
+The human path out is `kk repair`. It diagnoses an exhausted intent to exactly two named plans, `retry-delivery` and `discard-delivery`. `retry-delivery` re-arms delivery in one journaled transaction — clearing the exhaustion mark, incrementing the intent's delivery epoch, and resetting the soft-redelivery count — after which one fresh bounded `RestartStartup` cycle is permitted. Every attempt is stamped with the epoch it was created under. Bounds count only current-epoch attempts, by exact id match, never by timestamp comparison. So clock skew cannot smuggle a stale attempt into the fresh cycle, or a fresh one out of it. A re-armed intent that exhausts again returns here. `discard-delivery` acknowledges the intent without delivery proof, under a one-shot approval bound to the plan. It records that human resolution on the intent and frees the queue behind it. The payload is never delivered, and the plan states that consequence before approval. These two exits are the only writes permitted against an exhausted intent.
 
 The first `PreToolUse` generated by the replacement process may acknowledge only when it names the replacement incarnation and causally echoes the exact `startup_delivery_id`. That evidence proves the model turn was generated after consuming the startup payload. The acknowledgement transaction then clears the `RestartStartup` proof and incarnation marker before selecting the next intent. It does not require or fabricate a tool-batch id for the startup input. No tool from the interrupted batch is replayed automatically. A mismatched or absent startup id fails closed.
 
@@ -237,7 +249,7 @@ The agent edits B's files. Then A evolves X1→X2 before B's next jj snapshot. A
 
 ### Scenario 3: parent adds a revision
 
-Parent `bar` advances from X to X+b1 while child `foo` stays at X+f1. kiki records `ParentAdvance { from_base: X, to_base: X+b1 }`. At `foo`'s safe boundary, kiki snapshots and reconciles the workspace as required, explicitly rebases the owned stack, stores the result and payload, and informs the agent. Any evolved grandchild receives its own `NativeRewrite` intent.
+Parent `bar` advances from X to X+b1 while child `foo` stays at X+f1. kiki records `ParentAdvance { from_base: X, to_base: X+b1 }`. At `foo`'s safe boundary, kiki probes the workspace, takes the boundary snapshot if the probe found fresh unsnapshotted edits, explicitly rebases the owned stack, reconciles the workspace, stores the result and payload, and informs the agent. Any evolved grandchild receives its own `NativeRewrite` intent.
 
 ### Scenario 4: direct human reconciliation
 
@@ -255,10 +267,21 @@ One assistant response requests tools T1, T2, and T3 concurrently. T1's hook fin
 
 In jj, conflicts and divergent changes are first-class states, not necessarily failed commands. kiki inspects result revisions and every successor of the affected working-copy change id. It does not rely only on process exit status, or on whichever divergent commit jj happens to place on disk.
 
+### Textual conflicts in a result
+
+A rebase or a native rewrite can succeed and still leave jj conflicts in the thread's commits. That is a result, not a failure, and it is not a new intent state.
+
+- **Recording.** When the reconciliation result contains conflicts anywhere on the thread's chain from its base to its head, kiki sets `result_has_conflicts` on the intent in the transaction that stores the result. The intent still moves `Reconciling → Materialized → Delivered → Acknowledged` by the ordinary rules.
+- **Status.** The thread's derived cascade status is `conflicted` for as long as an intent of that thread has `result_has_conflicts` set and not cleared. Acknowledgement does not clear it: the agent knowing about a conflict is not the conflict being resolved.
+- **Payload.** The delivered payload states the base transition, the actual result commit, and that the result contains conflicts. It lists each conflicted commit and each conflicted path, says that the listed files now contain jj conflict markers, and says that the conflicts must be resolved before other work continues. The payload is byte-stable like every other payload, so the list is fixed when the payload is composed.
+- **Exit.** The flag is cleared when a later operation's exact view shows every commit on the thread's chain conflict-free. The watcher records that operation as `conflicts_cleared_op_id`, and the status then leaves `conflicted` unless another reason holds it there. Nothing else clears the flag: not acknowledgement, not a later intent, and not elapsed time. A later reconciliation whose result is itself conflicted sets the flag on its own intent.
+
+A textual conflict alone does not hard-pause the agent; the agent is the party that resolves it. Divergent successors are different, and stay an escalation.
+
 Hard escalation is required when:
 
-- a required workspace mutation sees `FreshDirty | StaleDirty | Unknown`;
-- reconciliation exposes textual conflicts or divergent successors;
+- a required workspace mutation sees `StaleDirty | Unknown`, or a `FreshDirty` that the boundary snapshot did not clear;
+- reconciliation exposes divergent successors;
 - topology or exact base state cannot be reconciled automatically;
 - an active delivery barrier has no provable batch-completion or later-model-turn boundary;
 - bounded delivery attempts are exhausted because receipts or startup handshakes keep proving the payload is not reaching the model; or
@@ -266,7 +289,7 @@ Hard escalation is required when:
 
 ## Parent merged
 
-Once the v1.x GitHub polling integration ships, a parent merge records a `ParentAdvance`-shaped transition. Its exact `to_base_commit` is the resolved default-branch commit. The child rebases and reconciles at its safe boundary. The approved remote-operation journal then updates the child branch and PR base. It drops the follows link only after local and remote state are observed coherent.
+Once the v1.x GitHub polling integration ships, a parent merge records a `ParentAdvance`-shaped transition. Its exact `to_base_commit_id` is the resolved default-branch commit. The child rebases and reconciles at its safe boundary. The approved remote-operation journal then updates the child branch and PR base. It drops the follows link only after local and remote state are observed coherent.
 
 ## Parent abandoned
 
@@ -274,4 +297,4 @@ A change to the parent's checkpoint bookmark never changes the pinned follows re
 
 ## Detach and graph surgery
 
-`kk thread detach` removes the follows edge and leaves the child's current ancestry unchanged. It first runs `RefreshToFrontier`: it refreshes the parent and child workspace heads from the pinned operation view, and creates any transition a lagging watcher had not yet recorded. The user must reconcile that exact transition, or explicitly discard it with one-shot approval. Only then does kiki checkpoint the child's exact live head and delete the edge. It preserves the thread-owned base anchor, so the now-independent thread stays publishable, reopenable, and safe to validate later. Broader graph surgery stays deferred beyond v1.
+`kk thread detach` removes the follows edge and leaves the child's current ancestry unchanged. It first runs `RefreshToFrontier`: it refreshes the parent and child workspace heads from the pinned operation view, and creates any transition a lagging watcher had not yet recorded. The user must reconcile that exact transition, or explicitly discard it with one-shot approval. Only then does kiki checkpoint the child at its checkpoint target and delete the edge. It preserves the thread-owned base anchor, so the now-independent thread stays publishable, reopenable, and safe to validate later. Broader graph surgery stays deferred beyond v1.
