@@ -1,14 +1,22 @@
 # The kiki Reference
 
-This directory is the implementation reference for kiki (`kk`).
+This directory is the implementation reference for kiki (`kk`). kiki is a tool that coordinates coding agents, the version-control tool [jj](book/appendix-a-glossary.md#ext-jj), and terminals.
 
-Read it as a small spec book: first the reason for the tool, then the model, then the safety rules, then the user surfaces and machinery. The book is normative. It defines kiki's permitted behavior, prohibited behavior, and v1 boundaries. Ambiguity should be treated as a documentation bug to fix.
+Read it as a small spec book, a book that states exactly what the tool must do. It goes in this order: first the reason for the tool, then the model, then the safety rules, then the user surfaces and machinery.
 
-New readers should start with the [Abstract](book/00-abstract.md) and [Orientation](book/01-orientation.md). Together they carry the narrative — the hand-built workspace-per-line-of-work workflow kiki automates, its frictions, and the mechanism that answers each one — before the contract chapters tighten the screws.
+The book is normative: it sets rules, and does not only describe. It defines kiki's permitted behavior, prohibited behavior, and v1 boundaries. Ambiguity should be treated as a documentation bug to fix.
+
+New readers should start with the [Abstract](book/00-abstract.md) and [Orientation](book/01-orientation.md). Together they carry the narrative, before the contract chapters tighten the screws:
+
+- the hand-built workflow that kiki automates, with one [workspace](book/appendix-a-glossary.md#workspace) per line of work;
+- the frictions of that workflow;
+- the mechanism that answers each friction.
+
+If you meet a term you do not know, look it up in the [Glossary](book/appendix-a-glossary.md). The chapters link to it the first time they use a special term.
 
 ## Reading order
 
-The chapters tell the story in order; the appendices hold reference material you dip into rather than read through.
+The chapters tell the story in order. The appendices hold reference material. You dip into them when you need them; you do not read them straight through.
 
 1. [Abstract](book/00-abstract.md)
 2. [Orientation](book/01-orientation.md)
@@ -37,11 +45,11 @@ Appendices:
 
 ## Authority
 
-The numbered chapters and appendices are the live contract. The Decisions chapter explains why parts of the contract look the way they do, but the behavioral chapters remain authoritative.
+The numbered chapters and appendices are the live contract: the rules that are in force now. The Decisions chapter explains why parts of the contract look the way they do, but the behavioral chapters remain authoritative.
 
-The repository's [project journal](https://github.com/skeswa/kiki/tree/main/journal) holds investigations, evidence, and the [numbered decision log](https://github.com/skeswa/kiki/blob/main/journal/decisions/README.md). Journal entries preserve findings and rationale; changes to behavior or scope must also update the owning chapters here.
+The repository's [project journal](https://github.com/skeswa/kiki/tree/main/journal) holds investigations, evidence, and the [numbered decision log](https://github.com/skeswa/kiki/blob/main/journal/decisions/README.md). Journal entries preserve findings and rationale (the reasons behind a choice). Changes to behavior or scope must also update the owning chapters here.
 
-When two live chapters appear to conflict, use this order:
+When two live chapters appear to conflict, use this order. A chapter higher in the list wins:
 
 1. [Invariants](book/02-invariants.md)
 2. Behavioral chapters: [Threads](book/03-threads.md), [Authority](book/04-authority.md), [Cascade](book/05-cascade.md), [Transcript](book/06-transcript.md), [Publishing](book/07-publishing.md), [Metadata Evolution](book/08-metadata.md), [Commands](book/09-commands.md), [Interface](book/10-interface/), [Configuration](book/11-configuration.md), and [Observability](book/12-observability.md)
@@ -51,4 +59,10 @@ When two live chapters appear to conflict, use this order:
 
 ## Language
 
-The words **must**, **must not**, **may**, and **should** are normative in the ordinary RFC sense. The voice is plain by design: kiki coordinates expensive, stateful work, and the docs should say exactly what they mean.
+The words **must**, **must not**, **may**, and **should** are normative in the ordinary RFC sense. That sense is defined in [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119), a short standard for requirement words:
+
+- **must** and **must not** are absolute rules;
+- **should** is a strong recommendation;
+- **may** marks something that is allowed but optional.
+
+The voice is plain by design. kiki coordinates expensive, stateful work, and the docs should say exactly what they mean.

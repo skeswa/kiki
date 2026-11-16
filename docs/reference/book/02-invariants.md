@@ -1,99 +1,271 @@
 # Invariants
 
-These are the promises v1 relies on. They cut across the whole book. Each chapter's local details should be read in light of them.
+An invariant is a promise that always holds. These are the promises v1 relies on. They cut across the whole book. Each chapter's local details should be read in light of them.
 
 ## Identity is stable
 
-Every thread has one stable ID: `thread_id`. A thread is kiki's unit of work — a themed sequence of jj revisions. Its live head is the current `@` of its managed workspace. In jj (the version-control tool kiki drives), `@` names the working-copy commit: the change being edited right now. kiki persists that head as `thread_head_commit_id`. Everything else — bookmark names, workspace paths, terminal groups, harness sessions — is a projection: an outward reflection of the thread, not the thread itself. Projections may change. The `thread_id` must not.
+Every [thread](appendix-a-glossary.md#thread) has one stable ID: `thread_id`. A thread is kiki's unit of work. It is a themed sequence of revisions in [jj](https://docs.jj-vcs.dev/latest/), the version-control tool kiki drives.
 
-This identity is load-bearing state. Credentials, audit rows, transcript rows, PR links, lifecycle state, and follows links all join through it. Code should treat a bookmark like a bookmark left in a book: it marks a checkpoint or a publication point, not the page you are actually on. A bookmark is not identity, and it is not the live source of truth for a running thread.
+A thread's [live head](appendix-a-glossary.md#live-head) is the current `@` of its managed [workspace](appendix-a-glossary.md#workspace). In jj, `@` names the [working-copy commit](https://docs.jj-vcs.dev/latest/glossary/): the change being edited right now. kiki saves that head as `thread_head_commit_id`.
+
+Everything else is a [projection](appendix-a-glossary.md#projection): an outward reflection of the thread, not the thread itself. [Bookmark](appendix-a-glossary.md#bookmark) names, workspace paths, [terminal groups](appendix-a-glossary.md#terminal-group), and [harness](appendix-a-glossary.md#harness) sessions are all projections. Projections may change. The `thread_id` must not.
+
+This identity is state that other things depend on. Credentials, audit rows, [transcript](appendix-a-glossary.md#thread-transcript) rows, [PR](https://docs.github.com/en/pull-requests) links, lifecycle state, and [follows](appendix-a-glossary.md#follows) links all join through it.
+
+Code should treat a jj bookmark like a bookmark left in a book. It marks a checkpoint or a publication point, not the page you are actually on. A bookmark is not identity. It is also not the live source of truth for a running thread.
 
 ## External projections fail loud
 
-Projections are mutable, so kiki observes them instead of assuming it still owns them. A missing, conflicted, or externally moved bookmark, a missing jj workspace record, a mismatched workspace path, a missing terminal group, or a surviving orphaned process must each be classified explicitly. kiki may repair a projection automatically only when it can prove what the correct result is. Otherwise the thread enters `ProjectionDiverged` and waits for `kk repair` or another explicit human choice.
+[Projections](appendix-a-glossary.md#projection) can change, so kiki observes them instead of assuming it still owns them. kiki must classify each of these cases explicitly:
 
-A broken projection does not erase the capabilities kiki can still prove. If only the bookmark is bad, checkpoint, publish, close, and detach are blocked, but unambiguous workspace-head tracking and follows classification keep working. If the terminal group or its `agent` role is missing, or a recorded process survives where none should, kiki can still observe the head, but boundary mutation is blocked. Only ambiguity about the workspace's identity or path suspends both. If an in-flight lifecycle journal owns a temporary projection change, that change fails or resumes the journal; it does not create a competing state machine.
+- a missing, conflicted, or externally moved [bookmark](appendix-a-glossary.md#bookmark);
+- a missing jj [workspace](appendix-a-glossary.md#workspace) record;
+- a mismatched workspace path;
+- a missing [terminal group](appendix-a-glossary.md#terminal-group);
+- a surviving [orphaned](appendix-a-glossary.md#orphan) process.
+
+kiki may repair a projection automatically only when it can prove what the correct result is. Otherwise the thread enters `ProjectionDiverged`. It then waits for `kk repair` or another explicit human choice. See [projection divergence](appendix-a-glossary.md#projection-divergence).
+
+A broken projection does not erase the abilities kiki can still prove:
+
+- **Only the bookmark is bad.** Checkpoint, publish, close, and detach are blocked. Unambiguous workspace-head tracking and follows classification keep working.
+- **The terminal group or its `agent` role is missing, or a recorded process survives where none should.** kiki can still observe the head. Boundary mutation is blocked.
+- **The workspace's identity or path is ambiguous.** Only this case suspends both head observation and boundary mutation.
+
+An in-flight [lifecycle journal](appendix-a-glossary.md#lifecycle-journal) may own a temporary projection change. If so, that change fails or resumes the journal. It does not create a competing [state machine](https://en.wikipedia.org/wiki/Finite-state_machine).
 
 ## Lifecycle work is recoverable
 
-Creating, closing, reopening, repairing, and destroying a thread each touch SQLite, jj, the filesystem, the terminal runtime, and a harness process. These operations are durable sagas — multi-step jobs that record their progress as they go — not atomic transactions across systems. If a step crashes, or a compensating cleanup step fails, kiki must leave behind a persisted journal and an honest lifecycle state. Restart recovery or an explicit command can then continue from that record. A reopened thread stays `Closed` until the replacement incarnation's ready handshake commits. No recovery path may leave a thread that looks `Active` after its managed agent and terminal group were already destroyed.
+Creating, closing, reopening, repairing, and destroying a thread each touch five systems: [SQLite](https://www.sqlite.org/), jj, the filesystem, the terminal runtime, and a [harness](appendix-a-glossary.md#harness) process. No single [transaction](https://en.wikipedia.org/wiki/Database_transaction) can cover all five.
+
+These operations are therefore durable [sagas](appendix-a-glossary.md#saga). A saga is a multi-step job that records its progress as it goes. It is not an atomic transaction across systems.
+
+- If a step crashes, or a [compensating](appendix-a-glossary.md#compensation) cleanup step fails, kiki must leave behind a persisted journal and an honest lifecycle state.
+- Restart recovery or an explicit command can then continue from that record.
+- A reopened thread stays `Closed` until the replacement [incarnation's](appendix-a-glossary.md#incarnation) [ready handshake](appendix-a-glossary.md#ready-handshake) commits.
+- No recovery path may leave a thread that looks `Active` after its managed agent and [terminal group](appendix-a-glossary.md#terminal-group) were already destroyed.
 
 ## The terminal runtime is a projection, not an authority
 
-Kiki hosts each thread's terminals in a terminal group on a dedicated Herdr server (see [Terminal runtime](13-architecture/terminal-runtime.md)). Herdr is the terminal's owner and never the thread's. Five consequences hold everywhere:
+Kiki hosts each thread's terminals in a [terminal group](appendix-a-glossary.md#terminal-group) on a [dedicated Herdr server](appendix-a-glossary.md#dedicated-herdr-server) (see [Terminal runtime](13-architecture/terminal-runtime.md)). [Herdr](https://github.com/herdrdev/herdr) is a [terminal multiplexer](https://en.wikipedia.org/wiki/Terminal_multiplexer): a program that runs and arranges many terminals. Herdr is the terminal's owner and never the thread's. Five consequences hold everywhere.
 
-- **Identities stay separate.** `thread_id`, the server instance, the terminal binding, Herdr's workspace, tab, and pane ids, a pane's role, an OS process identity, and a harness incarnation are distinct recorded facts. A Herdr id is a locator valid only within one server instance. Restored or recurring ids, labels, working directories, metadata tokens, and pane placement never bind a thread, authorize a mutation, or prove that files are safe to delete.
-- **A runtime reply is not an outcome.** A successful create, layout, input, focus, or close reply proves that Herdr accepted a request. Readiness is proved only by the launch gate and ready handshake. Delivery is proved only by the cascade protocol. Process exit is proved only by `ProcessSupervisor` against OS process identities. Screen idleness, Herdr's agent detection, `agent.wait`, queued terminal input, and asynchronous plugin hooks prove none of these.
-- **Restore is reconciliation.** A restored layout is a set of empty containers. Kiki never adopts or reuses one. Kiki, not the runtime, issues each incarnation's credential, launch settings, gate, and handshake. Automatic agent resume by the runtime is disabled. Kiki distinguishes client reconnect, pane exit, cold restore, and live handoff, and none of them can make a thread `Active`.
-- **Absence from the terminal is not absence from the machine.** A process can outlive its pane, its terminal group, and the terminal server, under any terminal host. Kiki scans for surviving recorded processes before it starts a replacement agent, and for every holder of the workspace before it deletes one. It ends processes itself, by verified identity, before it asks the terminal to close anything, and it rechecks the files afterwards. An unknown writer, an unstable process set, or drift after the final proof preserves the files.
-- **Navigation is caller-local.** `kk switch` moves the invoking viewer's terminal and no other. Kiki never substitutes a focus change that moves every attached client unless the user asked for exactly that by name.
+**Identities stay separate.**
 
-Herdr's events are bounded and its metadata is mutable and ephemeral. After any gap, kiki takes an authoritative snapshot, reconciles, and republishes. Kiki's journals and jj's operation history remain the durable record.
+- These are distinct recorded facts: `thread_id`, the [server instance](appendix-a-glossary.md#server-instance), the [terminal binding](appendix-a-glossary.md#terminal-binding), Herdr's workspace, tab, and pane ids, a pane's role, an OS [process identity](https://en.wikipedia.org/wiki/Process_identifier), and a harness [incarnation](appendix-a-glossary.md#runtime-agent-incarnation).
+- A Herdr id is a locator valid only within one server instance.
+- Restored or recurring ids, labels, working directories, [metadata tokens](appendix-a-glossary.md#sidebar-token), and pane placement never bind a thread. They never authorize a mutation. They never prove that files are safe to delete.
+
+**A runtime reply is not an outcome.**
+
+- A successful create, layout, input, focus, or close reply proves that Herdr accepted a request. It proves nothing more.
+- Readiness is proved only by the [launch gate](appendix-a-glossary.md#launch-gate) and [ready handshake](appendix-a-glossary.md#ready-handshake).
+- Delivery is proved only by the cascade protocol.
+- Process exit is proved only by [`ProcessSupervisor`](appendix-a-glossary.md#processsupervisor) against OS process identities.
+- Screen idleness, Herdr's agent detection, `agent.wait`, queued terminal input, and asynchronous plugin hooks prove none of these.
+
+**Restore is reconciliation.**
+
+- A restored layout is a set of empty containers. Kiki never adopts or reuses one. See [cold restore](appendix-a-glossary.md#cold-restore).
+- Kiki, not the runtime, issues each incarnation's credential, launch settings, gate, and handshake.
+- Automatic agent resume by the runtime is disabled.
+- Kiki distinguishes client reconnect, pane exit, cold restore, and live handoff. None of them can make a thread `Active`.
+
+**Absence from the terminal is not absence from the machine.**
+
+- A process can outlive its pane, its terminal group, and the terminal server. This is true under any terminal host.
+- Kiki scans for surviving recorded processes before it starts a replacement agent.
+- Kiki scans for every [holder](appendix-a-glossary.md#holder) of the workspace before it deletes one. A holder is a process that still has the workspace open.
+- Kiki ends processes itself, by verified identity, before it asks the terminal to close anything. It rechecks the files afterwards.
+- An unknown writer, an unstable process set, or drift after the [final proof](appendix-a-glossary.md#final-proof) preserves the files.
+
+**Navigation is caller-local.**
+
+- `kk switch` moves the invoking viewer's terminal and no other. See [caller-local focus](appendix-a-glossary.md#caller-local-focus).
+- Kiki never substitutes a focus change that moves every attached client unless the user asked for exactly that by name.
+
+Herdr's events are bounded, and its metadata is mutable and short-lived. After any gap, kiki takes an authoritative snapshot, reconciles, and republishes. Kiki's journals and jj's [operation history](https://docs.jj-vcs.dev/latest/operation-log/) remain the durable record.
 
 ## Workspaces are cooperative isolation
 
-Each thread gets its own workspace so threads do not trample each other's files during normal use. That isolation is cooperative, not security. It should not be documented, tested, or presented as filesystem security.
+Each [thread](appendix-a-glossary.md#thread) gets its own [workspace](appendix-a-glossary.md#workspace) so threads do not trample each other's files during normal use. That isolation is cooperative, not security. It should not be documented, tested, or presented as filesystem security.
 
-Any process running as the same user can read sibling workspaces, `~/.config/kiki`, and shared jj repository state. v1 accepts that fact. Credential scoping exists to shrink the blast radius of accidents, not to defeat an adversary who already has the user's privileges.
+Any process running as the same user can read sibling workspaces, `~/.config/kiki`, and shared jj repository state. v1 accepts that fact.
+
+Credential scoping exists to shrink the damage an accident can do. It does not exist to defeat an adversary who already has the user's privileges.
 
 ## Cascade materializes only at safe boundaries
 
-A cascade is how a change in a parent thread reaches the child threads that follow it. When a parent commit is rewritten, jj may immediately evolve the descendant commits in repository state on its own. kiki must not redundantly rebase history that jj already evolved. Instead, it records the exact transition — from the last synchronized base to the evolved base — and materializes the child's current jj state only at an agent boundary or at agent quiescence (a moment when the harness adapter proves the agent is idle; this is distinct from the process quiescence proof that close uses). It does not pin the child's working-copy commit as the target, because that commit may legitimately evolve again before the boundary.
+A cascade is how a change in a parent thread reaches the child threads that [follow](appendix-a-glossary.md#follows) it. See [cascade reconciliation](appendix-a-glossary.md#cascade-reconciliation). To [materialize](appendix-a-glossary.md#materialization) means to update a workspace's files on disk to match the commit jj already recorded for it.
 
-The other case is a head advance. When a parent's persisted live head advances by adding a new revision, and that exact new head is not already an ancestor of the child, kiki performs an explicit rebase of the child's owned stack at the same kind of safe boundary. In v1, an owned stack must be a provable single-parent chain from the synchronized base to the child's live head. If the topology is ambiguous, merged, or foreign, kiki stops and marks the thread `TopologyDiverged`. Waiting is acceptable: either reconciliation kind may wait for a safe boundary or for `kkd` (the kiki daemon) to become reachable. Two things are not acceptable: kiki must not materialize or explicitly rebase the managed workspace while its agent is mid-edit, and it must not silently drop pending reconciliation.
+### When jj has already rewritten the child
 
-This guarantee covers kiki-controlled mutations for the managed agent, and only those. A human may run `jj` directly in a stale child workspace and explicitly update it before kiki's boundary. Depending on the repository, that command may or may not record a new operation in the op-log (jj's operation log), and its success does not prove that edits were preserved, so kiki probes the workspace again at the next boundary instead of relying on watcher events alone. kiki is an ambient coordinator; it does not pretend direct human commands are gated.
+When a parent commit is rewritten, jj may immediately evolve the descendant commits in repository state on its own. kiki must not redundantly rebase history that jj already evolved. ([Rebase](https://git-scm.com/docs/git-rebase) means moving commits onto a new base.)
 
-kiki must not make unsnapshotted edits — file changes jj has not yet recorded — disappear from the visible working tree. Immediately before reconciliation, kiki proves the stale workspace is clean, or it hard-pauses and enters explicit recovery. Recovery runs outside the source workspace. It preserves and enumerates divergent successors, verifies where the edits landed, and resumes only after selecting a result that retains them or obtaining human direction.
+Instead, kiki does two things:
 
-Delivery rides on the harness's pre-tool boundary: the hook that fires before an agent's tool call runs. For every v1 adapter — Claude Code and Codex alike — kiki exclusively owns that boundary in the managed session, and it re-proves that exclusive ownership for every process incarnation. It must not race user-defined pre-tool handlers. A batch is the set of tool calls the harness dispatches together. If one tool in a dispatched batch triggers reconciliation, kiki durably binds `Block` and the complete batch identity before it changes the workspace. Every tool call in that batch is blocked. Batch completion establishes soft-delivery proof — evidence the payload reached the harness. Only a later model turn may acknowledge the payload. Another concurrent `PreToolUse` event from the same batch is never acknowledgement evidence.
+1. It records the exact transition, from the [last synchronized base](appendix-a-glossary.md#synchronized-base) to the evolved base.
+2. It materializes the child's current jj state only at an agent boundary or at [agent quiescence](appendix-a-glossary.md#agent-quiescence).
 
-What counts as a batch, and how its completion is proved, is an adapter/version proof. Claude Code dispatches tools in parallel, and its batch closes with an explicit completion signal. Codex dispatches tools serially, and that serial behavior is itself proven, so each Codex batch is a single tool call. A denied Codex call never runs and fires no post-tool event. The crash-surviving completion report is therefore the next turn-scoped hook event to arrive, and the serial proof shows that event cannot precede the blocked call's resolution. Codex acknowledgement requires one thing more: the harness session record must contain a byte-identical delivery receipt, because hook-side write evidence cannot prove the model received the payload rather than a substituted result. If a safe batch boundary cannot be proved, a replacement process receives the saved payload as its first startup message, and it must prove it processed that message before acknowledgement.
+Agent quiescence is a moment when the [harness](appendix-a-glossary.md#harness) adapter proves the agent is idle. This is distinct from the [process quiescence proof](appendix-a-glossary.md#process-quiescence-proof) that close uses.
+
+kiki does not pin the child's working-copy commit as the target. That commit may legitimately evolve again before the boundary.
+
+### When the parent's head advances
+
+The other case is a head advance. Suppose a parent's saved [live head](appendix-a-glossary.md#live-head) advances by adding a new revision, and that exact new head is not already an ancestor of the child. kiki then performs an explicit rebase of the child's [owned stack](appendix-a-glossary.md#owned-stack) at the same kind of [safe boundary](appendix-a-glossary.md#safe-boundary).
+
+In v1, an owned stack must be a provable single-parent chain from the synchronized base to the child's live head. If the topology (the shape of the commit graph) is ambiguous, merged, or foreign, kiki stops and marks the thread [`TopologyDiverged`](appendix-a-glossary.md#topologydiverged).
+
+Waiting is acceptable. Either reconciliation kind may wait for a safe boundary. Either may also wait for [`kkd`](appendix-a-glossary.md#kkd), the kiki [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>), to become reachable.
+
+Two things are not acceptable:
+
+- kiki must not materialize or explicitly rebase the managed workspace while its agent is mid-edit.
+- kiki must not silently drop pending reconciliation.
+
+### What the guarantee covers
+
+This guarantee covers kiki-controlled mutations for the managed agent, and only those. A human may run `jj` directly in a [stale](https://docs.jj-vcs.dev/latest/working-copy/) child workspace and explicitly update it before kiki's boundary.
+
+Depending on the repository, that command may or may not record a new operation in the op-log (jj's [operation log](https://docs.jj-vcs.dev/latest/operation-log/)). Its success also does not prove that edits were preserved. So kiki probes the workspace again at the next boundary instead of relying on watcher events alone.
+
+kiki is an [ambient coordinator](appendix-a-glossary.md#ambient-coordinator). It does not pretend direct human commands are gated.
+
+### Unsnapshotted edits must not vanish
+
+Unsnapshotted edits are file changes jj has not yet recorded. kiki must not make them disappear from the visible working tree.
+
+Immediately before reconciliation, kiki proves the stale workspace is clean. If it cannot, it [hard-pauses](appendix-a-glossary.md#hard-pause) and enters explicit recovery. Recovery follows these rules:
+
+- It runs outside the source workspace.
+- It preserves and lists [divergent](https://docs.jj-vcs.dev/latest/glossary/) successors.
+- It verifies where the edits landed.
+- It resumes only after selecting a result that retains the edits, or after obtaining human direction.
+
+See [`WorkspaceRecovery`](appendix-a-glossary.md#workspacerecovery).
+
+### Delivery at the pre-tool boundary
+
+Delivery rides on the harness's pre-tool boundary. That is the [hook](appendix-a-glossary.md#pretooluse) that fires before an agent's tool call runs.
+
+For every v1 adapter — [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [Codex](https://github.com/openai/codex) alike — kiki exclusively owns that boundary in the managed session. It re-proves that exclusive ownership for every process incarnation. It must not race user-defined pre-tool handlers.
+
+A batch is the set of tool calls the harness dispatches together. See [tool batch](appendix-a-glossary.md#tool-batch). The rules for a batch are:
+
+- If one tool in a dispatched batch triggers reconciliation, kiki durably binds `Block` and the complete batch identity before it changes the workspace.
+- Every tool call in that batch is blocked.
+- Batch completion establishes soft-delivery proof: evidence that the payload reached the harness. See [`SoftBatch` delivery proof](appendix-a-glossary.md#softbatch-delivery-proof).
+- Only a later [model turn](appendix-a-glossary.md#model-turn) may acknowledge the payload.
+- Another concurrent `PreToolUse` event from the same batch is never acknowledgement evidence.
+
+### Batches differ by harness
+
+What counts as a batch, and how its completion is proved, is an adapter/version proof.
+
+- **Claude Code** dispatches tools in parallel. Its batch closes with an explicit completion signal.
+- **Codex** dispatches tools serially, one at a time. That serial behavior is itself proven, so each Codex batch is a single tool call.
+
+A denied Codex call never runs and fires no post-tool event. The crash-surviving completion report is therefore the next turn-scoped hook event to arrive. The serial proof shows that this event cannot come before the blocked call's resolution.
+
+Codex acknowledgement requires one thing more. The harness session record must contain a byte-identical [delivery receipt](appendix-a-glossary.md#delivery-receipt). The reason is that hook-side write evidence cannot prove the model received the payload rather than a substituted result.
+
+If a safe batch boundary cannot be proved, a replacement process receives the saved payload as its first startup message. It must prove it processed that message before acknowledgement. See [`RestartStartup` delivery proof](appendix-a-glossary.md#restartstartup-delivery-proof).
 
 ## Cascade delivery is crash-safe
 
-Cascade delivery must be idempotent and crash-safe. Idempotent means running it twice has the same effect as running it once. The system should prefer a rare duplicate delivery over silently dropping a cascade. When optional transcript projection ships, it must remain idempotent too.
+[Cascade](appendix-a-glossary.md#cascade-reconciliation) delivery must be [idempotent](https://en.wikipedia.org/wiki/Idempotence) and crash-safe. Idempotent means running it twice has the same effect as running it once.
 
-The implementation therefore stores reconciliation state, the byte-stable delivery payload, acknowledgement, and recovery state on one durable `sync_intent`. It may derive UI state from those rows, but it must not maintain a second progress protocol that can disagree with them.
+The system should prefer a rare duplicate delivery over silently dropping a cascade. When optional [transcript](appendix-a-glossary.md#thread-transcript) projection ships, it must remain idempotent too.
+
+The implementation therefore stores four things on one durable [`sync_intent`](appendix-a-glossary.md#sync-intent): reconciliation state, the byte-stable delivery payload, acknowledgement, and recovery state. It may derive UI state from those rows. It must not maintain a second progress protocol that can disagree with them.
 
 ## Operation history is a DAG
 
-jj records every repository operation in a log. That history is a DAG — a directed acyclic graph, not a straight line. An operation may have multiple parents, and heads may temporarily diverge.
+jj records every repository operation in a log, the [operation log](https://docs.jj-vcs.dev/latest/operation-log/). That history is a DAG — a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph), not a straight line. An operation may have multiple parents, and heads may temporarily diverge. A head is an operation with nothing after it yet.
 
-Kiki observes that history without changing it. Most jj commands that look read-only snapshot the working copy, and any command that loads the repository without naming an operation merges divergent heads as a side effect. Every kiki read therefore names one exact operation id and ignores the working copy, and every bookmark, rebase, or other repository mutation names the exact head it builds on.
+### Kiki reads without changing
+
+Kiki observes that history without changing it. This takes care, for two reasons:
+
+- Most jj commands that look read-only [snapshot](https://docs.jj-vcs.dev/latest/working-copy/) the working copy. A snapshot records the current files into the working-copy commit.
+- Any command that loads the repository without naming an operation merges [divergent heads](https://docs.jj-vcs.dev/latest/technical/concurrency/) as a side effect.
+
+So kiki follows two rules:
+
+- Every kiki read names one exact operation id and ignores the working copy. See [pinned read](appendix-a-glossary.md#pinned-read).
+- Every bookmark, rebase, or other repository mutation names the exact head it builds on.
+
+### The commands that are not pinned
 
 A closed list of commands is not pinned that way:
 
-- the boundary snapshot and `jj workspace update-stale` in a managed workspace. Both act on a working copy. The boundary snapshot is a kiki-run snapshot of a managed workspace, taken at agent quiescence or a held harness boundary — or, for a harness that cannot prove quiescence, at a lifecycle preflight — so that a pinned head contains every tracked edit before a checkpoint that precedes deletion or publication;
-- deliberate integration of divergent operation heads, which is what kiki does when a step needs one view and there are several;
-- the human-invoked passthroughs: the body of `kk status`, and the overlay's diff preview for the caller's own thread. The `kk` CLI runs these in the caller's own workspace as an explicit human request, exactly as if the human had typed the jj command.
+- **The [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) and `jj workspace update-stale` in a managed workspace.** Both act on a working copy. The boundary snapshot is a kiki-run snapshot of a managed workspace. Kiki takes it at [agent quiescence](appendix-a-glossary.md#agent-quiescence) or a held harness boundary. For a harness that cannot prove quiescence, kiki may also take it at a lifecycle preflight. Its purpose is that a pinned head contains every tracked edit before a checkpoint that precedes deletion or publication.
+- **[Deliberate integration](appendix-a-glossary.md#deliberate-integration) of divergent operation heads.** This is what kiki does when a step needs one view and there are several.
+- **The human-invoked passthroughs.** These are the body of `kk status`, and the overlay's diff preview for the caller's own thread. The `kk` CLI runs these in the caller's own workspace as an explicit human request, exactly as if the human had typed the jj command.
 
-The working-copy commands run only under the thread's reconciliation or lifecycle lock, only after a frontier sample shows a single head, and are followed by a fresh sample. Integration runs under the same lock. Kiki attributes every operation any of these commands writes; one command can write more than one. The passthroughs are direct human jj use that happens to be spelled `kk`; `kkd` never runs them, and no background renderer, watcher, or polling path does.
+These commands run under strict conditions:
 
-Everything else is pinned, including the workspace-shaping commands. `jj workspace add` names the exact head it builds on and is the one pinned command that must not ignore the working copy, because its job is to write a new one. `jj workspace forget`, bookmark placement, rebase, abandon, and push name an exact head and ignore the working copy. A pinned mutation does not snapshot the human's own working copy. It can still leave two operation heads when another operation lands at the same moment, which is one more reason kiki treats several heads as normal.
+- The working-copy commands run only under the thread's reconciliation or lifecycle lock.
+- The working-copy commands run only after a frontier sample shows a single head. (The [operation frontier](appendix-a-glossary.md#operation-frontier) is the current set of operation heads.)
+- The working-copy commands are followed by a fresh sample.
+- Integration runs under the same lock.
+- Kiki attributes every operation any of these commands writes. One command can write more than one.
 
-With several heads, kiki evaluates each head's view or integrates them deliberately and attributes that operation; it never lets a status query do it by accident. Listing the complete set of heads without side effects has no supported jj interface yet, so the frontier sampler is a versioned adapter and a standing proof requirement. Restart catch-up therefore stores normalized parent edges and traverses every unprocessed ancestor reachable from the observed frontier, in topological order. A singular parent column, or a "last cursor to head" scan, is not an acceptable approximation, because either one can silently skip a workspace transition.
+The passthroughs are direct human jj use that happens to be spelled `kk`. `kkd` never runs them. No background renderer, watcher, or polling path runs them either.
+
+### Everything else is pinned
+
+Everything else is pinned, including the workspace-shaping commands:
+
+- `jj workspace add` names the exact head it builds on. It is the one pinned command that must not ignore the working copy, because its job is to write a new one.
+- `jj workspace forget`, bookmark placement, rebase, abandon, and push name an exact head and ignore the working copy.
+
+A pinned mutation does not snapshot the human's own working copy. It can still leave two operation heads when another operation lands at the same moment. That is one more reason kiki treats several heads as normal.
+
+### Working with several heads
+
+With several heads, kiki evaluates each head's view, or it integrates them deliberately and attributes that operation. It never lets a status query do it by accident.
+
+Listing the complete set of heads without side effects has no supported jj interface yet. So the [frontier sampler](appendix-a-glossary.md#frontier-sampler) is a versioned adapter and a standing proof requirement.
+
+Restart catch-up therefore stores normalized parent edges. It traverses every unprocessed ancestor reachable from the observed frontier, in [topological order](https://en.wikipedia.org/wiki/Topological_sorting) (parents before children).
+
+A singular parent column is not an acceptable approximation. Neither is a "last cursor to head" scan. Either one can silently skip a workspace transition.
 
 ## Human prose is owned by humans
 
-Revision descriptions, bookmark names, and PR descriptions that a human wrote must not be silently overwritten.
+Revision descriptions, [bookmark](appendix-a-glossary.md#bookmark) names, and [PR](https://docs.github.com/en/pull-requests) descriptions that a human wrote must not be silently overwritten.
 
 kiki may draft. kiki may refresh when explicitly asked. It must preserve deliberate user prose unless the user opts back into regeneration.
 
 ## Transcript storage and egress are explicit
 
-kiki stores thread transcripts locally. Transcripts must not feed externally visible artifacts such as PR descriptions, auto-describe output, or auto-renames. Some flows do send data out: a catch-up sent to a hosted harness, or a transcript-derived MCP result returned to a hosted model, may leave the machine for the configured provider. Before that happens, kiki must disclose the boundary and obtain a grant that is remembered, revocable, and bound to the thread, the provider, and the purpose.
+kiki stores [thread transcripts](appendix-a-glossary.md#thread-transcript) locally. Transcripts must not feed externally visible artifacts such as PR descriptions, [auto-describe](appendix-a-glossary.md#auto-describe) output, or auto-renames. See the [no-publication rule](appendix-a-glossary.md#no-publication-rule).
+
+Some flows do send data out. Egress means data leaving the machine. Two flows may leave the machine for the configured provider:
+
+- a catch-up sent to a hosted [harness](appendix-a-glossary.md#harness);
+- a transcript-derived [MCP](https://modelcontextprotocol.io/) result returned to a hosted model.
+
+Before that happens, kiki must disclose the boundary and obtain a grant. The grant is remembered, revocable, and bound to the thread, the provider, and the purpose.
 
 This is a confidentiality rule. Treat it accordingly.
 
 ## Authority is explicit
 
-Some daemon actions are high-stakes: destructive actions, cross-thread actions, sensitive reads, and externally visible actions. Each one requires a one-shot human approval bound to the method, target, arguments, and rendered plan, issued through a persisted begin/display/confirm exchange with an enrolled interactive `ApprovalPresenter`. A reusable Admin credential must not be loaded automatically by every `kk` subprocess, and it cannot replace confirmation for an operational call.
+Some daemon actions are high-stakes: destructive actions, cross-thread actions, sensitive reads, and externally visible actions. Each one requires a one-shot [human approval](appendix-a-glossary.md#human-approval). That approval:
 
-Thread-scoped credentials may operate on their own thread and may read the narrow same-repo summary surface. They must not read sibling transcripts, inspect sibling diffs, or mutate sibling threads.
+- is bound to the method, target, arguments, and rendered plan;
+- is issued through a persisted begin/display/confirm exchange with an enrolled interactive [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter).
+
+A reusable [Admin credential](appendix-a-glossary.md#bootstrap-admin-credential) must not be loaded automatically by every `kk` subprocess. It cannot replace confirmation for an operational call.
+
+[Thread-scoped credentials](appendix-a-glossary.md#threadscoped-credential) may operate on their own thread. They may also read the narrow same-repo summary surface (the [repo-summary read scope](appendix-a-glossary.md#repo-summary-read-scope)). They must not read sibling transcripts, inspect sibling diffs, or mutate sibling threads.
+
+See [Authority](04-authority.md) for the full model.
 
 ## State is distinguishable without color
 
 Every state kiki surfaces in any UI must be distinguishable without color. Glyphs and labels carry the signal. Color is an accelerator, never the only signal.
 
-kiki honors `NO_COLOR=1` by emitting no ANSI color sequences. The shared `LogRenderer` and `StatusRenderer` projections must produce monochrome-distinguishable output for every state in the cascade, agent, and lifecycle vocabularies.
+kiki honors [`NO_COLOR=1`](https://no-color.org/) by emitting no [ANSI color sequences](https://en.wikipedia.org/wiki/ANSI_escape_code). The shared [`LogRenderer` and `StatusRenderer`](appendix-a-glossary.md#logrenderer-statusrenderer) projections must produce monochrome-distinguishable output for every state in the cascade, agent, and lifecycle vocabularies.

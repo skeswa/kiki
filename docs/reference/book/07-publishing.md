@@ -1,15 +1,17 @@
 # Publishing
 
-`kk publish` publishes a thread to GitHub through `gh`, GitHub's official command-line tool. The flag surface lives in [Commands](09-commands.md#kk-publish); this chapter owns the behavior.
+`kk publish` publishes a [thread](appendix-a-glossary.md#thread) to GitHub through [`gh`](https://cli.github.com/), GitHub's official command-line tool. (A thread is kiki's unit of work: a themed sequence of revisions.) The flag surface lives in [Commands](09-commands.md#kk-publish); this chapter owns the behavior.
 
-Publishing is the moment local work becomes visible to reviewers. That boundary is why PR prose belongs to the human. It is also why the agent transcript is never used as input to template generation or to later AI drafting.
+Publishing is the moment local work becomes visible to reviewers. It opens a [pull request](https://docs.github.com/en/pull-requests) (PR), a request to merge a branch that others can review. That boundary is why PR prose belongs to the human. It is also why the agent [transcript](appendix-a-glossary.md#thread-transcript) is never used as input to template generation or to later AI drafting.
 
-Stack-aware publishing is the first v1.x workflow planned after the coordination acceptance slice (kiki's first shippable milestone). No acceptance-slice lifecycle or cascade operation requires `gh`, a GitHub account, or network access.
+Stack-aware publishing is the first [v1.x](appendix-a-glossary.md#v1-x-polish) workflow planned after the coordination [acceptance slice](appendix-a-glossary.md#acceptance-slice) (kiki's first shippable milestone). No acceptance-slice lifecycle or cascade operation requires `gh`, a GitHub account, or network access.
 
 ## Defaults
 
+This section lists what `kk publish` does when you give it no extra instructions. It also says how kiki makes sure it pushes exactly the commit the human approved.
+
 - PRs open as drafts by default. Opening one ready-for-review requires an explicit flag.
-- When a thread is stacked on a parent, its PR base — the branch the PR merges into — is the parent thread's branch.
+- When a thread is stacked on a parent, its PR base — the branch the PR merges into — is the parent thread's branch. (A thread is stacked on a parent when it [follows](appendix-a-glossary.md#follows) that parent thread.)
 - Unstacked, detached, or parentless threads use the repo default branch as the base.
 - If a parent is unpublished, `kk publish` publishes the unpublished ancestors first, top-down.
 - Each PR in a stack publish gets its own editor session, top-down.
@@ -22,11 +24,41 @@ Stack publish:
 
 Publishing is manual by default. Configurable eager modes may later push or open draft PRs automatically. Even then, exploratory threads should not become reviewer-facing merely because they exist.
 
-Before presenting the publish plan for approval, kiki takes the boundary snapshot under the same rule as close preflight, then pins the current operation view and the exact `thread_head_commit_id` — the commit at the thread's live head. It validates the v1 linear owned stack. It includes that head in the plan digest. After approval, and immediately before pushing, kiki proves the head is unchanged. It then checkpoints the thread bookmark to the checkpoint target for that head: the head itself, or its parent when the head is the empty, undescribed working-copy commit jj leaves after `jj commit` (see [Threads](03-threads.md#thread-identity)). jj refuses to push an undescribed commit, and an empty one has nothing to publish. That checkpoint is an explicit placement: it records the placement and resets the expected bookmark target to the pushed commit. An unresolved bookmark projection issue (`BookmarkMissing`, `BookmarkMoved`, or `BookmarkConflicted`) blocks it, so kiki never pushes through a bookmark whose target it cannot explain. If the head has changed, the approval is invalid and kiki regenerates the plan. kiki never pushes whichever older commit the bookmark happened to retain.
+### Pinning the head before the push
+
+Before presenting the publish plan for approval, kiki does two things in order:
+
+1. It takes the [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) under the same rule as close preflight. The boundary snapshot records the workspace's tracked edits in [jj](https://docs.jj-vcs.dev/latest/), the version-control tool kiki drives.
+2. It then pins the current [operation](https://docs.jj-vcs.dev/latest/operation-log/) view and the exact `thread_head_commit_id` — the commit at the thread's [live head](appendix-a-glossary.md#live-head).
+
+It validates the v1 linear [owned stack](appendix-a-glossary.md#owned-stack). It includes that head in the [plan digest](appendix-a-glossary.md#plan-digest) (a [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the plan).
+
+After approval, and immediately before pushing, kiki proves the head is unchanged. It then checkpoints the thread [bookmark](appendix-a-glossary.md#bookmark) to the [checkpoint target](appendix-a-glossary.md#checkpoint-target) for that head. A bookmark is jj's named pointer to a revision. The checkpoint target is one of:
+
+- the head itself; or
+- the head's parent, when the head is the empty, undescribed working-copy commit jj leaves after `jj commit` (see [Threads](03-threads.md#thread-identity)).
+
+The second case exists because jj refuses to push an undescribed commit, and an empty one has nothing to publish.
+
+That checkpoint is an explicit placement (see [checkpoint placement](appendix-a-glossary.md#checkpoint-placement)). It records the placement and resets the [expected bookmark target](appendix-a-glossary.md#expected-bookmark-target) to the pushed commit.
+
+Two things stop the push:
+
+- An unresolved bookmark [projection issue](appendix-a-glossary.md#projection-issue) ([`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing), [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), or [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted)) blocks the checkpoint. So kiki never pushes through a bookmark whose target it cannot explain.
+- If the head has changed, the approval is invalid and kiki regenerates the plan.
+
+kiki never pushes whichever older commit the bookmark happened to retain.
 
 ## PR text
 
-The first publishing release opens a deterministic, human-editable PR title/body template. The template is built from explicit command input and non-transcript thread metadata. It performs no model call. AI drafting is deferred; it ships with the metadata execution loop. Once it ships, it may draft from the diff and publishable thread metadata, and only after explicit invocation.
+This section says where the PR's title and body come from, and who owns them afterward. The short version: kiki fills in a plain template, and after that the words belong to the human.
+
+The first publishing release opens a deterministic, human-editable PR title/body template. Deterministic means the same input always gives the same text.
+
+- The template is built from explicit command input and non-transcript thread metadata.
+- It performs no model call.
+
+AI drafting is deferred; it ships with the metadata execution loop (see [Metadata Evolution](08-metadata.md)). Once it ships, it may draft from the diff and publishable thread metadata, and only after explicit invocation.
 
 The transcript is never input to PR drafting.
 
@@ -34,16 +66,38 @@ After PR creation, the title and body are human territory. kiki does not silentl
 
 ## GitHub events
 
-Polling, comments, CI presentation, and automatic merge handling are later v1.x work, after manual publishing.
+After a PR exists, things happen to it on GitHub: it gets merged, closed, tested, or commented on. This section says how kiki will react to each event, and how publishing is authenticated and approved.
 
-- merged PR: kiki notifies and updates thread/PR state. Still later, auto-archive may propose closing the merged thread: a toast whose `review` action opens the ordinary close approval card. Auto-archive never closes a thread by itself; a close always consumes a one-shot approval.
-- closed without merge: kiki notifies only.
-- CI state change: kiki notifies only.
-- review comment: kiki exposes it read-only through `kk thread comments`.
-- external force-push: someone rewrote the remote branch's history from outside kiki. kiki marks remote divergence and requires explicit reconciliation.
+Polling, comments, [CI](https://en.wikipedia.org/wiki/Continuous_integration) (continuous integration, automated checks on each change) presentation, and automatic merge handling are later v1.x work, after manual publishing.
 
-The first publishing release uses `gh` as the GitHub backend. The architecture keeps this behind a `GitHubBackend` trait — a swappable interface — so a direct REST or GraphQL backend can replace it later.
+- **Merged PR:** kiki notifies and updates thread/PR state. Still later, auto-archive may propose closing the merged thread: a toast whose `review` action opens the ordinary close approval card. (A toast is a small pop-up notice.) Auto-archive never closes a thread by itself; a close always consumes a one-shot approval.
+- **Closed without merge:** kiki notifies only.
+- **CI state change:** kiki notifies only.
+- **Review comment:** kiki exposes it read-only through `kk thread comments`.
+- **External force-push:** someone rewrote the remote branch's history from outside kiki. kiki marks remote divergence and requires explicit reconciliation.
 
-kiki reuses the `gh` authentication already on the user's machine. `kk init` never requires or validates it. `kk publish` performs the required repository and authentication preflight immediately before making remote changes. `kk doctor --github` offers the same check without publishing. kiki does not introduce separate GitHub credentials in v1.x.
+### Backend and authentication
 
-Publishing is externally visible, so it always uses the two-phase foreground flow: kiki presents a plan, and pushes only after the human approves that exact plan. `BeginApproval` returns the exact thread heads, checkpoints, resolved remotes/bases, PR text hashes, operation, and security-relevant flags for the presenter to show. An approval covers one PR or one stack plan. It cannot authorize a later refresh, force-push, comment, changed text, or different stack. Non-interactive publishing is unavailable in v1.x unless the authority model is explicitly revised.
+The first publishing release uses `gh` as the GitHub backend. The architecture keeps this behind a `GitHubBackend` [trait](https://doc.rust-lang.org/book/ch10-02-traits.html) — a swappable interface — so a direct REST or GraphQL backend can replace it later.
+
+kiki reuses the `gh` authentication already on the user's machine.
+
+- `kk init` never requires or validates it.
+- `kk publish` performs the required repository and authentication preflight immediately before making remote changes.
+- `kk doctor --github` offers the same check without publishing.
+- kiki does not introduce separate GitHub credentials in v1.x.
+
+### Approval
+
+Publishing is externally visible, so it always uses the two-phase foreground flow: kiki presents a plan, and pushes only after the human approves that exact plan (see [human approval](appendix-a-glossary.md#human-approval)).
+
+`BeginApproval` returns these items for the presenter to show:
+
+- the exact thread heads;
+- checkpoints;
+- resolved remotes/bases;
+- PR text hashes;
+- the operation; and
+- security-relevant flags.
+
+An approval covers one PR or one stack plan. It cannot authorize a later refresh, force-push, comment, changed text, or different stack. Non-interactive publishing is unavailable in v1.x unless the authority model is explicitly revised.

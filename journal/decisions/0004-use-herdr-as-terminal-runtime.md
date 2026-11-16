@@ -8,31 +8,42 @@
 
 ## Decision
 
-Herdr is kiki's terminal runtime. Kiki runs one dedicated, named Herdr server per
-user, separate from the user's default Herdr server in process, socket, saved
-session, and configuration file. `kkd` alone starts it, under the user's
-service manager. Each thread gets one Herdr
-workspace, called a terminal group, with role panes for the managed agent, the
-human shell, and an optional kiki UI.
+[Herdr](https://github.com/herdrdev/herdr) is kiki's terminal runtime: the
+[terminal multiplexer](https://en.wikipedia.org/wiki/Terminal_multiplexer) that runs and keeps alive the terminals kiki
+uses. Kiki runs one [dedicated](../../docs/reference/book/appendix-a-glossary.md#dedicated-herdr-server), named Herdr server
+per user. It is separate from the user's default Herdr server in process,
+socket, saved session, and configuration file. [`kkd`](../../docs/reference/book/appendix-a-glossary.md#kkd), kiki's
+background [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>), alone starts it, under the user's service
+manager. Each [thread](../../docs/reference/book/appendix-a-glossary.md#thread) gets one Herdr workspace, called a
+[terminal group](../../docs/reference/book/appendix-a-glossary.md#terminal-group). It has [role panes](../../docs/reference/book/appendix-a-glossary.md#role-pane) for the
+managed agent, the human shell, and an optional kiki UI.
 
-`kkd` stays a separate coordinator. It owns thread identity, SQLite, jj
-workspace creation and deletion, follows, journals, approvals, harness launch
-and delivery, and OS process proofs. Herdr owns PTYs, layout, input, rendering,
-and its native sidebar. Kiki integrates through Herdr's executable, JSON socket
-API, configuration, and plugin facilities. It does not fork Herdr, and it never
-uses Herdr's Git worktree methods.
+`kkd` stays a separate coordinator. The split of ownership is:
 
-`kk switch` stays caller-local. Kiki requires an upstream client-targeted focus
-extension instead of adopting Herdr's broadcast focus.
+- `kkd` owns thread identity, [SQLite](https://www.sqlite.org/), [jj](https://docs.jj-vcs.dev/latest/)
+  [workspace](../../docs/reference/book/appendix-a-glossary.md#workspace) creation and deletion, [follows](../../docs/reference/book/appendix-a-glossary.md#follows),
+  journals, approvals, [harness](../../docs/reference/book/appendix-a-glossary.md#harness) launch and delivery, and OS
+  process proofs.
+- Herdr owns [PTYs](https://en.wikipedia.org/wiki/Pseudoterminal), layout, input, rendering, and its native sidebar.
+
+Kiki integrates through Herdr's executable, JSON socket API, configuration,
+and plugin facilities. It does not fork Herdr, and it never uses Herdr's
+[Git worktree](https://git-scm.com/docs/git-worktree) methods.
+
+`kk switch` stays [caller-local](../../docs/reference/book/appendix-a-glossary.md#caller-local-focus): it moves only the
+viewer who ran it. Kiki requires an upstream client-targeted focus extension
+instead of adopting Herdr's broadcast focus.
 
 ## Why
 
-The 2026-10-30 investigations showed Herdr can host a jj workspace through its
-plain workspace and layout methods, launch a direct argv command with explicit
-cwd and env, and survive client detach. Its integrated agent workspace UI is the
-product reason to adopt it. The same evidence showed what it does not provide:
-idempotent provisioning, a public server identity, caller-targeted focus,
-durable metadata, a managed restore, or proof that processes exited. Tmux
+The 2026-10-30 investigations showed three things. Herdr can host a jj
+workspace through its plain workspace and layout methods. It can launch a
+direct argv command with explicit cwd and env. It survives client detach. Its
+integrated agent workspace UI is the product reason to adopt it.
+
+The same evidence showed what it does not provide: [idempotent](https://en.wikipedia.org/wiki/Idempotence)
+provisioning, a public server identity, caller-targeted focus, durable
+metadata, a managed restore, or proof that processes exited. [Tmux](https://github.com/tmux/tmux)
 provides none of those proofs either, and the orphan-writer behavior was
 reproduced under both. Those gaps are therefore kiki adapter contracts, not
 reasons to keep tmux. The 2026-11-16 revalidation against Herdr commit
@@ -40,12 +51,16 @@ reasons to keep tmux. The 2026-11-16 revalidation against Herdr commit
 
 Adoption is a contract change, not a validation claim. The Herdr-backed
 acceptance gate is unproven, and one part of it depends on an upstream change:
-client-targeted focus. Two adversarial reviews on 2026-11-16 corrected earlier
-wording: Herdr's macOS terminal-quit fix covers only servers Herdr spawns
-itself, so kiki places `kkd` and the server under the service manager instead
-of requiring a Herdr release; and Herdr cannot relocate its state without
-leaking environment into panes, so isolation is by session name and
-configuration file, not by directory.
+client-targeted focus.
+
+Two adversarial reviews on 2026-11-16 corrected earlier wording:
+
+- Herdr's macOS terminal-quit fix covers only servers Herdr spawns itself. So
+  kiki places `kkd` and the server under the service manager instead of
+  requiring a Herdr release.
+- Herdr cannot relocate its state without leaking
+  [environment](https://en.wikipedia.org/wiki/Environment_variable) into panes. So isolation is by session name and
+  configuration file, not by directory.
 
 ## Alternatives and consequences
 
@@ -59,9 +74,10 @@ configuration file, not by directory.
   that the process boundary is insufficient. Revisit if the required extensions
   cannot land upstream.
 
-Direct `tmux` use is no longer part of the ambient-coordinator promise; direct
-`jj`, `gh`, and native Herdr use are. Kiki takes on a version-pinned dependency
-and a small set of upstream requests.
+Direct `tmux` use is no longer part of the
+[ambient-coordinator](../../docs/reference/book/appendix-a-glossary.md#ambient-coordinator) promise; direct `jj`, `gh`, and
+native Herdr use are. Kiki takes on a version-pinned dependency and a small
+set of upstream requests.
 
 ## Links
 

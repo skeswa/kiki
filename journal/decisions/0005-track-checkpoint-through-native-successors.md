@@ -8,44 +8,53 @@
 
 ## Decision
 
+A [bookmark](../../docs/reference/book/appendix-a-glossary.md#bookmark) is [jj](https://docs.jj-vcs.dev/latest/)'s named pointer to a commit. Each kiki
+[thread](../../docs/reference/book/appendix-a-glossary.md#thread) has one, used as a checkpoint: a saved point to reopen or
+publish from.
+
 The checkpoint bookmark stays a checkpoint. Kiki still _places_ it only at
-explicit checkpoints, and it is still never the live head or a follows target.
-What changes is the expected target between placements. Kiki keeps four facts
-apart:
+explicit checkpoints, and it is still never the [live head](../../docs/reference/book/appendix-a-glossary.md#live-head) or a
+[follows](../../docs/reference/book/appendix-a-glossary.md#follows) target. What changes is the
+[expected target](../../docs/reference/book/appendix-a-glossary.md#expected-bookmark-target) between placements. Kiki keeps
+four facts apart:
 
 1. **Placement history.** Each explicit checkpoint appends an immutable row:
    the exact commit, change, and operation where kiki put the bookmark.
-2. **Native successor tracking.** When jj itself carries the bookmark to a
-   rewrite successor of the expected commit, and the operation's predecessor
-   record proves it, kiki advances the expected target and appends a succession
-   row. No issue is raised.
-3. **External movement.** Any other change of target — a different unrelated
-   commit, a conflicted bookmark, divergent successors, deletion, or a move
-   without predecessor evidence — is a projection issue for `kk repair`.
+2. **[Native successor](../../docs/reference/book/appendix-a-glossary.md#native-successor) tracking.** Sometimes jj itself
+   carries the bookmark to a rewrite successor of the expected commit. When
+   the operation's predecessor record proves that, kiki advances the expected
+   target and appends a succession row. No issue is raised.
+3. **External movement.** Any other change of target is a
+   [projection](../../docs/reference/book/appendix-a-glossary.md#projection-divergence) issue for `kk repair`. That covers a
+   different unrelated commit, a conflicted bookmark, divergent successors,
+   deletion, or a move without predecessor evidence.
 4. **Head advance.** `jj new` or `jj commit` moves `@` and leaves the bookmark
    behind. That is an ordinary relationship, not an issue.
 
-Three refinements followed from probes on jj 0.46.0 the same day. `jj undo` of
-a tracked succession pops the expected target back instead of raising an
-issue. A `jj bookmark rename` proven in one local operation is normalized, not
-reported as a deletion. And a checkpoint targets the live head or, when that
-head is the empty commit jj leaves after `jj commit`, its parent; it refuses
-to move the bookmark backward or sideways, and the relationship vocabulary is
-`current | behind | ahead | diverged`.
+Three refinements followed from probes on jj 0.46.0 the same day:
 
-For an active thread, a successor in a different change (the result of
-`jj split` or of squashing the bookmarked commit into its parent) is accepted
-only when it is the live head or lies on the validated owned chain. For a
-closed thread only a same-change successor is accepted, and the archived head
-advances with it.
+- `jj undo` of a tracked succession pops the expected target back instead of
+  raising an issue.
+- A `jj bookmark rename` proven in one local operation is normalized, not
+  reported as a deletion.
+- A checkpoint targets the live head or, when that head is the empty commit jj
+  leaves after `jj commit`, its parent. It refuses to move the bookmark
+  backward or sideways. The relationship vocabulary is
+  `current | behind | ahead | diverged`.
+
+For an active thread, a successor in a different change is accepted only when
+it is the live head or lies on the validated [owned chain](../../docs/reference/book/appendix-a-glossary.md#owned-stack).
+Such a successor is the result of `jj split` or of squashing the bookmarked
+commit into its parent. For a closed thread only a same-change successor is
+accepted, and the archived head advances with it.
 
 ## Why
 
 jj bookmarks follow rewrites. The first ordinary edit after `kk new` snapshots
 the working copy, rewrites the checkpointed commit, and moves the bookmark to
 its successor with no bookmark command. Under the earlier fixed
-`checkpoint_commit_id` rule that was `BookmarkMoved`, so every thread would have
-entered repair on its first edit, and every closed thread on any ancestor
+`checkpoint_commit_id` rule that was `BookmarkMoved`. So every thread would
+have entered repair on its first edit, and every closed thread on any ancestor
 rewrite. Reproduced on jj 0.44.0 and 0.46.0.
 
 ## Alternatives and consequences
