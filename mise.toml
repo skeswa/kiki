@@ -2,6 +2,7 @@
 # Pin formatters exactly; update them deliberately and run `mise run fmt`.
 [tools]
 bun = "1.3.5"
+jj = "0.46.0"
 # The npm Oxfmt backend needs Node, but not this repo's node_modules.
 node = "24.22.2"
 "npm:oxfmt" = "0.64.0"
@@ -10,6 +11,21 @@ taplo = "0.10.0"
 [tasks.setup]
 description = "Install the locked documentation dependencies"
 run = "bun install --frozen-lockfile"
+
+[tasks."vcs:init"]
+description = "Initialize colocated jj and apply repository-local VCS defaults"
+run = '''
+if [ ! -e .git ]; then
+  echo "vcs:init requires an existing Git checkout" >&2
+  exit 1
+fi
+if [ ! -d .jj ]; then
+  jj git init --colocate
+fi
+jj config set --repo snapshot.max-new-file-size 16MiB
+jj config set --repo 'revset-aliases."trunk()"' main@origin
+jj bookmark track main@origin
+'''
 
 [tasks.fmt]
 description = "Format handwritten TOML, code, and documentation"

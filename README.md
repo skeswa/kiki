@@ -48,6 +48,7 @@ The reference book is also a VitePress site. The site deploys to GitHub Pages fr
 
 ```sh
 mise install         # install the pinned tooling
+mise run vcs:init    # once per Git clone: initialize colocated jj
 mise run setup       # install locked documentation dependencies
 mise run dev         # local documentation server
 mise run fmt         # format handwritten code and docs
@@ -62,6 +63,11 @@ scripts delegate to those tasks. Formatting uses pinned Oxfmt and Taplo and
 works before installing the site's dependencies. Captured evidence and the
 dated research reports are excluded from automatic formatting. See
 [AGENTS.md](AGENTS.md) for the contributor workflow.
+
+Use `jj` for version control in the colocated checkout. GitHub remains the
+remote host; `main` tracks `main@origin`. Each logical change gets a described
+jj revision. The [VCS guidance](AGENTS.md#version-control) covers draft changes
+and the commands for an authorized commit or push.
 
 ## License
 

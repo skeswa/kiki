@@ -1,103 +1,22 @@
-# CLAUDE.md
+@AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Also read [AGENTS.md](AGENTS.md) for the shared journal and decision-recording workflow.
+# Claude Code guidance
 
-## Read this first
+[AGENTS.md](AGENTS.md) is the shared contributor guide and is imported above.
+It owns the repository context, reference-book reading order, and the
+Swingset-derived practices used by all agents:
 
-The canonical contract for what this repo is building lives in the reference book under `docs/reference/book/`. Start at `docs/reference/README.md` for navigation, then read in this order based on what you're doing:
+- **Journal and decisions:** follow the [journal workflow](AGENTS.md#keep-the-project-journal-current).
+  Record consequential choices, identify the actual decider, link reversals,
+  and keep the current reference chapters consistent with the choice.
+- **Scripts and tasks:** use `mise run <task>` from [mise.toml](mise.toml).
+  `mise run check` is the shared local and CI check; Bun scripts delegate to mise.
+- **Formatting:** use `mise run fmt` and `mise run fmt:check`, with exact tool
+  pins and the [evidence exclusions](AGENTS.md#formatting).
+- **Version control:** use [jj](AGENTS.md#version-control) for VCS operations,
+  keep logical changes in separate described drafts, and use non-interactive
+  commands. Finalize with `jj commit`, move `main`, or push only when asked.
 
-- For behavior questions (what does `kk x` do?): `docs/reference/book/02-invariants.md` first, then the relevant chapter in `docs/reference/book/`.
-- For structure questions (which crate, which sqlite table, which gRPC method?): `docs/reference/book/13-architecture/`.
-- For "why is it this way?": `journal/decisions/README.md` for the numbered decision log and links to earlier book rationale.
-- For investigations, supporting evidence, and reproduction tools: `journal/README.md`.
-- For deferred surfaces (v2 MCP substrate, etc.): `docs/reference/book/16-roadmap.md`.
-- For terminology: `docs/reference/book/appendix-a-glossary.md`.
-- For product intent and v1 scope: `docs/reference/book/00-abstract.md`, `docs/reference/book/01-orientation.md`, and `docs/reference/book/appendix-b-user-stories.md`.
-
-The original PRD has been folded into the reference book. Treat the book as the contract.
-
-If something in the code disagrees with the spec or architecture, that is a finding to surface, not silently align with.
-
-## What kiki is, in one paragraph
-
-kiki (binary `kk`) is a daemon-backed coordinator that ties jujutsu (jj), tmux, agent harnesses (Claude Code and Codex in v1), and eventually the GitHub CLI (`gh`) into a workflow for multi-threaded agentic coding. The atom is a **thread** — a themed sequence of jj revisions whose live head is its managed workspace's `@`; its bookmark is an explicit checkpoint/publication projection. Threads can follow other threads. A managed session reserves the pre-tool hook boundary exclusively for kiki, blocks the entire triggering tool batch during reconciliation (Claude Code's parallel batch; a proven-serial Codex version's single-call batch), and acknowledges delivery only from a later model turn. kiki remains an **ambient coordinator** for direct `jj`/`gh`/`tmux` operations, but ambiguous external projection changes fail loud into repair rather than being guessed through.
-
-The planned cargo workspace has four crates: `kiki-core` (library — shared types/traits/proto/migrations, no I/O), `kkd` (daemon binary), `kk` (CLI binary that also hosts the TUI as a subcommand), and `kk-hook` (harness hook sidecar). `kkd` is the gRPC server over `~/.config/kiki/kkd.sock`; local clients share that contract. State lives in `~/.config/kiki/state.db` (cross-repo registry) plus `~/.config/kiki/repos/<repo_id>/state.db` (per-repo runtime). Remote clients require a future transport and authentication contract rather than inheriting unix-socket assumptions.
-
-## Implementation-stack tension to be aware of
-
-The architecture decision is **Rust** for `kkd` and friends (`docs/reference/book/13-architecture/crates.md`). The repo is currently bootstrapped as a **Bun + TypeScript** project (`package.json`, `tsconfig.json`, `index.ts` placeholder). This is a real divergence pending the first real `kkd` commit. If you are about to write or modify implementation code, surface this to the user before picking a language — do not silently default to either side.
-
-## Common commands
-
-```bash
-mise install         # install pinned tools
-mise run setup       # install locked documentation dependencies
-mise run dev         # serve the documentation site
-mise run fmt         # format handwritten files with pinned Oxfmt and Taplo
-mise run fmt:check   # check formatting without writes
-mise run docs:links  # validate local Markdown links, anchors, and contract terms
-mise run check       # all current checks, including the production docs build
-```
-
-`mise.toml` is the authority for scripts and tasks; `package.json` contains
-compatibility aliases. Follow the formatting and evidence-preservation rules
-in [AGENTS.md](AGENTS.md#formatting). There is no application test runner,
-linter, or application build yet; add those tasks when implementation starts.
-
-## VCS
-
-This repo uses **jujutsu (jj) colocated with git**. Both `.jj/` and `.git/` exist; `git` operations work but `jj` is the primary interface. Conventions:
-
-- Use `jj describe -m '<message>'` for revision descriptions, where `<message>` is a one-line subject in imperative mood, a blank line, then a multi-paragraph body — match the style of recent commits. Build multi-line messages with real newlines (heredoc or ANSI-C quoting; see "Multi-line `-m` messages" below) — never `"subject\n\nbody"`, since `\n` doesn't expand inside double quotes.
-- The `main` bookmark is the trunk.
-- The repo uses GitHub (`origin git@github.com:skeswa/kiki.git`); pushes go via `jj git push` or `git push`.
-
-### One revision per individual change
-
-Land each individual change as its own jj revision, and describe every one. The idiomatic flow is `jj new` to start an empty change on top of the current revision, edit, then `jj describe -m '<message>'` once that change is coherent — or `jj commit -m '<message>'` as the shorthand for `describe + new`. Never leave the working copy parked on top of a previous revision and pile a second logical change into it; that produces the un-atomic "whoops, also fixed X" history that jj is designed to avoid.
-
-Concretely, when you're asked to make multiple changes in one turn:
-
-- Treat each logically distinct change (a refactor, a bugfix, a doc edit, a config tweak) as its own revision. If the diff would warrant a separate bullet in a PR description, it warrants its own revision.
-- Before starting the next change, run `jj new` (or `jj commit -m "..."` to describe-and-advance in one step) so the next edits land on a fresh empty revision rather than amending the prior one.
-- Always provide a description with `-m`. Match the imperative-subject + body style of recent commits — the body should explain _why_, not restate the diff. Never push or hand off an undescribed revision.
-- If you realize mid-edit that what you're doing is actually two changes, stop and split rather than describing it as one — see the non-interactive recipe below.
-
-> **Multi-line `-m` messages must use real newlines, not `\n`.** Backslash escapes do not expand inside `"..."` or `'...'`, so `-m "subject\n\nbody"` literally embeds the four characters `\n\n` in your description. Reliable bash forms (the Bash tool runs through bash, not the user's interactive fish):
->
-> - Heredoc via command substitution (preferred for multi-paragraph bodies):
->
->   ```bash
->   jj describe -m "$(cat <<'EOF'
->   subject line
->
->   first body paragraph
->
->   second body paragraph
->   EOF
->   )"
->   ```
->
-> - ANSI-C quoting for short two-paragraph cases: `jj describe -m $'subject\n\nbody'`.
->
-> Apply the same pattern to every `-m '<message>'` placeholder in the recipes below.
-
-### Agent-safe (non-interactive) jj recipes
-
-`jj split` and `jj squash` open an editor by default — never invoke them in their bare form from an agent session, or the command will hang. Use the explicit forms:
-
-- **Splitting by file paths:** `jj split <path>... -m '<message>'`. The original revision is replaced by a two-commit stack: a **first** (lower) commit containing the named paths, child of the original parent, with your `-m` description; and a **second** (upper) commit containing the remaining changes, child of the first, which keeps the original description. Descendants reattach to the second commit. If the original revision had a description and you omit `-m`, jj still pops an editor for the first commit's message, so always pass `-m`. Use `-p/--parallel` if you want the two halves to be siblings instead of stacked, or `-o`/`-A`/`-B` to extract the selected changes elsewhere while the rest stay in place.
-- **Squashing a working-copy change down into its parent:** `jj squash -r <rev> -m '<message>'`, or `jj squash --from <rev> --into <rev> -m '<message>'` for cross-revision moves. `-m` is required whenever both source and destination have non-empty descriptions, otherwise jj prompts for the combined message. Use `-u/--use-destination-message` instead of `-m` when you want to keep the destination's description verbatim.
-- **Squashing only specific paths:** add fileset arguments — `jj squash <path>... --from <rev> --into <rev> -m '<message>'`. Without paths and without `-i`, all changes move.
-- **Never pass `-i/--interactive`, `--tool`, or `--editor`** from an agent — those force the diff/message editor and will hang.
-
-Same principle applies to `jj describe` (use `-m`, never bare) and `jj commit` (use `-m`, never bare). Construct `<message>` with the heredoc or ANSI-C form above whenever it spans more than one line.
-
-## Codex stop-time review gate
-
-A stop-time Codex review gate is enabled for this repo (set up via `/codex-jj:setup --enable-review-gate`). Before stop, a fresh Codex review may be required. The plugin lives outside this repo at `/Users/skeswa/repos/skeswa/codex-plugin-cc`.
-
-## PRD and spec review precedent
-
-Spec changes in this repo are expected to survive a Codex review pass. The first PRD's review found three v1-scope contradictions (config layering, Codex harness, `kk reopen`), all resolved before the PRD was folded into the book. When editing the reference book, cross-check against `docs/reference/book/02-invariants.md` and neighboring chapters before publishing.
+Claude Code's Git-oriented tool hints do not change the jj workflow. Use
+`jj git fetch` and, when requested, `jj git push`; do not substitute Git write
+commands. Follow the shared implementation-stack and review guidance as well.
