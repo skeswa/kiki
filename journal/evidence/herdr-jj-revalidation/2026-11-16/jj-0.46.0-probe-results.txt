@@ -1,0 +1,1657 @@
+jj 0.46.0 revalidation, 2026-11-16. Binary: ~/.local/share/mise/installs/jj/0.46.0/jj
+Scripts: /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/probe/jj_semantics.py (unmodified copy), extra.sh, extra2.sh, extra3.sh
+Part 1 rerun output: /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/run046.json ; per-command log: /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/jj-experiment-k8ab4hc9/commands.json
+NOTE: extra.sh repos use 0.46 default git.colocate=true; extra2/extra3 use --no-colocate unless stated. In extra.sh section C the '--at-op=<id>' tries and section A7 split used a stale id / cwd-relative fileset and are superseded by extra2.sh (C2, A7).
+
+################ extra.sh ################
+$ jj --version
+    jj 0.46.0-7d382314f9420b4b8d932245b49c99492c812b9f
+    [exit 0]
+
+=================== A1 snapshot rewrite: bookmark on @ follows snapshot successor ===================
+$ jj -R a1 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> syzksnws/a745ae45 removed=[]
+    [exit 0]
+$ jj -R a1 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    syzksnws/a745ae45 wc= bm=[cp] div=false empty=false base
+    [exit 0]
+$ jj -R a1 status
+    Working copy changes:
+    A a1/f1
+    A a1/f2
+    Working copy  (@) : syzksnws e15c86c3 cp | base
+    Parent commit (@-): zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+$ jj -R a1 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> syzksnws/e15c86c3 removed=[]
+    [exit 0]
+$ jj -R a1 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    syzksnws/e15c86c3 wc= bm=[cp] div=false empty=false base
+    [exit 0]
+$ jj -R a1 evolog -G -r cp -T commit.commit_id().short(8) ++ " op=" ++ operation.id().short(8) ++ " preds=[" ++ predecessors.map(|c| c.commit_id().short(8)).join(",") ++ "] " ++ operation.description() ++ "\n"
+    e15c86c3 op=43a09a9f preds=[a745ae45] snapshot working copy
+    a745ae45 op=6fb2601e preds=[e238e9a5] describe commit e238e9a569b01dfac1689ea4193d77abbcc9a085
+    e238e9a5 op=9cf1b9c4 preds=[653ea363] snapshot working copy
+    653ea363 op=7345ced8 preds=[] add workspace 'default'
+    [exit 0]
+
+=================== A2 describe ===================
+$ jj -R a1 describe -m base described
+    Working copy  (@) now at: syzksnws fbe8c5b1 cp | base described
+    Parent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+$ jj -R a1 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> syzksnws/fbe8c5b1 removed=[]
+    [exit 0]
+$ jj -R a1 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    syzksnws/fbe8c5b1 wc= bm=[cp] div=false empty=false base described
+    [exit 0]
+
+=================== A3 jj new: bookmark stays behind ===================
+$ jj -R a1 new -m child
+    Working copy  (@) now at: krnlolqq cb45a5ac (empty) child
+    Parent commit (@-)      : syzksnws fbe8c5b1 cp | base described
+    [exit 0]
+$ jj -R a1 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> syzksnws/fbe8c5b1 removed=[]
+    [exit 0]
+$ jj -R a1 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    krnlolqq/cb45a5ac wc= bm=[] div=false empty=true child
+    syzksnws/fbe8c5b1 wc= bm=[cp] div=false empty=false base described
+    [exit 0]
+
+=================== A4a squash child(@) into bookmarked parent ===================
+$ jj -R a1 squash -u
+    Working copy  (@) now at: nyyzttwv 2df0b837 (empty) (no description set)
+    Parent commit (@-)      : syzksnws 75fb1cde cp | base described
+    [exit 0]
+$ jj -R a1 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> syzksnws/75fb1cde removed=[]
+    [exit 0]
+$ jj -R a1 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    nyyzttwv/2df0b837 wc= bm=[] div=false empty=true 
+    syzksnws/75fb1cde wc= bm=[cp] div=false empty=false base described
+    [exit 0]
+
+=================== A4b squash bookmarked @ into its parent (bookmark on source) ===================
+$ jj -R a4 new -m top
+    Working copy  (@) now at: ykopounk 221657ae (empty) top
+    Parent commit (@-)      : nlvkpqxx 2265f813 cp | base
+    [exit 0]
+$ jj -R a4 bookmark create topbm -r @
+    Created 1 bookmarks pointing to ykopounk ce4074f5 topbm | top
+    [exit 0]
+$ jj -R a4 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> nlvkpqxx/2265f813 removed=[]
+    topbm -> ykopounk/ce4074f5 removed=[]
+    [exit 0]
+$ jj -R a4 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    ykopounk/ce4074f5 wc= bm=[topbm] div=false empty=false top
+    nlvkpqxx/2265f813 wc= bm=[cp] div=false empty=false base
+    [exit 0]
+$ jj -R a4 squash -u
+    Working copy  (@) now at: loloovpu 34c03d9a (empty) (no description set)
+    Parent commit (@-)      : nlvkpqxx 72859ebf cp topbm | base
+    [exit 0]
+$ jj -R a4 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> nlvkpqxx/72859ebf removed=[]
+    topbm -> nlvkpqxx/72859ebf removed=[]
+    [exit 0]
+$ jj -R a4 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    loloovpu/34c03d9a wc= bm=[] div=false empty=true 
+    nlvkpqxx/72859ebf wc= bm=[cp topbm] div=false empty=false base
+    [exit 0]
+
+=================== A5 rebase bookmarked commit ===================
+$ jj -R a5 new root() -m other
+    Working copy  (@) now at: sstklsqq 5fd9ae41 (empty) other
+    Parent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)
+    Added 0 files, modified 0 files, removed 2 files
+    [exit 0]
+$ jj -R a5 rebase -r cp -d @
+    Rebased 1 commits to destination.
+    [exit 0]
+$ jj -R a5 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> utqxozvx/ffd9cc6e removed=[]
+    [exit 0]
+$ jj -R a5 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    utqxozvx/ffd9cc6e wc= bm=[cp] div=false empty=false base
+    sstklsqq/5fd9ae41 wc= bm=[] div=false empty=true other
+    [exit 0]
+
+=================== A6a abandon bookmarked commit (default) ===================
+$ jj -R a6 new -m top
+    Working copy  (@) now at: vonoqnkx 5eea38d7 (empty) top
+    Parent commit (@-)      : plvlkorr f61f29d8 cp | base
+    [exit 0]
+$ jj -R a6 abandon cp
+    Abandoned 1 commits:
+      plvlkorr f61f29d8 cp | base
+    Deleted bookmarks: cp
+    Rebased 1 descendant commits onto parents of abandoned commits.
+    Working copy  (@) now at: vonoqnkx bba8bba2 (empty) top
+    Parent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)
+    Added 0 files, modified 0 files, removed 2 files
+    [exit 0]
+$ jj -R a6 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    [exit 0]
+$ jj -R a6 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    vonoqnkx/bba8bba2 wc= bm=[] div=false empty=true top
+    [exit 0]
+
+=================== A6b abandon --retain-bookmarks ===================
+$ jj -R a6b new -m top
+    Working copy  (@) now at: lzkqnvss 779408a4 (empty) top
+    Parent commit (@-)      : ylzrzpkn 3616fc90 cp | base
+    [exit 0]
+$ jj -R a6b abandon --retain-bookmarks cp
+    Abandoned 1 commits:
+      ylzrzpkn 3616fc90 cp | base
+    Rebased 1 descendant commits onto parents of abandoned commits.
+    Warning: Failed to export some bookmarks:
+      cp@git: Ref cannot point to the root commit in Git
+    Working copy  (@) now at: lzkqnvss cf636681 (empty) top
+    Parent commit (@-)      : zzzzzzzz 00000000 cp* | (empty) (no description set)
+    Added 0 files, modified 0 files, removed 2 files
+    [exit 0]
+$ jj -R a6b --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> zzzzzzzz/00000000 removed=[]
+    cp -> ylzrzpkn/3616fc90 removed=[]
+    [exit 0]
+$ jj -R a6b --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    lzkqnvss/cf636681 wc= bm=[] div=false empty=true top
+    [exit 0]
+
+=================== A6c abandon bookmarked @ working copy commit itself (default) ===================
+$ jj -R a6c abandon @
+    Abandoned 1 commits:
+      lmvkkxnp 43c50284 cp | base
+    Deleted bookmarks: cp
+    Working copy  (@) now at: vooovtyq 0b30db55 (empty) (no description set)
+    Parent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)
+    Added 0 files, modified 0 files, removed 2 files
+    [exit 0]
+$ jj -R a6c --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    [exit 0]
+$ jj -R a6c --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    vooovtyq/0b30db55 wc= bm=[] div=false empty=true 
+    [exit 0]
+
+=================== A7 split bookmarked @ ===================
+$ jj -R a7 split -m first half f1
+    Error: Failed to parse fileset: Invalid file pattern
+    Caused by:
+    1:  --> 1:1
+      |
+    1 | f1
+      | ^^
+      |
+      = Invalid file pattern
+    2: Path "f1" is not in the repo "a7"
+    3: Invalid component ".." in repo-relative path "../f1"
+    Hint: Consider using root:"f1" to specify repo-relative path
+    [exit 1]
+$ jj -R a7 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> okowvvtm/a00fe48c removed=[]
+    [exit 0]
+$ jj -R a7 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    okowvvtm/a00fe48c wc= bm=[cp] div=false empty=false base
+    [exit 0]
+
+=================== A7b split bookmarked non-@ commit ===================
+$ jj -R a7b new -m top
+    Working copy  (@) now at: wlpnppnn 192c36aa (empty) top
+    Parent commit (@-)      : stwopvwx 7c18029c cp | base
+    [exit 0]
+$ jj -R a7b split -r cp -m first half f1
+    Error: Failed to parse fileset: Invalid file pattern
+    Caused by:
+    1:  --> 1:1
+      |
+    1 | f1
+      | ^^
+      |
+      = Invalid file pattern
+    2: Path "f1" is not in the repo "a7b"
+    3: Invalid component ".." in repo-relative path "../f1"
+    Hint: Consider using root:"f1" to specify repo-relative path
+    [exit 1]
+$ jj -R a7b --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> stwopvwx/7c18029c removed=[]
+    [exit 0]
+$ jj -R a7b --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    wlpnppnn/192c36aa wc= bm=[] div=false empty=true top
+    stwopvwx/7c18029c wc= bm=[cp] div=false empty=false base
+    [exit 0]
+
+=================== A8 divergence: two visible successors of bookmarked commit via concurrent ops ===================
+$ jj -R a8 new -m top
+    Working copy  (@) now at: kqusmnss 2b798678 (empty) top
+    Parent commit (@-)      : kmxqrvzo f59f9826 cp | base
+    [exit 0]
+$ jj -R a8 --at-op=501a6c8912487642f9653f67e481a141ab99106eb576e18aa85d4384b82604a491c18d1f2cbc3f69dcdf4313a4b2823d18c08440a5ce35b96ba869f8ce56663a describe -r cp -m left
+    Rebased 1 descendant commits.
+    [exit 0]
+$ jj -R a8 --at-op=501a6c8912487642f9653f67e481a141ab99106eb576e18aa85d4384b82604a491c18d1f2cbc3f69dcdf4313a4b2823d18c08440a5ce35b96ba869f8ce56663a describe -r cp -m right
+    Rebased 1 descendant commits.
+    Warning: Failed to update Git HEAD ref
+    Caused by:
+    1: Could not prepare reference edit, "reference"="HEAD", "referent"="HEAD"
+    2: Expected reference content f59f98264896652912f21a180f55f46e4465df90
+    Warning: Failed to export some bookmarks:
+      cp@git: Failed to set: Could not prepare reference edit, "reference"="refs/heads/cp", "referent"="refs/heads/cp": Expected reference content f59f98264896652912f21a180f55f46e4465df90
+    Hint: Git doesn't allow a branch/tag name that looks like a parent directory of
+    another (e.g. `foo` and `foo/bar`). Try to rename the bookmarks/tags that failed
+    to export or their "parent" bookmarks/tags.
+    [exit 0]
+    op_heads(a8): 85edaf73ef34 97e98cc08f78 
+$ jj -R a8 --ignore-working-copy op log -G -n3 -T id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    Concurrent modification detected, resolving automatically.
+    9d58e027 parents=97e98cc0,85edaf73 reconcile divergent operations
+    97e98cc0 parents=501a6c89 describe commit f59f98264896652912f21a180f55f46e4465df90
+    85edaf73 parents=501a6c89 describe commit f59f98264896652912f21a180f55f46e4465df90
+    [exit 0]
+    op_heads(a8): 9d58e0271806 
+$ jj -R a8 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> CONFLICTED kmxqrvzo/8bfdeb5b,kmxqrvzo/08b600d8 removed=[f59f9826]
+    cp -> kmxqrvzo/8bfdeb5b removed=[]
+    Hint: Some bookmarks have conflicts. Use `jj bookmark set <name> -r <rev>` to resolve.
+    [exit 0]
+$ jj -R a8 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    kqusmnss/9f144cbb wc= bm=[] div=true empty=true top
+    kmxqrvzo/08b600d8 wc= bm=[cp??] div=true empty=false right
+    kqusmnss/2b966b6a wc= bm=[] div=true empty=true top
+    kmxqrvzo/8bfdeb5b wc= bm=[cp?? cp@git] div=true empty=false left
+    [exit 0]
+$ jj -R a8 --ignore-working-copy log -G -r cp -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    Error: Name `cp` is conflicted
+    Hint: Use commit ID to select single revision from: 8bfdeb5ba16f, 08b600d8a15e
+    Hint: Use `bookmarks(cp)` to select all revisions
+    Hint: To set which revision the bookmark points to, run `jj bookmark set cp -r <REVISION>`
+    [exit 1]
+$ jj -R a8 --ignore-working-copy log -G -r bookmarks(cp) -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    kmxqrvzo/08b600d8 wc= bm=[cp??] div=true empty=false right
+    kmxqrvzo/8bfdeb5b wc= bm=[cp?? cp@git] div=true empty=false left
+    [exit 0]
+
+=================== A9 bookmark set backwards/sideways/delete are plain ops ===================
+$ jj -R a9 new -m top
+    Working copy  (@) now at: nmoskqvp eafc6032 (empty) top
+    Parent commit (@-)      : wnslxpvt c4dcc0af cp | base
+    [exit 0]
+$ jj -R a9 bookmark move cp --to @
+    Moved 1 bookmarks to nmoskqvp eafc6032 cp* | (empty) top
+    [exit 0]
+$ jj -R a9 bookmark delete cp
+    Deleted 1 bookmarks.
+    [exit 0]
+$ jj -R a9 --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    [exit 0]
+$ jj -R a9 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    nmoskqvp/eafc6032 wc= bm=[] div=false empty=true top
+    wnslxpvt/c4dcc0af wc= bm=[] div=false empty=false base
+    [exit 0]
+$ jj -R a9 op log -G -n3 -T id.short(8) ++ " " ++ description ++ "\n"
+    375ab66d delete bookmark cp
+    1cd2d8e9 point bookmark cp to commit eafc6032fc58628f2b800fc6d96e3a12200a6315
+    4cd7fba8 new empty commit
+    [exit 0]
+
+=================== B dirty update-stale with bookmark on CHILD workspace @ ===================
+$ jj -R b-parent workspace add --name child -r @ /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/b-child
+    Created Git worktree for the new workspace.
+    Created workspace in "b-child"
+    Working copy  (@) now at: wkzrpslq 33555eab (empty) (no description set)
+    Parent commit (@-)      : supzzwpm e8b6d866 parent
+    Added 1 files, modified 0 files, removed 0 files
+    [exit 0]
+$ jj -R b-child describe -m child
+    Working copy  (@) now at: wkzrpslq a6ab592c child
+    Parent commit (@-)      : supzzwpm e8b6d866 parent
+    [exit 0]
+$ jj -R b-child bookmark create childcp -r @
+    Created 1 bookmarks pointing to wkzrpslq a6ab592c childcp | child
+    [exit 0]
+$ jj -R b-parent --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    childcp -> wkzrpslq/a6ab592c removed=[]
+    [exit 0]
+$ jj -R b-parent --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    wkzrpslq/a6ab592c wc=child@ bm=[childcp] div=false empty=false child
+    supzzwpm/e8b6d866 wc=default@ bm=[] div=false empty=false parent
+    [exit 0]
+$ jj -R b-parent status
+    Rebased 1 descendant commits onto updated working copy.
+    Working copy changes:
+    A b-parent/base.txt
+    Working copy  (@) : supzzwpm 03aa4976 parent
+    Parent commit (@-): zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+    op_heads(b-parent): 72469d9f276e 
+$ jj -R b-child status
+    Error: The working copy is stale (not updated since operation 8905d8e0f2bb).
+    Hint: Run `jj workspace update-stale` to update it.
+    See https://docs.jj-vcs.dev/latest/working-copy/#stale-working-copy for more information.
+    [exit 1]
+$ jj -R b-child workspace update-stale
+    Warning: Failed to export some bookmarks:
+      childcp@git: Failed to set: Could not prepare reference edit, "reference"="refs/heads/childcp", "referent"="refs/heads/childcp": Expected reference content a6ab592c970a54f577466fa898712a19e668317b
+    Hint: Git doesn't allow a branch/tag name that looks like a parent directory of
+    another (e.g. `foo` and `foo/bar`). Try to rename the bookmarks/tags that failed
+    to export or their "parent" bookmarks/tags.
+    Concurrent modification detected, resolving automatically.
+    Rebased 1 descendant commits onto commits rewritten by other operation.
+    Working copy  (@) now at: wkzrpslq/2 d4f0a680 childcp?? childcp@git | (divergent) child
+    Parent commit (@-)      : supzzwpm 03aa4976 parent
+    Added 0 files, modified 1 files, removed 1 files
+    Updated working copy to fresh commit d4f0a6801d1a
+    [exit 0]
+    op_heads(b-parent): a6e4cad1cce5 
+    ls b-child: base.txt
+    ls b-child: child.txt
+$ jj -R b-parent --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    childcp -> CONFLICTED wkzrpslq/d4f0a680,wkzrpslq/d5679ad2 removed=[a6ab592c]
+    childcp -> wkzrpslq/d4f0a680 removed=[]
+    Hint: Some bookmarks have conflicts. Use `jj bookmark set <name> -r <rev>` to resolve.
+    [exit 0]
+$ jj -R b-parent --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    wkzrpslq/d5679ad2 wc= bm=[childcp??] div=true empty=false child
+    wkzrpslq/d4f0a680 wc=child@ bm=[childcp?? childcp@git] div=true empty=false child
+    supzzwpm/03aa4976 wc=default@ bm=[] div=false empty=false parent
+    [exit 0]
+$ jj -R b-parent --ignore-working-copy log -G -r bookmarks(childcp) -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    wkzrpslq/d5679ad2 wc= bm=[childcp??] div=true empty=false child
+    wkzrpslq/d4f0a680 wc=child@ bm=[childcp?? childcp@git] div=true empty=false child
+    [exit 0]
+$ jj -R b-parent --ignore-working-copy log -G -r change_id(wkzrpslqmpkxskswsvxqmposyyszmwsz) -T commit_id.short(8) ++ " offset=" ++ change_offset ++ " div=" ++ divergent ++ " conflict=" ++ conflict ++ " files=" ++ diff.files().map(|f| f.path()).join(",") ++ "\n"
+    d5679ad2 offset=0 div=true conflict=false files=child.txt,unsnap.txt
+    d4f0a680 offset=2 div=true conflict=false files=child.txt
+    [exit 0]
+$ jj -R b-parent --ignore-working-copy evolog -G -r change_id(wkzrpslqmpkxskswsvxqmposyyszmwsz) -T commit.commit_id().short(8) ++ " op=" ++ operation.id().short(8) ++ " preds=[" ++ predecessors.map(|c| c.commit_id().short(8)).join(",") ++ "] " ++ operation.description() ++ "\n"
+    d5679ad2 op=04f49360 preds=[7fcc2fb7] reconcile divergent operations
+    d4f0a680 op=72469d9f preds=[a6ab592c] snapshot working copy
+    7fcc2fb7 op=a62eeeef preds=[a6ab592c] snapshot working copy
+    a6ab592c op=403d0b40 preds=[e0000729] describe commit e00007294058b79841bebe9b29c3052d3a9c3fdc
+    e0000729 op=0251073b preds=[33555eab] snapshot working copy
+    33555eab op=06ea19da preds=[] create initial working-copy commit in workspace child
+    [exit 0]
+$ jj -R b-parent --ignore-working-copy op log -G -n5 -T id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    a6e4cad1 parents=04f49360 reset git head
+    04f49360 parents=72469d9f,a62eeeef reconcile divergent operations
+    72469d9f parents=8905d8e0 snapshot working copy
+    a62eeeef parents=8905d8e0 snapshot working copy
+    8905d8e0 parents=403d0b40 create bookmark childcp pointing to commit a6ab592c970a54f577466fa898712a19e668317b
+    [exit 0]
+$ jj -R b-parent --at-op=a6e4cad1cce50bef108c4fab8648124136418c62e9d613d1f58078ef65bd79976c6ad2cdc06ef85f013399e9d77d14360ac5cf1f5439d9ad2f38cd999842dab8 op show --no-graph a6e4cad1cce50bef108c4fab8648124136418c62e9d613d1f58078ef65bd79976c6ad2cdc06ef85f013399e9d77d14360ac5cf1f5439d9ad2f38cd999842dab8
+    a6e4cad1cce5 skeswa@host child@ now, lasted 6 milliseconds
+    reset git head
+    args: jj -R b-child workspace update-stale
+    [exit 0]
+$ jj -R b-parent --at-op=a6e4cad1cce50bef108c4fab8648124136418c62e9d613d1f58078ef65bd79976c6ad2cdc06ef85f013399e9d77d14360ac5cf1f5439d9ad2f38cd999842dab8 log -G -r working_copies() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    wkzrpslq/d4f0a680 wc=child@ bm=[childcp?? childcp@git] div=true empty=false child
+    supzzwpm/03aa4976 wc=default@ bm=[] div=false empty=false parent
+    [exit 0]
+$ jj -R b-child status
+    Working copy changes:
+    A b-child/child.txt
+    Working copy  (@) : wkzrpslq/2 d4f0a680 childcp?? childcp@git | (divergent) child
+    Parent commit (@-): supzzwpm 03aa4976 parent
+    Warning: These bookmarks have conflicts:
+      childcp
+    Hint: Use `jj bookmark list` to see details. Use `jj bookmark set <name> -r <rev>` to resolve.
+    [exit 0]
+$ jj -R b-parent --ignore-working-copy bookmark list -T name ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ if(present, "", "ABSENT ") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    childcp -> CONFLICTED wkzrpslq/d4f0a680,wkzrpslq/d5679ad2 removed=[a6ab592c]
+    childcp -> wkzrpslq/d4f0a680 removed=[]
+    Hint: Some bookmarks have conflicts. Use `jj bookmark set <name> -r <rev>` to resolve.
+    [exit 0]
+$ jj -R b-parent --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    wkzrpslq/d5679ad2 wc= bm=[childcp??] div=true empty=false child
+    wkzrpslq/d4f0a680 wc=child@ bm=[childcp?? childcp@git] div=true empty=false child
+    supzzwpm/03aa4976 wc=default@ bm=[] div=false empty=false parent
+    [exit 0]
+
+=================== C op DAG: which commands merge two heads ===================
+--- try: jj -R c --at-op=@ op log -G -n1 -T id.short(8) ++ "\n"
+    op_heads(c): 32003c88e2d7 8d4251d7ba58 
+$ jj -R c --at-op=@ op log -G -n1 -T id.short(8) ++ "\n"
+    Error: The "@" expression resolved to more than one operation
+    Hint: Try specifying one of the operations by ID: 32003c88e2d7, 8d4251d7ba58
+    [exit 1]
+    op_heads(c): 32003c88e2d7 8d4251d7ba58 
+--- try: jj -R c --at-op=@ --ignore-working-copy log -G -r @ -T commit_id.short(8) ++ "\n"
+    op_heads(c): 02d0ce9ac843 1934aece4732 
+$ jj -R c --at-op=@ --ignore-working-copy log -G -r @ -T commit_id.short(8) ++ "\n"
+    Error: The "@" expression resolved to more than one operation
+    Hint: Try specifying one of the operations by ID: 02d0ce9ac843, 1934aece4732
+    [exit 1]
+    op_heads(c): 02d0ce9ac843 1934aece4732 
+--- try: jj -R c --at-op=02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 op log -G -n2 -T id.short(8) ++ "\n"
+    op_heads(c): d0a130249f61 db3e972d44b3 
+$ jj -R c --at-op=02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 op log -G -n2 -T id.short(8) ++ "\n"
+    Error: No operation ID matching "02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020"
+    [exit 1]
+    op_heads(c): d0a130249f61 db3e972d44b3 
+--- try: jj -R c --at-op=02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 log -G -r @ -T commit_id.short(8) ++ "\n"
+    op_heads(c): a3c24f728627 b24ded7e8a51 
+$ jj -R c --at-op=02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 log -G -r @ -T commit_id.short(8) ++ "\n"
+    Error: No operation ID matching "02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020"
+    [exit 1]
+    op_heads(c): a3c24f728627 b24ded7e8a51 
+--- try: jj -R c --at-op=02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 bookmark list
+    op_heads(c): 50c4010bf5ce eb564df4f80e 
+$ jj -R c --at-op=02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 bookmark list
+    Error: No operation ID matching "02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020"
+    [exit 1]
+    op_heads(c): 50c4010bf5ce eb564df4f80e 
+--- try: jj -R c --ignore-working-copy op log -G -n1 -T id.short(8) ++ "\n"
+    op_heads(c): 4737adb757d6 53d85bc430ef 
+$ jj -R c --ignore-working-copy op log -G -n1 -T id.short(8) ++ "\n"
+    Concurrent modification detected, resolving automatically.
+    18ac0787
+    [exit 0]
+    op_heads(c): 18ac07877c68 
+--- try: jj -R c --ignore-working-copy log -G -r @ -T commit_id.short(8) ++ "\n"
+    op_heads(c): 106ad1fad3a1 fdc69ee61bb4 
+$ jj -R c --ignore-working-copy log -G -r @ -T commit_id.short(8) ++ "\n"
+    Concurrent modification detected, resolving automatically.
+    58010cdd
+    [exit 0]
+    op_heads(c): d403a6d4124a 
+--- try: jj -R c --ignore-working-copy bookmark list
+    op_heads(c): 158d08dd8404 2295daa018c6 
+$ jj -R c --ignore-working-copy bookmark list
+    Concurrent modification detected, resolving automatically.
+    left: zzzzzzzz 00000000 (empty) (no description set)
+    right: zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+    op_heads(c): 8b10e66a7b5e 
+--- try: jj -R c --ignore-working-copy workspace list
+    op_heads(c): 7751f12bac1d 8cb45ffe3620 
+$ jj -R c --ignore-working-copy workspace list
+    Concurrent modification detected, resolving automatically.
+    default: c ywypokkm 757e1710 c
+    ws2: c-ws myxpxxmz 2153aa47 (empty) (no description set)
+    [exit 0]
+    op_heads(c): df2b5510349c 
+--- try: jj -R c --ignore-working-copy workspace root
+    op_heads(c): 72d726b2f199 d1df26e01dfb 
+$ jj -R c --ignore-working-copy workspace root
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/c
+    [exit 0]
+    op_heads(c): 72d726b2f199 d1df26e01dfb 
+--- try: jj -R c op log -G -n1 -T id.short(8) ++ "\n"
+    op_heads(c): d98d811d86aa dfa9a5aa4892 
+$ jj -R c op log -G -n1 -T id.short(8) ++ "\n"
+    Concurrent modification detected, resolving automatically.
+    0038d9d0
+    [exit 0]
+    op_heads(c): 0038d9d07b23 
+--- try: jj -R c status
+    op_heads(c): 2035fbab42a3 ddbbf761abba 
+$ jj -R c status
+    Concurrent modification detected, resolving automatically.
+    Working copy changes:
+    A c/x
+    Working copy  (@) : nqprvluu be665be0 c
+    Parent commit (@-): zzzzzzzz 00000000 left right | (empty) (no description set)
+    [exit 0]
+    op_heads(c): 144bae9bcec0 
+--- try: jj -R c debug working-copy
+    op_heads(c): 1198277367ca 1556370d639b 
+$ jj -R c debug working-copy
+    Concurrent modification detected, resolving automatically.
+    Type: "local"
+    Current operation: OperationId("a098d4888d725d19ae6d6246eb46fbd66ad0f1c6372118455a3043f78ef9c8f76ac328652306650f4802ec00b88d02ca428aa9c6bb8872d47577ad7f64db0eee")
+    Current tree: MergedTree { tree_ids: Resolved(TreeId("ab69b4abf3bb84d4e268bd42d84e4a9a5e242bd3")), labels: Unlabeled, .. }
+    [exit 0]
+    op_heads(c): 598fabdae9b6 
+--- try: jj -R c --ignore-working-copy debug working-copy
+    op_heads(c): 0a5483a8b431 ccda62f24b1b 
+$ jj -R c --ignore-working-copy debug working-copy
+    Concurrent modification detected, resolving automatically.
+    Type: "local"
+    Current operation: OperationId("c1d8ac2e3d190172855d362298f8e21d488ff4f526745d5a026e0cc2b11a9710de5151b20f313bd485929b5ef3f1504f9367635f5b0765952f12c46560172f83")
+    Current tree: MergedTree { tree_ids: Resolved(TreeId("ab69b4abf3bb84d4e268bd42d84e4a9a5e242bd3")), labels: Unlabeled, .. }
+    [exit 0]
+    op_heads(c): b9fb9e88e596 
+--- try: jj -R c debug local-working-copy
+    op_heads(c): 824f4ea68b4c b6ce3b53f071 
+$ jj -R c debug local-working-copy
+    Concurrent modification detected, resolving automatically.
+    Current operation: OperationId("d2224c5a7cf0b8ca2c665c14654029bed11c248d9c9b8334b62081085b99e842472cac073d579afda73deb43afc777b6611353e2263e38de80eefe95a9c817b2")
+    Current tree: MergedTree { tree_ids: Resolved(TreeId("ab69b4abf3bb84d4e268bd42d84e4a9a5e242bd3")), labels: Unlabeled, .. }
+    Normal { exec_bit: ExecBit(false) }             2 1794855361989 None "x"
+    [exit 0]
+    op_heads(c): d2224c5a7cf0 
+--- try: jj -R c version
+    op_heads(c): 05be1efd14f8 ad9da94231cd 
+$ jj -R c version
+    jj 0.46.0-7d382314f9420b4b8d932245b49c99492c812b9f
+    [exit 0]
+    op_heads(c): 05be1efd14f8 ad9da94231cd 
+--- try: jj -R c --ignore-working-copy config list user.name
+    op_heads(c): b67e4e76d792 d071b3388b66 
+$ jj -R c --ignore-working-copy config list user.name
+    user.name = "Experiment"
+    [exit 0]
+    op_heads(c): b67e4e76d792 d071b3388b66 
+--- try: jj -R c --ignore-working-copy util gc --help
+    op_heads(c): c53eff273a21 f26ff574a64e 
+$ jj -R c --ignore-working-copy util gc --help
+    Run backend-dependent garbage collection.
+    
+    To garbage-collect old operations and the commits/objects referenced by them, run `jj op abandon
+    ..<some old operation>` before `jj util gc`.
+    
+    Usage: jj util gc [OPTIONS]
+    
+    Options:
+          --expire <EXPIRE>
+              Time threshold
+              
+              By default, only obsolete objects and operations older than 2 weeks are pruned.
+              
+              Only the string "now" can be passed to this parameter. Support for arbitrary absolute and
+              relative timestamps will come in a subsequent release.
+    
+      -h, --help
+              Print help (see a summary with '-h')
+    
+    Global Options:
+      -R, --repository <REPOSITORY>
+              Path to repository to operate on
+              
+              By default, Jujutsu searches for the closest .jj/ directory in an ancestor of the current
+              working directory.
+    
+          --ignore-working-copy
+              Don't snapshot the working copy, and don't update it
+              
+              By default, Jujutsu snapshots the working copy at the beginning of every command. The
+              working copy is also updated at the end of the command, if the command modified the
+              working-copy commit (`@`). If you want to avoid snapshotting the working copy and instead
+              see a possibly stale working-copy commit, you can use `--ignore-working-copy`. This may be
+              useful e.g. in a command prompt, especially if you have another process that commits the
+              working copy.
+              
+              Loading the repository at a specific operation with `--at-operation` implies
+              `--ignore-working-copy`.
+    
+          --no-integrate-operation
+              Run the command as usual but don't integrate any operations
+              
+              When this option is given, the operations will still be created as usual but they will not
+              be integrated to the operation log. The working copy will also not be updated.
+              
+              The command will print the resulting operation ID. You can pass that to e.g. `jj --at-op`
+              to inspect the resulting repo state, or you can pass it to `jj op restore` to restore the
+              repo to that state. You can also pass the ID to `jj op integrate` to integrate the
+              operation.
+              
+              Note that this does *not* prevent side effects outside the repo. For example, `jj git push
+              --no-integrate-operation` will still perform the push.
+    
+          --ignore-immutable
+              Allow rewriting immutable commits
+              
+              By default, Jujutsu prevents rewriting commits in the configured set of immutable commits.
+              This option disables that check and lets you rewrite any commit but the root commit.
+              
+              This option only affects the check. It does not affect the `immutable_heads()` revset or
+              the `immutable` template keyword.
+    
+          --at-operation <AT_OPERATION>
+              Operation to load the repo at
+              
+              Operation to load the repo at. By default, Jujutsu loads the repo at the most recent
+              operation, or at the merge of the divergent operations if any.
+              
+              You can use `--at-op=<operation ID>` to see what the repo looked like at an earlier
+              operation. For example `jj --at-op=<operation ID> st` will show you what `jj st` would
+              have shown you when the given operation had just finished. `--at-op=@` is pretty much the
+              same as the default except that divergent operations will never be merged.
+              
+              Use `jj op log` to find the operation ID you want. Any unambiguous prefix of the operation
+              ID is enough.
+              
+              When loading the repo at an earlier operation, the working copy will be ignored, as if
+              `--ignore-working-copy` had been specified.
+              
+              It is possible to run mutating commands when loading the repo at an earlier operation.
+              Doing that is equivalent to having run concurrent commands starting at the earlier
+              operation. There's rarely a reason to do that, but it is possible.
+              
+              [alias: --at-op]
+    
+          --debug
+              Enable debug logging
+    
+          --color <WHEN>
+              When to colorize output
+              
+              [possible values: always, never, debug, auto]
+    
+          --quiet
+              Silence non-primary command output
+              
+              For example, `jj file list` will still list files, but it won't tell you if the working
+              copy was snapshotted or if descendants were rebased.
+              
+              Warnings and errors will still be printed.
+    
+          --no-pager
+              Disable the pager
+    
+          --config <NAME=VALUE>
+              Additional configuration options (can be repeated)
+              
+              The name should be specified as TOML dotted keys. The value should be specified as a TOML
+              expression. If string value isn't enclosed by any TOML constructs (such as array
+              notation), quotes can be omitted.
+    
+          --config-file <PATH>
+              Additional configuration files (can be repeated)
+    [exit 0]
+    op_heads(c): c53eff273a21 f26ff574a64e 
+--- try: jj -R c --ignore-working-copy op log -G -T id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    op_heads(c): c47cfe527d6a caa6247a4c6e 
+$ jj -R c --ignore-working-copy op log -G -T id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    Concurrent modification detected, resolving automatically.
+    eb1a3212 parents=caa6247a,c47cfe52 reconcile divergent operations
+    caa6247a parents=b1892d47 create bookmark left pointing to commit 0000000000000000000000000000000000000000
+    c47cfe52 parents=b1892d47 create bookmark right pointing to commit 0000000000000000000000000000000000000000
+    b1892d47 parents=9c5aef56 create initial working-copy commit in workspace ws2
+    9c5aef56 parents=5828dd30 add workspace 'ws2'
+    5828dd30 parents=62f6aad1 describe commit 2a1daca27b643474ef7d3bac2513c8e92ccee3f4
+    62f6aad1 parents=a7265b6c snapshot working copy
+    a7265b6c parents=00000000 add workspace 'default'
+    00000000 parents= 
+    [exit 0]
+    op_heads(c): eb1a3212d7b3 
+--- from added workspace
+    op_heads(c): 161b9060bf32 ece9155e6d69 
+    op_heads(c-ws): 161b9060bf32 ece9155e6d69 
+    c/.jj/repo is dir; c-ws/.jj/repo is file containing: ../../c/.jj/repo
+    c-ws/.jj:
+    repo
+    working_copy
+    
+    c/.jj:
+    repo
+    working_copy
+    
+    c/.jj/repo:
+    index
+    op_heads
+    op_store
+    store
+    submodule_store
+    workspace_store
+    
+    c/.jj/repo/op_heads:
+    heads
+    type
+$ jj -R c-ws --at-op=@ --ignore-working-copy op log -G -n1
+    Error: The "@" expression resolved to more than one operation
+    Hint: Try specifying one of the operations by ID: ece9155e6d69, 161b9060bf32
+    [exit 1]
+$ jj -R c --at-op=@- op log -G -n1 -T id.short(8) ++ "\n"
+    Error: The "@" expression resolved to more than one operation
+    Hint: Try specifying one of the operations by ID: ece9155e6d69, 161b9060bf32
+    [exit 1]
+    op_heads(c): 161b9060bf32 ece9155e6d69 
+--- template keyword search for heads
+$ jj -R c --at-op=02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 op log -G -n1 -T self.heads()
+    Error: No operation ID matching "02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020"
+    [exit 1]
+$ jj -R c --at-op=02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 op log -G -n1 -T current_operation ++ " root=" ++ root ++ " snapshot=" ++ snapshot ++ " ws=" ++ workspace_name ++ "\n"
+    Error: No operation ID matching "02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020"
+    [exit 1]
+$ jj -R c --at-op=02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 debug object operation 02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020
+    Internal error: Failed to load an operation
+    Caused by:
+    1: Object 02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020 of type operation not found
+    2: Cannot access /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/c/.jj/repo/op_store/operations/02d0ce9ac84313a882b4b4f745243eb1921fe4ceee9d01890022e358f46e4892d12e2597725c9af2824e190cbb899cc5a256a1f6e22962a369587f30831cb020
+    3: No such file or directory (os error 2)
+    [exit 255]
+$ jj -R c debug object --help
+    Show information about an operation and its view
+    
+    Usage: jj debug object [OPTIONS] <COMMAND>
+    
+    Commands:
+      commit     
+      file       
+      operation  
+      symlink    
+      tree       
+      view       
+    
+    Options:
+      -h, --help
+              Print help (see a summary with '-h')
+    
+    Global Options:
+      -R, --repository <REPOSITORY>
+              Path to repository to operate on
+              
+              By default, Jujutsu searches for the closest .jj/ directory in an ancestor of the current
+              working directory.
+    
+          --ignore-working-copy
+              Don't snapshot the working copy, and don't update it
+              
+              By default, Jujutsu snapshots the working copy at the beginning of every command. The
+              working copy is also updated at the end of the command, if the command modified the
+              working-copy commit (`@`). If you want to avoid snapshotting the working copy and instead
+              see a possibly stale working-copy commit, you can use `--ignore-working-copy`. This may be
+              useful e.g. in a command prompt, especially if you have another process that commits the
+              working copy.
+              
+              Loading the repository at a specific operation with `--at-operation` implies
+              `--ignore-working-copy`.
+    
+          --no-integrate-operation
+              Run the command as usual but don't integrate any operations
+              
+              When this option is given, the operations will still be created as usual but they will not
+              be integrated to the operation log. The working copy will also not be updated.
+              
+              The command will print the resulting operation ID. You can pass that to e.g. `jj --at-op`
+              to inspect the resulting repo state, or you can pass it to `jj op restore` to restore the
+              repo to that state. You can also pass the ID to `jj op integrate` to integrate the
+              operation.
+              
+              Note that this does *not* prevent side effects outside the repo. For example, `jj git push
+              --no-integrate-operation` will still perform the push.
+    
+          --ignore-immutable
+              Allow rewriting immutable commits
+              
+              By default, Jujutsu prevents rewriting commits in the configured set of immutable commits.
+              This option disables that check and lets you rewrite any commit but the root commit.
+              
+              This option only affects the check. It does not affect the `immutable_heads()` revset or
+              the `immutable` template keyword.
+    
+          --at-operation <AT_OPERATION>
+              Operation to load the repo at
+              
+              Operation to load the repo at. By default, Jujutsu loads the repo at the most recent
+              operation, or at the merge of the divergent operations if any.
+              
+              You can use `--at-op=<operation ID>` to see what the repo looked like at an earlier
+              operation. For example `jj --at-op=<operation ID> st` will show you what `jj st` would
+              have shown you when the given operation had just finished. `--at-op=@` is pretty much the
+              same as the default except that divergent operations will never be merged.
+              
+              Use `jj op log` to find the operation ID you want. Any unambiguous prefix of the operation
+              ID is enough.
+              
+              When loading the repo at an earlier operation, the working copy will be ignored, as if
+              `--ignore-working-copy` had been specified.
+              
+              It is possible to run mutating commands when loading the repo at an earlier operation.
+              Doing that is equivalent to having run concurrent commands starting at the earlier
+              operation. There's rarely a reason to do that, but it is possible.
+              
+              [alias: --at-op]
+    
+          --debug
+              Enable debug logging
+    
+          --color <WHEN>
+              When to colorize output
+              
+              [possible values: always, never, debug, auto]
+    
+          --quiet
+              Silence non-primary command output
+              
+              For example, `jj file list` will still list files, but it won't tell you if the working
+              copy was snapshotted or if descendants were rebased.
+              
+              Warnings and errors will still be printed.
+    
+          --no-pager
+              Disable the pager
+    
+          --config <NAME=VALUE>
+              Additional configuration options (can be repeated)
+              
+              The name should be specified as TOML dotted keys. The value should be specified as a TOML
+              expression. If string value isn't enclosed by any TOML constructs (such as array
+              notation), quotes can be omitted.
+    
+          --config-file <PATH>
+              Additional configuration files (can be repeated)
+    [exit 0]
+    op_heads(c): 161b9060bf32 ece9155e6d69 
+
+=================== D which read-only-looking commands snapshot / create ops ===================
+    jj status                                               exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj log                                                  exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj diff                                                 exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj show                                                 exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj evolog                                               exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj op log                                               exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj op show                                              exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj bookmark list                                        exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj workspace list                                       exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj workspace root                                       exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit b1b65c77a332e61447d0bd287bbec3c145244607"
+    jj file list                                            exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj config list                                          exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit 5d27576e20abe3b5975d31b0283492b0a6d11b67"
+    jj version                                              exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit 05e880b68c91a9372f69d8917f8d348628bb0b3c"
+    jj debug working-copy                                   exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit b16fa968807c882476ad2b04712891c7a45b5237"
+    jj debug local-working-copy                             exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj --ignore-working-copy status                         exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit f3f02e14e440c2619227a32239f85e794f9b06f6"
+    jj --ignore-working-copy log                            exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit 1deef0cbc57e7d24d303f84531a4c714df7a3149"
+    jj --ignore-working-copy diff                           exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit 09c4772bbe016562c6ee6961bdb4b63627c0a469"
+    jj --ignore-working-copy op log                         exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit 6d93dead430a88c592b8a058561f4b4fceaa4e58"
+    jj --ignore-working-copy bookmark list                  exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit 01b5dbbf805d2e851d8844fe36c1025bbec5d95f"
+    jj --ignore-working-copy workspace list                 exit=0 new_op=no wc_commit_changed=no last_op="create bookmark cp pointing to commit b3047c4a2572256d649ff8c92197e473639b6a1d"
+    jj --at-op=@ status                                     exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj --at-op=@ log                                        exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj --at-op=@ diff                                       exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj --at-op=@ op log                                     exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+    jj --config snapshot.auto-track=none() status           exit=0 new_op=YES wc_commit_changed=YES last_op="snapshot working copy"
+--- stale workspace: read commands
+    (stale ws) jj status                          exit=1 new_op=no files_updated=no err="Error: The working copy is stale (not updated since operation b9ec5555a3ef)."
+    (stale ws) jj log                             exit=1 new_op=no files_updated=no err="Error: The working copy is stale (not updated since operation 3bc358616f31)."
+    (stale ws) jj op log                          exit=1 new_op=no files_updated=no err="Error: The working copy is stale (not updated since operation ab8d24ec6494)."
+    (stale ws) jj bookmark list                   exit=1 new_op=no files_updated=no err="Error: The working copy is stale (not updated since operation 1f45bde75e8c)."
+    (stale ws) jj workspace list                  exit=1 new_op=no files_updated=no err="Error: The working copy is stale (not updated since operation 9a6383079684)."
+    (stale ws) jj --ignore-working-copy log       exit=0 new_op=no files_updated=no err=""
+    (stale ws) jj --at-op=@ log                   exit=1 new_op=no files_updated=no err="Error: The working copy is stale (not updated since operation afa53ffb694f)."
+    (stale ws) jj workspace update-stale          exit=0 new_op=YES files_updated=YES err="Working copy  (@) now at: qpvlptvy 3cfe19d2 (empty) (no description set)"
+    (stale ws) jj debug working-copy              exit=0 new_op=no files_updated=no err=""
+
+=================== E --no-integrate-operation / op integrate ===================
+$ jj -R e new root() -m newbase
+    Working copy  (@) now at: tszsulzs 245bf778 (empty) newbase
+    Parent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)
+    Added 0 files, modified 0 files, removed 1 files
+    [exit 0]
+    op_heads(e): 2d6790c855ea 
+$ jj -R e --no-integrate-operation rebase -r description(exact:"e-child\n") -d description(exact:"newbase\n") --ignore-working-copy
+    Rebased 1 commits to destination.
+    Operation left uncommitted because --no-integrate-operation was requested: 4cf680063602
+    [exit 0]
+    op_heads(e): 2d6790c855ea 
+$ jj -R e --no-integrate-operation --ignore-working-copy describe -r @ -m planned
+    Operation left uncommitted because --no-integrate-operation was requested: 05aad6cad968
+    [exit 0]
+    op_heads(e): 2d6790c855ea 
+    PLAN=e061a3f45462
+$ jj -R e --ignore-working-copy op log -G -n2 -T id.short(12) ++ " " ++ description ++ "\n"
+    2d6790c855ea new empty commit
+    41d92fff70e7 describe commit b1874b1f3a60d64718a21470e2a202854d15c789
+    [exit 0]
+$ jj -R e --at-op=e061a3f45462 log -G -r ws2@ -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    pvwlwswq/085f4bda wc=ws2@ bm=[] div=false empty=false planned-child
+    [exit 0]
+$ jj -R e --at-op=e061a3f45462 op log -G -n2 -T id.short(12) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    e061a3f45462 parents=2d6790c8 describe commit 7dd4b52f82dd347ab3cdad45f062d3a488618ece
+    2d6790c855ea parents=41d92fff new empty commit
+    [exit 0]
+$ jj -R e --no-integrate-operation status
+    The working copy has no changes.
+    Working copy  (@) : tszsulzs 245bf778 (empty) newbase
+    Parent commit (@-): zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+$ jj -R e status
+    Working copy changes:
+    A e/x
+    Working copy  (@) : tszsulzs b6afbf52 newbase
+    Parent commit (@-): zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+$ jj -R e --ignore-working-copy op integrate e061a3f45462
+    The specified operation has been integrated with other existing operations.
+    [exit 0]
+    op_heads(e): 940194956698 
+$ jj -R e --ignore-working-copy op log -G -n4 -T id.short(12) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    940194956698 parents=e061a3f4,f45a1745 reconcile divergent operations
+    e061a3f45462 parents=2d6790c8 describe commit 7dd4b52f82dd347ab3cdad45f062d3a488618ece
+    f45a17456adb parents=2d6790c8 snapshot working copy
+    2d6790c855ea parents=41d92fff new empty commit
+    [exit 0]
+    op_heads(e): 940194956698 
+$ jj -R e --ignore-working-copy op integrate e061a3f45462
+    [exit 0]
+$ jj -R e-ws status
+    Working copy changes:
+    A e-ws/c
+    Working copy  (@) : pvwlwswq 085f4bda planned-child
+    Parent commit (@-): yunvrxwv 982ecd21 e-parent
+    [exit 0]
+$ jj -R e --ignore-working-copy op integrate deadbeef
+    Error: No operation ID matching "deadbeef"
+    [exit 1]
+
+=================== F added workspace .git, forget, root, list ===================
+$ jj git init --no-colocate f
+    Initialized repo in "f"
+    [exit 0]
+$ jj -R f workspace add --name ws2 /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    Created workspace in "f-ws"
+    Working copy  (@) now at: xsswmmul f1cb3db4 (empty) (no description set)
+    Parent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+    f-ws: total 0
+    f-ws: drwxr-xr-x@  3 skeswa  wheel   96 Nov 16 13:56 .
+    f-ws: drwxr-xr-x@ 26 skeswa  wheel  832 Nov 16 13:56 ..
+    f-ws: drwxr-xr-x@  4 skeswa  wheel  128 Nov 16 13:56 .jj
+$ git -C f-ws rev-parse --show-toplevel
+    fatal: not a git repository (or any of the parent directories): .git
+    [exit 128]
+$ git -C f worktree list
+    fatal: not a git repository (or any of the parent directories): .git
+    [exit 128]
+$ jj -R f workspace list
+    default: f ztxsuqpp 91e73248 f
+    ws2: f-ws xsswmmul f1cb3db4 (empty) (no description set)
+    [exit 0]
+$ jj -R f workspace list -T name ++ " " ++ target.commit_id().short(8) ++ " root=" ++ root ++ "\n"
+    default 91e73248 root=/private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f
+    ws2 f1cb3db4 root=/private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    [exit 0]
+$ jj -R f-ws workspace root
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    [exit 0]
+$ jj -R f workspace root --name ws2
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    [exit 0]
+$ jj -R f workspace forget ws2
+    [exit 0]
+    f-ws exists after forget: yes; .jj: yes; x: no
+$ jj -R f workspace list
+    default: f ztxsuqpp 91e73248 f
+    [exit 0]
+$ jj -R f-ws workspace root
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    [exit 0]
+$ jj -R f workspace root --name ws2
+    Error: No such workspace: ws2
+    [exit 1]
+$ jj -R f-ws status
+    No working copy.
+    [exit 0]
+$ jj -R f-ws --ignore-working-copy log -G -r @ -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    Error: Workspace `ws2` doesn't have a working-copy commit
+    [exit 1]
+$ git -C f worktree list
+    fatal: not a git repository (or any of the parent directories): .git
+    [exit 128]
+$ jj git init --colocate f
+    Initialized repo in "f"
+    [exit 0]
+$ jj -R f workspace add --name ws2 /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    Created Git worktree for the new workspace.
+    Created workspace in "f-ws"
+    Working copy  (@) now at: wkxwvwtw 2e93c994 (empty) (no description set)
+    Parent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+    f-ws: total 8
+    f-ws: drwxr-xr-x@  4 skeswa  wheel  128 Nov 16 13:56 .
+    f-ws: drwxr-xr-x@ 26 skeswa  wheel  832 Nov 16 13:56 ..
+    f-ws: -rw-r--r--@  1 skeswa  wheel   33 Nov 16 13:56 .git
+    f-ws: drwxr-xr-x@  5 skeswa  wheel  160 Nov 16 13:56 .jj
+    f-ws/.git type: file
+    .git content: gitdir: ../f/.git/worktrees/f-ws
+$ git -C f-ws rev-parse --show-toplevel
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    [exit 0]
+$ git -C f worktree list
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f    0000000 [main]
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws 0000000 [jj/root]
+    [exit 0]
+$ jj -R f workspace list
+    default: f sumlxvpv 4f4a5726 f
+    ws2: f-ws wkxwvwtw 2e93c994 (empty) (no description set)
+    [exit 0]
+$ jj -R f workspace list -T name ++ " " ++ target.commit_id().short(8) ++ " root=" ++ root ++ "\n"
+    default 4f4a5726 root=/private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f
+    ws2 2e93c994 root=/private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    [exit 0]
+$ jj -R f-ws workspace root
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    [exit 0]
+$ jj -R f workspace root --name ws2
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    [exit 0]
+$ jj -R f workspace forget ws2
+    Removed Git worktree for "/private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws".
+    [exit 0]
+    f-ws exists after forget: yes; .jj: yes; x: no
+$ jj -R f workspace list
+    default: f sumlxvpv 4f4a5726 f
+    [exit 0]
+$ jj -R f-ws workspace root
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f-ws
+    [exit 0]
+$ jj -R f workspace root --name ws2
+    Error: No such workspace: ws2
+    [exit 1]
+$ jj -R f-ws status
+    No working copy.
+    [exit 0]
+$ jj -R f-ws --ignore-working-copy log -G -r @ -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    Error: Workspace `ws2` doesn't have a working-copy commit
+    [exit 1]
+$ git -C f worktree list
+    /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/f 0000000 [main]
+    [exit 0]
+$ jj workspace remove --help
+    Remove a workspace and its working-copy files from disk
+    
+    The workspace directory and its contents are removed from disk. The working-copy state is
+    snapshotted into a commit before the workspace is removed. The main workspace cannot be removed.
+    
+    Usage: jj workspace remove [OPTIONS] <WORKSPACES>...
+    
+    Arguments:
+      <WORKSPACES>...
+              Names of the workspaces to remove
+    
+    Options:
+      -h, --help
+              Print help (see a summary with '-h')
+    
+    Global Options:
+      -R, --repository <REPOSITORY>
+              Path to repository to operate on
+              
+              By default, Jujutsu searches for the closest .jj/ directory in an ancestor of the current
+              working directory.
+    
+          --ignore-working-copy
+              Don't snapshot the working copy, and don't update it
+              
+              By default, Jujutsu snapshots the working copy at the beginning of every command. The
+              working copy is also updated at the end of the command, if the command modified the
+              working-copy commit (`@`). If you want to avoid snapshotting the working copy and instead
+              see a possibly stale working-copy commit, you can use `--ignore-working-copy`. This may be
+              useful e.g. in a command prompt, especially if you have another process that commits the
+              working copy.
+              
+              Loading the repository at a specific operation with `--at-operation` implies
+              `--ignore-working-copy`.
+    
+          --no-integrate-operation
+              Run the command as usual but don't integrate any operations
+              
+              When this option is given, the operations will still be created as usual but they will not
+              be integrated to the operation log. The working copy will also not be updated.
+              
+              The command will print the resulting operation ID. You can pass that to e.g. `jj --at-op`
+              to inspect the resulting repo state, or you can pass it to `jj op restore` to restore the
+              repo to that state. You can also pass the ID to `jj op integrate` to integrate the
+              operation.
+              
+              Note that this does *not* prevent side effects outside the repo. For example, `jj git push
+              --no-integrate-operation` will still perform the push.
+    
+          --ignore-immutable
+              Allow rewriting immutable commits
+              
+              By default, Jujutsu prevents rewriting commits in the configured set of immutable commits.
+              This option disables that check and lets you rewrite any commit but the root commit.
+              
+              This option only affects the check. It does not affect the `immutable_heads()` revset or
+              the `immutable` template keyword.
+    
+          --at-operation <AT_OPERATION>
+              Operation to load the repo at
+              
+              Operation to load the repo at. By default, Jujutsu loads the repo at the most recent
+              operation, or at the merge of the divergent operations if any.
+              
+              You can use `--at-op=<operation ID>` to see what the repo looked like at an earlier
+              operation. For example `jj --at-op=<operation ID> st` will show you what `jj st` would
+              have shown you when the given operation had just finished. `--at-op=@` is pretty much the
+              same as the default except that divergent operations will never be merged.
+              
+              Use `jj op log` to find the operation ID you want. Any unambiguous prefix of the operation
+              ID is enough.
+              
+              When loading the repo at an earlier operation, the working copy will be ignored, as if
+              `--ignore-working-copy` had been specified.
+              
+              It is possible to run mutating commands when loading the repo at an earlier operation.
+              Doing that is equivalent to having run concurrent commands starting at the earlier
+              operation. There's rarely a reason to do that, but it is possible.
+              
+              [alias: --at-op]
+    
+          --debug
+              Enable debug logging
+    
+          --color <WHEN>
+              When to colorize output
+              
+              [possible values: always, never, debug, auto]
+    
+          --quiet
+              Silence non-primary command output
+              
+              For example, `jj file list` will still list files, but it won't tell you if the working
+              copy was snapshotted or if descendants were rebased.
+              
+              Warnings and errors will still be printed.
+    
+          --no-pager
+              Disable the pager
+    
+          --config <NAME=VALUE>
+              Additional configuration options (can be repeated)
+              
+              The name should be specified as TOML dotted keys. The value should be specified as a TOML
+              expression. If string value isn't enclosed by any TOML constructs (such as array
+              notation), quotes can be omitted.
+    
+          --config-file <PATH>
+              Additional configuration files (can be repeated)
+    [exit 0]
+
+################ extra2.sh ################
+$ jj config list --include-defaults git.colocate
+    git.colocate = true
+    [exit 0]
+$ bash -c jj config list --include-defaults | grep -iE "advance|split\.|auto-update-stale|bookmark" 
+    colors.bookmark = "magenta"
+    colors.bookmarks = "magenta"
+    colors.local_bookmarks = "magenta"
+    colors.remote_bookmarks = "magenta"
+    colors."working_copy bookmark" = "bright magenta"
+    colors."working_copy bookmarks" = "bright magenta"
+    colors."working_copy local_bookmarks" = "bright magenta"
+    colors."working_copy remote_bookmarks" = "bright magenta"
+    aliases.b = ["bookmark"]
+    experimental-advance-branches.enabled-branches = []
+    experimental-advance-branches.disabled-branches = []
+    git.track-default-bookmark-on-clone = true
+    ui.bookmark-list-sort-keys = ["name"]
+    snapshot.auto-update-stale = false
+    split.legacy-bookmark-behavior = true
+    revsets.git-push = "remote_bookmarks(remote=exact:remote)..@"
+    revsets.bookmark-advance-to = "@"
+    revsets.bookmark-advance-from = "heads(::to & bookmarks())"
+      remote_bookmarks(exact:"main", exact:"origin") |
+      remote_bookmarks(exact:"master", exact:"origin") |
+      remote_bookmarks(exact:"trunk", exact:"origin") |
+      remote_bookmarks(exact:"main", exact:"upstream") |
+      remote_bookmarks(exact:"master", exact:"upstream") |
+      remote_bookmarks(exact:"trunk", exact:"upstream") |
+    trunk() | tags() | untracked_remote_bookmarks() | untracked_remote_tags()
+    templates.bookmark_list = 'format_commit_ref(self, "bookmark") ++ "\n"'
+    templates.commit_summary = 'format_commit_summary_with_refs(self, format_commit_ref_names(bookmarks))'
+    templates.git_push_bookmark = '"push-" ++ change_id.short()'
+          commit.bookmarks(),
+      surround("Bookmarks: ", "\n", separate(" ",
+        commit.local_bookmarks(),
+        commit.remote_bookmarks(),
+        format_commit_summary_with_refs(target, format_commit_ref_names(target.bookmarks())),
+        root.bookmarks(),
+      commit.bookmarks(),
+      commit.bookmarks().map(|bookmark| concat(
+        "bookmark-", hash(bookmark.name()).substr(0, 4),
+        if(bookmark.remote(),
+          "@remote-" ++ hash(bookmark.remote()).substr(0, 4),
+          if(!bookmark.synced(), "*")
+    [exit 0]
+
+=================== A7 split bookmarked @ (root: fileset) ===================
+$ jj -R a7 --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> zrylnryn/53b05aac removed=[]
+    [exit 0]
+$ jj -R a7 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    zrylnryn/53b05aac wc= bm=[cp] div=false empty=false base
+    [exit 0]
+$ jj -R a7 split -m first half root:f1
+    Selected changes : zrylnryn 04754b77 first half
+    Remaining changes: nwrxnrot a4be834f cp | base
+    Working copy  (@) now at: nwrxnrot a4be834f cp | base
+    Parent commit (@-)      : zrylnryn 04754b77 first half
+    [exit 0]
+$ jj -R a7 --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> nwrxnrot/a4be834f removed=[]
+    [exit 0]
+$ jj -R a7 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    nwrxnrot/a4be834f wc= bm=[cp] div=false empty=false base
+    zrylnryn/04754b77 wc= bm=[] div=false empty=false first half
+    [exit 0]
+
+=================== A7b split bookmarked non-@ commit ===================
+$ jj -R a7b new -m top
+    Working copy  (@) now at: sqtypxyk 74bad86d (empty) top
+    Parent commit (@-)      : qtpovkrq 5d3232eb cp | base
+    [exit 0]
+$ jj -R a7b split -r cp -m first half root:f1
+    Rebased 1 descendant commits.
+    Selected changes : qtpovkrq 6fd4c916 first half
+    Remaining changes: vvropopl 0062aa78 cp | base
+    Working copy  (@) now at: sqtypxyk 0d4bac4a (empty) top
+    Parent commit (@-)      : vvropopl 0062aa78 cp | base
+    [exit 0]
+$ jj -R a7b --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> vvropopl/0062aa78 removed=[]
+    [exit 0]
+$ jj -R a7b --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    sqtypxyk/0d4bac4a wc= bm=[] div=false empty=true top
+    vvropopl/0062aa78 wc= bm=[cp] div=false empty=false base
+    qtpovkrq/6fd4c916 wc= bm=[] div=false empty=false first half
+    [exit 0]
+
+=================== A7c split --parallel bookmarked @ ===================
+$ jj -R a7c split --parallel -m first half root:f1
+    Selected changes : yklvyqlz 96aed605 first half
+    Remaining changes: nownwlpk 74ea0159 cp | base
+    Working copy  (@) now at: nownwlpk 74ea0159 cp | base
+    Parent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)
+    Added 0 files, modified 0 files, removed 1 files
+    [exit 0]
+$ jj -R a7c --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> nownwlpk/74ea0159 removed=[]
+    [exit 0]
+$ jj -R a7c --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    nownwlpk/74ea0159 wc= bm=[cp] div=false empty=false base
+    yklvyqlz/96aed605 wc= bm=[] div=false empty=false first half
+    [exit 0]
+
+=================== A10 jj commit / jj edit / jj prev with bookmark on @ ===================
+$ jj -R a10 commit -m committed
+    Working copy  (@) now at: mulrpsrq da6bd812 (empty) (no description set)
+    Parent commit (@-)      : upklovpm 9ca4bb6b cp | committed
+    [exit 0]
+$ jj -R a10 --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> upklovpm/9ca4bb6b removed=[]
+    [exit 0]
+$ jj -R a10 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    mulrpsrq/da6bd812 wc= bm=[] div=false empty=true 
+    upklovpm/9ca4bb6b wc= bm=[cp] div=false empty=false committed
+    [exit 0]
+$ jj -R a10 new root() -m elsewhere
+    Working copy  (@) now at: pplvxmrm f070e8eb (empty) elsewhere
+    Parent commit (@-)      : zzzzzzzz 00000000 (empty) (no description set)
+    Added 0 files, modified 0 files, removed 2 files
+    [exit 0]
+$ jj -R a10 --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> upklovpm/9ca4bb6b removed=[]
+    [exit 0]
+$ jj -R a10 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    pplvxmrm/f070e8eb wc= bm=[] div=false empty=true elsewhere
+    upklovpm/9ca4bb6b wc= bm=[cp] div=false empty=false committed
+    [exit 0]
+
+=================== A11 abandon one divergent side resolves conflicted bookmark? ===================
+$ jj -R a11 new -m top
+    Working copy  (@) now at: tnpqmwvu 35500a02 (empty) top
+    Parent commit (@-)      : pqokqwln ff9818a6 cp | base
+    [exit 0]
+$ jj -R a11 --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    Concurrent modification detected, resolving automatically.
+    cp -> CONFLICTED pqokqwln/43986112,pqokqwln/484c6059 removed=[ff9818a6]
+    Hint: Some bookmarks have conflicts. Use `jj bookmark set <name> -r <rev>` to resolve.
+    [exit 0]
+$ jj -R a11 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    tnpqmwvu/bd7259f4 wc= bm=[] div=true empty=true top
+    pqokqwln/484c6059 wc= bm=[cp??] div=true empty=false right
+    tnpqmwvu/dc999e4a wc= bm=[] div=true empty=true top
+    pqokqwln/43986112 wc= bm=[cp??] div=true empty=false left
+    [exit 0]
+$ jj -R a11 --ignore-working-copy abandon 484c60596e5af62d4b4dfcf4522a2fcef65ab983
+    Abandoned 1 commits:
+      pqokqwln/0 484c6059 cp?? | (divergent) right
+    Rebased 1 descendant commits onto parents of abandoned commits.
+    [exit 0]
+$ jj -R a11 --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    cp -> CONFLICTED pqokqwln/43986112 removed=[ff9818a6]
+    Hint: Some bookmarks have conflicts. Use `jj bookmark set <name> -r <rev>` to resolve.
+    [exit 0]
+$ jj -R a11 --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    tnpqmwvu/4d3e22ac wc= bm=[] div=true empty=true top
+    tnpqmwvu/dc999e4a wc= bm=[] div=true empty=true top
+    pqokqwln/43986112 wc= bm=[cp??] div=false empty=false left
+    [exit 0]
+
+=================== A12 bookmark on child ws @, ancestor rewritten from parent ws (clean child) ===================
+$ jj -R p --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    childcp -> usmzzykr/9ac8804c removed=[]
+    [exit 0]
+$ jj -R p --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    usmzzykr/9ac8804c wc=child@ bm=[childcp] div=false empty=false child
+    wkvooxoq/04b03c7d wc=default@ bm=[] div=false empty=false parent
+    [exit 0]
+$ jj -R p status
+    Rebased 1 descendant commits onto updated working copy.
+    Working copy changes:
+    A p/base
+    Working copy  (@) : wkvooxoq 39f39835 parent
+    Parent commit (@-): zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+$ jj -R p --ignore-working-copy bookmark list -T name ++ if(remote, "@" ++ remote, "") ++ " -> " ++ if(conflict, "CONFLICTED ", "") ++ added_targets.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ " removed=[" ++ removed_targets.map(|c| c.commit_id().short(8)).join(",") ++ "]\n"
+    childcp -> usmzzykr/defa53c0 removed=[]
+    [exit 0]
+$ jj -R p --ignore-working-copy log -G -r all() ~ root() -T change_id.short(8) ++ "/" ++ commit_id.short(8) ++ " wc=" ++ working_copies ++ " bm=[" ++ local_bookmarks ++ "] div=" ++ divergent ++ " empty=" ++ empty ++ " " ++ description.first_line() ++ "\n"
+    usmzzykr/defa53c0 wc=child@ bm=[childcp] div=false empty=false child
+    wkvooxoq/39f39835 wc=default@ bm=[] div=false empty=false parent
+    [exit 0]
+$ jj -R p --ignore-working-copy evolog -G -r childcp -n2 -T commit.commit_id().short(8) ++ " op=" ++ operation.id().short(8) ++ " preds=[" ++ predecessors.map(|c| c.commit_id().short(8)).join(",") ++ "] " ++ operation.description() ++ "\n"
+    defa53c0 op=a96375ba preds=[9ac8804c] snapshot working copy
+    9ac8804c op=8c81f40f preds=[6ff1df59] describe commit 6ff1df59aee4dfd6184e22c0936c4dfaaaa3e4be
+    [exit 0]
+$ jj -R p --at-op=a96375bab847088f8ca0dcb362923c95f42a7d40c1d1e9cc429c5a32cc837fad833c09333789e7d0db80a22a0e75ef0e96a8d46e3c370927a6b3c698211f66f6 op show --no-graph a96375bab847088f8ca0dcb362923c95f42a7d40c1d1e9cc429c5a32cc837fad833c09333789e7d0db80a22a0e75ef0e96a8d46e3c370927a6b3c698211f66f6
+    a96375bab847 skeswa@host default@ now, lasted 14 milliseconds
+    snapshot working copy
+    args: jj -R p status
+    
+    Changed commits:
+    + usmzzykr defa53c0 childcp | child
+    - usmzzykr/1 9ac8804c (hidden) child
+    + wkvooxoq 39f39835 parent
+    - wkvooxoq/1 04b03c7d (hidden) parent
+    
+    Changed working copy child@:
+    + usmzzykr defa53c0 childcp | child
+    - usmzzykr/1 9ac8804c (hidden) child
+    Changed working copy default@:
+    + wkvooxoq 39f39835 parent
+    - wkvooxoq/1 04b03c7d (hidden) parent
+    
+    Changed local bookmarks:
+    childcp:
+    + usmzzykr defa53c0 childcp | child
+    - usmzzykr/1 9ac8804c (hidden) child
+    [exit 0]
+$ jj -R q --at-op=a96375bab847088f8ca0dcb362923c95f42a7d40c1d1e9cc429c5a32cc837fad833c09333789e7d0db80a22a0e75ef0e96a8d46e3c370927a6b3c698211f66f6 log -r @ --no-graph -T change_id ++ " " ++ commit_id ++ "\n"
+    usmzzykrtsqtlyuywuwptmkxvzvzvtuv defa53c0b924ef5cba223a7f356079157ea3ced1
+    [exit 0]
+$ jj -R q --at-op=@ --ignore-working-copy log -r @ --no-graph -T change_id.short(8) ++ " " ++ commit_id.short(8) ++ "\n"
+    usmzzykr defa53c0
+    [exit 0]
+
+=================== B2 inspect dirty-stale reconcile op in existing b-parent ===================
+$ jj -R b-parent --at-op=04f493609c819e8e720e87b8ed172a61f9574e8fe6cd1754321751db74c81d4f34cbfd613fc0eb13ceb6d9d32cb25affac55697b5ced14ce39d8fb4865f43456 op show --no-graph 04f493609c819e8e720e87b8ed172a61f9574e8fe6cd1754321751db74c81d4f34cbfd613fc0eb13ceb6d9d32cb25affac55697b5ced14ce39d8fb4865f43456
+    04f493609c81 skeswa@host child@ 1 minute ago, lasted 9 milliseconds
+    reconcile divergent operations
+    args: jj -R b-child workspace update-stale
+    [exit 0]
+$ jj -R b-parent --at-op=04f493609c819e8e720e87b8ed172a61f9574e8fe6cd1754321751db74c81d4f34cbfd613fc0eb13ceb6d9d32cb25affac55697b5ced14ce39d8fb4865f43456 op log -G -n1 -T id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " snapshot=" ++ snapshot ++ " tags=" ++ tags ++ "\n"
+    Warning: In template expression
+     --> 1:117
+      |
+    1 | id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " snapshot=" ++ snapshot ++ " tags=" ++ tags ++ "\n"
+      |                                                                                                                     ^--^
+      |
+      = operation.tags() is deprecated; use .attributes() instead
+    04f49360 parents=72469d9f,a62eeeef snapshot=false tags=args: jj -R b-child workspace update-stale
+    [exit 0]
+
+=================== C2 --at-op=<head id> with two/three heads ===================
+--- try: --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c op log -G -n2 -T id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    op_heads(c): 99adc5e11794 eb829086900a 
+$ jj -R c --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c op log -G -n2 -T id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    99adc5e1 parents=f6789536 create bookmark right pointing to commit 0000000000000000000000000000000000000000
+    f6789536 parents=175294b0 create initial working-copy commit in workspace ws2
+    [exit 0]
+    op_heads(c): 99adc5e11794 eb829086900a 
+--- try: --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c log -G -r @ -T commit_id.short(8) ++ "\n"
+    op_heads(c): 99adc5e11794 eb829086900a 
+$ jj -R c --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c log -G -r @ -T commit_id.short(8) ++ "\n"
+    97d4f152
+    [exit 0]
+    op_heads(c): 99adc5e11794 eb829086900a 
+--- try: --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c bookmark list
+    op_heads(c): 99adc5e11794 eb829086900a 
+$ jj -R c --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c bookmark list
+    right: zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+    op_heads(c): 99adc5e11794 eb829086900a 
+--- try: --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c workspace list
+    op_heads(c): 99adc5e11794 eb829086900a 
+$ jj -R c --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c workspace list
+    default: c knomwzxq 97d4f152 c
+    ws2: c-ws mmsmzmrm adfab3d2 (empty) (no description set)
+    [exit 0]
+    op_heads(c): 99adc5e11794 eb829086900a 
+--- try: --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c status
+    op_heads(c): 99adc5e11794 eb829086900a 
+$ jj -R c --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c status
+    Working copy changes:
+    A c/x
+    Working copy  (@) : knomwzxq 97d4f152 c
+    Parent commit (@-): zzzzzzzz 00000000 right | (empty) (no description set)
+    [exit 0]
+    op_heads(c): 99adc5e11794 eb829086900a 
+--- try: --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c debug object operation 99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c
+    op_heads(c): 99adc5e11794 eb829086900a 
+$ jj -R c --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c debug object operation 99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c
+    Operation {
+        view_id: ViewId(
+            "8b98e9202120c4c102b2d46769eb17c32e5dcd21a4bbcd449365203b0f685730fd0cca053781f72ee4bb221c1b494b036f53ea38f3b12b7a28a31216a6a07590",
+        ),
+        parents: [
+            OperationId(
+                "f678953683b0cbb5e1b5e0d9eac73d2b4f508e7c077859cc1be8a0e7e9d631d95ef4e0d2ab2ade7104211a11cf264a5e78b01ee162ca5477f15f3ea6c5aa98fc",
+            ),
+        ],
+        metadata: OperationMetadata {
+            time: TimestampRange {
+                start: Timestamp {
+                    timestamp: MillisSinceEpoch(
+                        1794855436235,
+                    ),
+                    tz_offset: -300,
+                },
+                end: Timestamp {
+                    timestamp: MillisSinceEpoch(
+                        1794855436239,
+                    ),
+                    tz_offset: -300,
+                },
+            },
+            description: "create bookmark right pointing to commit 0000000000000000000000000000000000000000",
+            hostname: "host",
+            username: "skeswa",
+            is_snapshot: false,
+            workspace_name: Some(
+                WorkspaceNameBuf(
+                    "default",
+                ),
+            ),
+            attributes: {
+                "args": "jj -R /private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/extra/c '--at-op=f678953683b0cbb5e1b5e0d9eac73d2b4f508e7c077859cc1be8a0e7e9d631d95ef4e0d2ab2ade7104211a11cf264a5e78b01ee162ca5477f15f3ea6c5aa98fc' bookmark create right -r 'root()'",
+            },
+        },
+        commit_predecessors: Some(
+            {},
+        ),
+    }
+    [exit 0]
+    op_heads(c): 99adc5e11794 eb829086900a 
+--- try: --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c op log -G -n1 -T self.heads()
+    op_heads(c): 99adc5e11794 eb829086900a 
+$ jj -R c --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c op log -G -n1 -T self.heads()
+    Error: Failed to parse template: Method `heads` doesn't exist for type `Operation`
+    Caused by:  --> 1:6
+      |
+    1 | self.heads()
+      |      ^---^
+      |
+      = Method `heads` doesn't exist for type `Operation`
+    [exit 1]
+    op_heads(c): 99adc5e11794 eb829086900a 
+--- try: --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c --ignore-working-copy bookmark create viaold -r root()
+    op_heads(c): 99adc5e11794 eb829086900a 
+$ jj -R c --at-op=99adc5e1179459e8405c3a8c11b7cd46e253b30fc5891cf70c827ee6b034ed7940aa54d79899912a1f9369c889b954678f6a83ce5a4ad321c4ae3abcb7f5ea0c --ignore-working-copy bookmark create viaold -r root()
+    Warning: Target revision is empty.
+    Created 1 bookmarks pointing to zzzzzzzz 00000000 right viaold | (empty) (no description set)
+    [exit 0]
+    op_heads(c): 05e9c8acaaa1 eb829086900a 
+--- try: --at-op=@ --ignore-working-copy op log -G -n1
+    op_heads(c): 306013203dd9 9529597df75e c88790521366 
+$ jj -R c --at-op=@ --ignore-working-copy op log -G -n1
+    Error: The "@" expression resolved to more than one operation
+    Hint: Try specifying one of the operations by ID: c88790521366, 9529597df75e, 306013203dd9
+    [exit 1]
+    op_heads(c): 306013203dd9 9529597df75e c88790521366 
+$ bash -c jj -R c --at-op=@ --ignore-working-copy op log -G -n1 2>&1 | grep -oE "[0-9a-f]{12}" | sort | tr "\n" " "; echo; ls c/.jj/repo/op_heads/heads | cut -c1-12 | sort | tr "\n" " "
+    306013203dd9 9529597df75e c88790521366 
+    306013203dd9 9529597df75e c88790521366     [exit 0]
+--- try: --at-op=@- --ignore-working-copy op log -G -n1
+    op_heads(c): 306013203dd9 9529597df75e c88790521366 
+$ jj -R c --at-op=@- --ignore-working-copy op log -G -n1
+    Error: The "@" expression resolved to more than one operation
+    Hint: Try specifying one of the operations by ID: c88790521366, 9529597df75e, 306013203dd9
+    [exit 1]
+    op_heads(c): 306013203dd9 9529597df75e c88790521366 
+--- try: --ignore-working-copy op log -G -n2 -T id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    op_heads(c): 306013203dd9 9529597df75e c88790521366 
+$ jj -R c --ignore-working-copy op log -G -n2 -T id.short(8) ++ " parents=" ++ parents.map(|p| p.id().short(8)).join(",") ++ " " ++ description ++ "\n"
+    Concurrent modification detected, resolving automatically.
+    082a96f9 parents=c8879052,9529597d,30601320 reconcile divergent operations
+    c8879052 parents=e83127b1 create bookmark left pointing to commit 0000000000000000000000000000000000000000
+    [exit 0]
+    op_heads(c): 082a96f9af30 
+--- op heads dir layout
+$ find c/.jj/repo/op_heads -maxdepth 2
+    c/.jj/repo/op_heads
+    c/.jj/repo/op_heads/heads
+    c/.jj/repo/op_heads/heads/082a96f9af30531a84b8f7606687415ea39cd99c8858b15d4f862b552c171e844387ed6078d00d48b10e6145f9c4ab8fae21564c64ea211ff5dff213df23efcf
+    c/.jj/repo/op_heads/type
+    [exit 0]
+$ cat c/.jj/repo/op_heads/type
+    simple_op_heads_store    [exit 0]
+$ find c-ws/.jj -maxdepth 2
+    c-ws/.jj
+    c-ws/.jj/working_copy
+    c-ws/.jj/working_copy/checkout
+    c-ws/.jj/working_copy/type
+    c-ws/.jj/working_copy/tree_state
+    c-ws/.jj/repo
+    [exit 0]
+$ cat c-ws/.jj/repo
+    ../../c/.jj/repo    [exit 0]
+$ jj -R c-ws --ignore-working-copy debug working-copy
+    Type: "local"
+    Current operation: OperationId("e83127b1cc47bcea305d6014aa898fea2e76e5b5981456c91b022fea96eba4d5572d869030c3c587c5fd4582303069ce4b41979bf59128bd00179327254e76bc")
+    Current tree: MergedTree { tree_ids: Resolved(TreeId("4b825dc642cb6eb9a060e54bf8d69288fbee4904")), labels: Unlabeled, .. }
+    [exit 0]
+
+################ extra3.sh ################
+
+=================== G1 evolog/predecessors after split (existing a7) and squash-source (existing a4) ===================
+$ jj -R a7 --ignore-working-copy evolog -G -r cp -n2 -T commit.change_id().short(8) ++ "/" ++ commit.commit_id().short(8) ++ " op=" ++ operation.id().short(8) ++ " preds=[" ++ predecessors.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ "] " ++ operation.description() ++ "\n"
+    nwrxnrot/a4be834f op=fb4a2ddf preds=[zrylnryn/53b05aac] split commit 53b05aaca5802e471ae6406ac4f2affd88c02eda
+    zrylnryn/53b05aac op=ebdc1c8c preds=[zrylnryn/95e6cd57] describe commit 95e6cd579ff84b2aedd74d8e3a9af77a8f7601b2
+    [exit 0]
+$ jj -R a7 --ignore-working-copy evolog -G -r cp- -n2 -T commit.change_id().short(8) ++ "/" ++ commit.commit_id().short(8) ++ " op=" ++ operation.id().short(8) ++ " preds=[" ++ predecessors.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ "] " ++ operation.description() ++ "\n"
+    zrylnryn/04754b77 op=fb4a2ddf preds=[zrylnryn/53b05aac] split commit 53b05aaca5802e471ae6406ac4f2affd88c02eda
+    zrylnryn/53b05aac op=ebdc1c8c preds=[zrylnryn/95e6cd57] describe commit 95e6cd579ff84b2aedd74d8e3a9af77a8f7601b2
+    [exit 0]
+$ jj -R a4 --ignore-working-copy evolog -G -r cp -n3 -T commit.change_id().short(8) ++ "/" ++ commit.commit_id().short(8) ++ " op=" ++ operation.id().short(8) ++ " preds=[" ++ predecessors.map(|c| c.change_id().short(8) ++ "/" ++ c.commit_id().short(8)).join(",") ++ "] " ++ operation.description() ++ "\n"
+    nlvkpqxx/72859ebf op=bffba9de preds=[nlvkpqxx/2265f813,ykopounk/ce4074f5] squash commits into 2265f8137fb1f54364334294e8caaada891e79cf
+    ykopounk/ce4074f5 op=22e4ac6f preds=[ykopounk/221657ae] snapshot working copy
+    ykopounk/221657ae op=60039f94 preds=[] new empty commit
+    [exit 0]
+$ bash -c jj -R a7 --at-op=fb4a2ddfc3eaf37cee3167fde188faec8f035e9be4b1fbe36d88de00ad3c9bfd05787ad9ba162a9ddc345adca4f384adee073171d8af2d5679456019e4b9628f debug object operation fb4a2ddfc3eaf37cee3167fde188faec8f035e9be4b1fbe36d88de00ad3c9bfd05787ad9ba162a9ddc345adca4f384adee073171d8af2d5679456019e4b9628f | sed -n '/commit_predecessors/,$p'
+        commit_predecessors: Some(
+            {
+                CommitId(
+                    "04754b7759726e940d67ec252f5248a53a6d639b",
+                ): [
+                    CommitId(
+                        "53b05aaca5802e471ae6406ac4f2affd88c02eda",
+                    ),
+                ],
+                CommitId(
+                    "a4be834f00cf413567d0ad9935f3d2962ee730af",
+                ): [
+                    CommitId(
+                        "53b05aaca5802e471ae6406ac4f2affd88c02eda",
+                    ),
+                ],
+            },
+        ),
+    }
+    [exit 0]
+$ jj -R a7 --at-op=fb4a2ddfc3eaf37cee3167fde188faec8f035e9be4b1fbe36d88de00ad3c9bfd05787ad9ba162a9ddc345adca4f384adee073171d8af2d5679456019e4b9628f op show --no-graph fb4a2ddfc3eaf37cee3167fde188faec8f035e9be4b1fbe36d88de00ad3c9bfd05787ad9ba162a9ddc345adca4f384adee073171d8af2d5679456019e4b9628f
+    fb4a2ddfc3ea skeswa@host default@ 29 seconds ago, lasted 13 milliseconds
+    split commit 53b05aaca5802e471ae6406ac4f2affd88c02eda
+    args: jj -R a7 split -m 'first half' root:f1
+    
+    Changed commits:
+    + nwrxnrot a4be834f cp | base
+    - zrylnryn/1 53b05aac (hidden) base
+    + zrylnryn 04754b77 first half
+    - zrylnryn/1 53b05aac (hidden) base
+    
+    Changed working copy default@:
+    + nwrxnrot a4be834f cp | base
+    - zrylnryn/1 53b05aac (hidden) base
+    
+    Changed local bookmarks:
+    cp:
+    + nwrxnrot a4be834f cp | base
+    - zrylnryn/1 53b05aac (hidden) base
+    [exit 0]
+
+=================== G2 clean update-stale: new op? colocated vs not ===================
+    mode=--no-colocate heads before: a7af53240005 
+$ jj -R s-ws workspace update-stale
+    Working copy  (@) now at: kywtkyww 99f3e644 child
+    Parent commit (@-)      : zlyrtskm 385f33ef s
+    Added 0 files, modified 1 files, removed 0 files
+    Updated working copy to fresh commit 99f3e6440759
+    [exit 0]
+    mode=--no-colocate heads after:  a7af53240005 
+$ jj -R s --ignore-working-copy op log -G -n2 -T id.short(12) ++ " " ++ description ++ "\n"
+    a7af53240005 snapshot working copy
+    cea8da8407a2 describe commit 886625cb7c679997284f7994424baaa4d046ca74
+    [exit 0]
+    mode=--colocate heads before: 2dbf7354fab5 
+$ jj -R s-ws workspace update-stale
+    Working copy  (@) now at: wnvtnptx 89c0c275 child
+    Parent commit (@-)      : kwnmxzqz bcb17bdb s
+    Added 0 files, modified 1 files, removed 0 files
+    Updated working copy to fresh commit 89c0c275d3dd
+    [exit 0]
+    mode=--colocate heads after:  6fdc79760566 
+$ jj -R s --ignore-working-copy op log -G -n2 -T id.short(12) ++ " " ++ description ++ "\n"
+    6fdc79760566 reset git head
+    2dbf7354fab5 snapshot working copy
+    [exit 0]
+
+=================== G3 --at-op=@ snapshots? (single head, dirty wc) ===================
+    before: bf0e77b204d6
+$ jj -R g --at-op=@ log -G -r @ -T commit_id.short(8) ++ "\n"
+    cd9c7ca6
+    [exit 0]
+    after:  c3e1597edd59
+    before: c3e1597edd59
+$ jj -R g --at-op=@ --ignore-working-copy log -G -r @ -T commit_id.short(8) ++ "\n"
+    cd9c7ca6
+    [exit 0]
+    after:  c3e1597edd59
+    before: c3e1597edd59
+$ jj -R g --at-op=c3e1597edd59c16d5f59862ab1a4b3790a8cfb12664654bf05ae24e893f2e6d9f61d5d87b54782f58072a2e962310661f719aa90c29ad34263650e3ae3bb8f72 log -G -r @ -T commit_id.short(8) ++ "\n"
+    cd9c7ca6
+    [exit 0]
+    after:  c3e1597edd59
+
+=================== G4 non-snapshotting checkpoint: bookmark set with --ignore-working-copy on dirty workspace, then snapshot ===================
+$ jj -R g --ignore-working-copy bookmark create cp -r @
+    Created 1 bookmarks pointing to wxonvsrz cd9c7ca6 cp | g
+    [exit 0]
+$ jj -R g --ignore-working-copy bookmark list
+    cp: wxonvsrz cd9c7ca6 g
+    [exit 0]
+$ jj -R g status
+    Working copy changes:
+    A g/x
+    Working copy  (@) : wxonvsrz 24669ef1 cp | g
+    Parent commit (@-): zzzzzzzz 00000000 (empty) (no description set)
+    [exit 0]
+$ jj -R g --ignore-working-copy bookmark list
+    cp: wxonvsrz 24669ef1 g
+    [exit 0]

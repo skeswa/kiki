@@ -12,7 +12,7 @@ A credential is a secret that proves who a caller is. A capability is a grant to
 
 - is bound to one thread — one themed line of work with its own workspace;
 - is written to `~/.config/kiki/repos/<repo_id>/credentials/<thread_id>` with mode `0600` (readable only by the owning user);
-- is read by `kk-hook` and by any `kk` command whose discovered context is that thread;
+- is read by `kk-hook`, by the thread's pane launcher, and by any `kk` command whose discovered context is that thread;
 - is rotated — replaced with a fresh secret — when an incarnation (one live agent session for the thread) ends, and when a thread reopens;
 - authorizes ordinary reads and mutations of that same thread only.
 
@@ -53,7 +53,7 @@ A thread-scoped credential may:
 - read its own thread state, working-state summary, and non-sensitive audit slice;
 - read and advance cascade delivery state — the record of updates flowing from a followed thread — for its own thread, through the specific hook methods;
 - perform ordinary same-thread lifecycle or metadata operations that are neither destructive nor externally visible;
-- read the minimal same-repo summary and tmux target (the terminal session address) that `kk ls` and `kk switch` need.
+- read the minimal same-repo summary and terminal target (where the thread's terminal group currently lives) that `kk ls` and `kk switch` need.
 
 It must not, by itself:
 
@@ -88,7 +88,7 @@ The repo summary is the only cross-thread read available without approval. Its c
 
 - repo and thread id, display name, bookmark display name, and the followed parent's id/name;
 - lifecycle state, three-valued cascade state, agent display state, and checkpoint relationship (`current | behind | diverged`);
-- tmux session target, one-line revision description, and the last-agent-event category and timestamp that Activity ordering uses;
+- terminal target (the dedicated server's address and instance, and the current binding's terminal-group and agent-pane refs), one-line revision description, and the last-agent-event category and timestamp that Activity ordering uses;
 - after GitHub integration ships: PR number, PR state, and CI roll-up.
 
 It contains no transcript text, no diff content or paths, no sync-intent payloads or internals, no audit arguments, no prompts, no tool content, no model/context-window telemetry, and no write methods. `kk ls`, `kk switch`, `kk log`, and future read-only renderers all consume this same row set. Adding a field is an authority-model change, not a renderer convenience.
@@ -97,7 +97,23 @@ It contains no transcript text, no diff content or paths, no sync-intent payload
 
 The CLI resolves a contextual thread as described in [Commands](09-commands.md#context-resolution) and loads only that thread's credential. Outside a thread context, repo-summary reads use a separate least-privilege registration capability. Commands that need stronger authority start an interactive approval flow.
 
-`kk switch <thread>` does two things: a summary-class lookup of the target tmux session, then `tmux switch-client`. It does not mutate daemon focus state, so selecting a thread does not require cross-thread mutation approval. Any audit emission records the invoker and the lookup; it does not turn switch into an Admin operation.
+`kk switch <thread>` does two things: a summary-class lookup of the target thread's terminal target, then a caller-local focus request to the terminal runtime through `TerminalClient`. It moves the invoking viewer's terminal and no other. It does not mutate daemon focus state, and it creates, closes, or changes no terminal resource, so selecting a thread does not require cross-thread mutation approval. Any audit emission records the invoker and the lookup; it does not turn switch into an Admin operation.
+
+Moving someone else's view is a different act. The terminal runtime's public focus methods move every attached client, so kiki uses them only for the explicitly named `kk switch --all-clients`, never as a fallback for the local form. When the caller cannot be tied to one attached client, `kk switch` moves no one. See [Terminal runtime · Caller-local focus](13-architecture/terminal-runtime.md#caller-local-focus).
+
+## Terminal runtime authority
+
+Herdr's socket has a different authority model from kiki's, and kiki does not borrow it. Any same-UID process that can reach the dedicated server's socket can create, close, relabel, or send input to any terminal group. That includes every process running inside a pane, which inherits the socket path. Herdr has no per-thread credential and no plan-bound approval.
+
+Kiki therefore draws the line on its own side:
+
+- Kiki's rules bind kiki's operations. A lifecycle saga closes a terminal group only inside an approved, journaled plan, whatever the runtime would allow an arbitrary caller to do.
+- A terminal change kiki did not journal is an external projection change. It is observed, classified, and repaired under the same rules as an out-of-band `jj` command; it is never treated as a kiki decision.
+- Nothing read from the runtime is authority. Labels, metadata tokens, working directories, pane placement, and Herdr ids never authorize a mutation, substitute for a credential, or prove that a directory may be deleted. A Herdr ref observed under the current server instance and matching a current binding may _locate_ the caller's contextual thread, as [Commands](09-commands.md#context-resolution) describes; what then authorizes the call is that thread's own credential.
+- A Herdr keybinding, plugin action, or sidebar click may start a `kk` process or request navigation. It is never a `HumanApproval`, and it gives that process no authority beyond its own credential. Approval still requires an enrolled `ApprovalPresenter` that owns its foreground terminal.
+- Kiki never places an `ApprovalPresenter` or Admin credential in a pane's launch environment, a metadata token, or the generated Herdr configuration.
+
+This is the cooperative model again, not enforcement against a same-UID adversary.
 
 ## Audit
 

@@ -4,9 +4,10 @@ kiki should make important state visible without turning every event into an int
 
 - command output, for explicit inspection;
 - durable lifecycle, cascade, and audit state, for diagnosis;
-- OS/tmux notifications, for acceptance-slice events that need attention.
+- notifications — OS-native or Herdr toasts — for acceptance-slice events that need attention;
+- the Herdr sidebar, where each thread's terminal group appears under the label kiki publishes.
 
-The deferred overlay and sidebar renderers project the same durable state. They never become new authorities — new sources of truth.
+The Herdr sidebar, the deferred overlay, and the optional `ui` pane all project the same durable state. They never become new authorities — new sources of truth.
 
 Audit logs are separate. They answer what happened and who invoked it. Notifications answer what needs the human right now.
 
@@ -30,16 +31,36 @@ These defaults are configurable under `[notifications]`.
 
 ## Notification transport
 
-In the acceptance slice, the attention channel is an OS-native or tmux notification. (tmux is the terminal multiplexer kiki runs sessions inside.) Once UI surfaces ship, transient in-UI toasts render in the overlay only (see [Interface](10-interface/spec.md)). The persistent sidebar stays a passive state renderer. It reflects lifecycle/cascade glyph changes, but it never hosts toasts or toast actions. If only the sidebar is visible, an attention event still uses the configured OS/tmux transport.
+In the acceptance slice, the attention channel is an OS-native notification or a Herdr toast. (Herdr is the terminal multiplexer that hosts kiki's terminal groups; see [Terminal runtime](13-architecture/terminal-runtime.md).) Once UI surfaces ship, kiki's own transient toasts render in the overlay only (see [Interface](10-interface/spec.md)). The Herdr sidebar and the optional `ui` pane stay passive state renderers. They reflect lifecycle and cascade changes, but they never host kiki toasts or toast actions. If no overlay is open, an attention event still uses the configured transport.
 
 The cross-platform default is the `notify-rust` crate, a Rust library for desktop notifications. On macOS, `notify-rust` requires a signed application bundle, so kiki falls back to shelling out to `osascript -e 'display notification ...'`. The transport is configurable under `[notifications]`:
 
-- `os_provider`: `auto | notify-rust | osascript | tmux | off` (default `auto`).
-- `auto` resolves to `notify-rust` on Linux and Windows, and to `osascript` on macOS.
-- `tmux` routes notifications to `tmux display-message` on the user's running tmux client. This is useful when the terminal kiki runs in always lives inside tmux.
-- `off` disables OS notifications entirely. A currently open overlay may still render its toast after that surface ships.
+- `os_provider`: `auto | notify-rust | osascript | herdr | off` (default `auto`).
+- `auto` resolves to `notify-rust` on Linux and to `osascript` on macOS. It never resolves to `herdr`.
+- `herdr` shows the notification as a toast in Herdr, through the dedicated server. It is useful when the user's attention lives inside the kiki Herdr server.
+- `off` disables notifications through this transport entirely. A currently open overlay may still render its toast after that surface ships.
+
+The `herdr` provider has these semantics, and kiki does not present it as more:
+
+- **Global.** Herdr shows the toast to every client attached to the kiki server. It cannot target one client or one terminal group. Kiki-originated attention events are about a thread, not about a caller, so a global toast is acceptable; the toast text names the thread.
+- **Best-effort.** With no client attached, nothing is shown. Herdr's source at the candidate revision reports that case in its reply and rate-limits toasts; both behaviors are source-read only and have not been run with attached clients, so they are an integration gate and kiki depends on neither. Kiki does not queue, retry, or fall back to another provider for a toast that was not shown.
+- **Not a record.** A shown toast proves nothing about delivery to a human. The thread's durable state — its blocked mark, cascade state, or projection issue — is what persists, and `kk status`, `kk ls`, and the sidebar projection show it whether or not any toast appeared.
+- **Not an action.** A toast carries no approval and no authority. Acting on the event goes through the ordinary command and approval flow.
 
 Per-event behavior (`loud | soft | silent`) is independent of transport. It is configured per-event under `[notifications]`.
+
+## Herdr sidebar projection
+
+Herdr's native sidebar lists the terminal groups on the dedicated server. It is the ambient cross-repo view of threads and takes the place of a kiki-drawn status strip.
+
+- In the acceptance slice, `kkd` publishes one label per terminal group as its Herdr workspace label: the repo directory name, the thread's display name, and a short provisioning tag. The label is what the sidebar and Herdr's own navigation show. It is the only kiki presentation in the acceptance slice besides notifications.
+- In v1.x, `kkd` also publishes metadata tokens that the generated Herdr configuration places in sidebar rows: lifecycle state, cascade state, agent display state, and follows parent. An unacknowledged attention event shows through the agent display state `blocked`. The generated configuration declares those tokens only when this surface ships.
+- Kiki publishes only to a terminal group with a current binding. A remnant container — a Herdr workspace restored without a binding — keeps whatever label Herdr restored and receives no kiki tokens.
+- Publishing is one-way. Kiki never reads a label or token back, and nothing a user or another process writes into them changes kiki's state. Any process on the server's socket can rename a Herdr workspace or overwrite a token, tokens can expire, and all tokens vanish when the server restarts. `kkd` republishes the label on every display-name change and after every resync, and in v1.x does the same for tokens, so a clobbered or lost value heals.
+- Herdr computes its own agent indicator (`idle | working | blocked | done | unknown`) from the screen and the process. It may appear beside kiki's tokens as a hint. It is not kiki's agent display state, and the two can disagree; kiki's commands and tokens are the ones backed by durable state.
+- A row in the sidebar is not evidence that a thread is `Active`. After a cold restore the sidebar shows remnant containers under their restored labels while the threads they once hosted are `ProjectionDiverged { reason: TerminalMissing }`. Kiki publishes nothing to those containers; `kk ls` and the attention notification carry the state until a repair plan binds a terminal group again.
+
+The sidebar renders what `kkd` already made durable. An attention event that fails to appear there is a presentation fault, never a lost event.
 
 ## CI and PR comments
 

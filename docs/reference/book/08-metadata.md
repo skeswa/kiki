@@ -39,7 +39,7 @@ It must not read the thread transcript.
 
 Auto-rename, when enabled, may propose slugs — short, dash-separated names — for kiki-owned thread bookmarks. (A jj bookmark is roughly a git branch name.) The prompt includes sibling bookmark names so the model can choose a distinct slug.
 
-An external `jj bookmark rename` marks the bookmark human-owned for the rest of the thread's life. kiki does not rename it again unless an explicit future command opts it back in.
+An external `jj bookmark rename` marks the bookmark human-owned for the rest of the thread's life. Kiki follows the rename to the new name only when one exact operation proves it, under the rename rule in [Op-log watcher](13-architecture/op-log-watcher.md#the-classifier); a rename it cannot prove is `BookmarkMissing` and goes to `kk repair`. kiki does not rename it again unless an explicit future command opts it back in.
 
 ## Squash and merge ownership
 

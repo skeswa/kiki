@@ -22,7 +22,7 @@
 
 Start an auth refactor. Hand the tests to another agent, then chase an unrelated bug while both agents run. That should feel normal, not like a bookkeeping stunt.
 
-kiki (`kk`) gives each line of work a **thread**. A thread combines a [jj](https://github.com/jj-vcs/jj) workspace, a [tmux](https://github.com/tmux/tmux) session, an agent session, and a live head in the repository history. Threads can follow one another. When a parent changes, kiki waits for the child agent to reach a safe boundary, updates its workspace, and tells the agent what moved.
+kiki (`kk`) gives each line of work a **thread**. A thread combines a [jj](https://github.com/jj-vcs/jj) workspace, a terminal group in [Herdr](https://github.com/herdrdev/herdr), an agent session, and a live head in the repository history. Threads can follow one another. When a parent changes, kiki waits for the child agent to reach a safe boundary, updates its workspace, and tells the agent what moved.
 
 ```sh
 kk new auth-refactor
@@ -31,7 +31,7 @@ kk new investigate-login-bug
 kk switch add-tests
 ```
 
-You keep using `jj`, `tmux`, and `gh` directly. kiki handles the thread bookkeeping around them.
+You keep using `jj`, `gh`, and Herdr's own terminal controls directly. kiki handles the thread bookkeeping around them.
 
 > [!IMPORTANT]
 > kiki is pre-alpha. The design is written, but implementation has not started. There is nothing to install yet.

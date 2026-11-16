@@ -54,7 +54,7 @@ export default defineConfig({
   title: "kiki",
   titleTemplate: ":title · kiki",
   description:
-    "Give every coding agent its own thread with kiki, a daemon-backed coordinator for jj, tmux, agent harnesses, and GitHub.",
+    "Give every coding agent its own thread with kiki, a daemon-backed coordinator for jj, Herdr, agent harnesses, and GitHub.",
   base,
   cleanUrls: true,
   rewrites: {

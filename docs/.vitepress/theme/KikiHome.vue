@@ -14,7 +14,7 @@ type ThreadState = {
 const states: ThreadState[] = [
   {
     command: "kk new payment-refactor",
-    note: "a thread: workspace + tmux session + agent",
+    note: "a thread: workspace + terminal group + agent",
     payment: "● working",
     tests: "queued",
     bug: "queued",
@@ -50,7 +50,7 @@ const principles = [
   [
     "01",
     "be additive, not invasive",
-    "Keep using jj, gh, and tmux as you always have. kiki reacts; it does not intercept or wrap.",
+    "Keep using jj, gh, and Herdr as you always have. kiki reacts; it does not intercept or wrap.",
   ],
   [
     "02",
@@ -133,8 +133,8 @@ onBeforeUnmount(() => clearInterval(timer));
       <p class="hero-deck">
         One workflow for several pieces of code and several agents at once. kiki ties
         <a href="https://github.com/jj-vcs/jj">jujutsu (jj)</a>,
-        <a href="https://github.com/tmux/tmux">tmux</a>, agent harnesses, and the GitHub CLI behind
-        a single command: <strong>kk</strong>.
+        <a href="https://github.com/herdrdev/herdr">Herdr</a>, agent harnesses, and the GitHub CLI
+        behind a single command: <strong>kk</strong>.
       </p>
       <div class="hero-actions">
         <a class="button primary" :href="withBase('/reference/')">read the reference →</a>
@@ -190,7 +190,7 @@ onBeforeUnmount(() => clearInterval(timer));
       <header>
         <p id="thread-title" class="eyebrow">02 / the thread</p>
         <p>
-          A themed sequence of jj revisions with a live head, one workspace, one tmux session, and
+          A themed sequence of jj revisions with a live head, one workspace, one terminal group, and
           one agent. Isolated on disk, related in history.
         </p>
       </header>
@@ -206,7 +206,7 @@ onBeforeUnmount(() => clearInterval(timer));
               <div>
                 <strong>payment-refactor</strong><span>{{ states[step].payment }}</span>
               </div>
-              <small>agent A · jj workspace · tmux</small>
+              <small>agent A · jj workspace · terminal</small>
             </article>
             <div class="follow-line"><span>follows · reconcile + inform on evolve</span></div>
             <article
@@ -219,14 +219,14 @@ onBeforeUnmount(() => clearInterval(timer));
               <div>
                 <strong>add-tests</strong><span>{{ states[step].tests }}</span>
               </div>
-              <small>agent B · jj workspace · tmux</small>
+              <small>agent B · jj workspace · terminal</small>
             </article>
           </div>
           <article :class="{ active: states[step].active === 'bug' }">
             <div>
               <strong>bug-investigation</strong><span>{{ states[step].bug }}</span>
             </div>
-            <small>agent C · jj workspace · tmux</small>
+            <small>agent C · jj workspace · terminal</small>
           </article>
         </div>
         <p class="demo-note">// {{ states[step].note }}</p>
@@ -313,7 +313,7 @@ onBeforeUnmount(() => clearInterval(timer));
 
     <footer class="home-footer">
       <span>MIT © 2026 Sandile Keswa</span>
-      <span>built on jj · tmux · agent harnesses · gh</span>
+      <span>built on jj · Herdr · agent harnesses · gh</span>
     </footer>
   </main>
 </template>

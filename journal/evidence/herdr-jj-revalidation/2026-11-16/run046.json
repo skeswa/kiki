@@ -1,0 +1,95 @@
+{
+  "root": "/private/tmp/claude-501/-Users-skeswa-repos-skeswa-kiki/2ff5341a-30b2-4fb9-bf6e-9ea78f6543c6/scratchpad/out/jj-experiment-k8ab4hc9",
+  "version": "jj 0.46.0-7d382314f9420b4b8d932245b49c99492c812b9f",
+  "native_rewrite": {
+    "old_parent": [
+      "sryvsmuqpmmnpwokwormytyxozsrwuvk",
+      "971086b9c2a75b975de8e6bf97ac74daab5069ee"
+    ],
+    "new_parent": [
+      "sryvsmuqpmmnpwokwormytyxozsrwuvk",
+      "946cb54a82b5a4f7296c57fa10eedd8a7cc74279"
+    ],
+    "old_child": [
+      "ywyrskvpxkmuzuyllkxxpkkyqrwrxwqk",
+      "6878aed38b5f0d559621c94da818a9d2b2884bbf"
+    ],
+    "new_child": [
+      "ywyrskvpxkmuzuyllkxxpkkyqrwrxwqk",
+      "e45ec40a8d09e42b0ebbacead3a2c3f8fee409f4"
+    ],
+    "stale_status_exit": 1,
+    "stale_status_stderr": "Error: The working copy is stale (not updated since operation 86d99ba37305).\nHint: Run `jj workspace update-stale` to update it.\nSee https://docs.jj-vcs.dev/latest/working-copy/#stale-working-copy for more information.\n",
+    "update_stale_op_heads_unchanged": true,
+    "op_heads": [
+      "fcd1a1d15a88679a93ca3712df6c3e6b22c588398f85996c2c275447624709dd73d60b88f0fa9317efb2fadbf82231f7579f330745e37da1ae82caacacf6412b"
+    ],
+    "parent_dot_git_exists": false,
+    "child_dot_git_exists": false
+  },
+  "head_advance": {
+    "parent_head": [
+      "kvvklqtrkmkxwpyvoqnswqllzkssxkxv",
+      "edaec522a2e75fe3198d1eb027cec11dfcf1ccb5"
+    ],
+    "checkpoint": [
+      "sryvsmuqpmmnpwokwormytyxozsrwuvk",
+      "946cb54a82b5a4f7296c57fa10eedd8a7cc74279"
+    ],
+    "child_unchanged_until_explicit_rebase": true,
+    "child_after_rebase": [
+      "ywyrskvpxkmuzuyllkxxpkkyqrwrxwqk",
+      "66837485dab686c68082b87f8c2e7a1f83653554"
+    ]
+  },
+  "read_snapshot": {
+    "before": [
+      "ywyrskvpxkmuzuyllkxxpkkyqrwrxwqk",
+      "66837485dab686c68082b87f8c2e7a1f83653554"
+    ],
+    "after_status": [
+      "ywyrskvpxkmuzuyllkxxpkkyqrwrxwqk",
+      "615f3821d9c695a43f63436751853dfd98813c6f"
+    ]
+  },
+  "dirty_stale": {
+    "old_child": [
+      "zlzvquxrkkkspntoumnxuwtsnxlvuoum",
+      "cf8c0491986f25e1b38ac0382dc706de839d1b44"
+    ],
+    "evolved_child": [
+      "zlzvquxrkkkspntoumnxuwtsnxlvuoum",
+      "93e96bf3ddc0bc5dcacddbb64f19819c09767689"
+    ],
+    "update_exit": 0,
+    "update_stderr": "Concurrent modification detected, resolving automatically.\nRebased 1 descendant commits onto commits rewritten by other operation.\nWorking copy  (@) now at: zlzvquxr/2 93e96bf3 (divergent) dirty child\nParent commit (@-)      : osopmywy 6786ca44 checkpoint | dirty parent\nAdded 0 files, modified 1 files, removed 1 files\nUpdated working copy to fresh commit 93e96bf3ddc0\n",
+    "edit_remains_on_disk": false,
+    "visible_successors": "8e9e3fd1395b0b17839d2616760210a300f7109f true false\n93e96bf3ddc0bc5dcacddbb64f19819c09767689 true false\n",
+    "successors_preserving_edit": [
+      "8e9e3fd1395b0b17839d2616760210a300f7109f"
+    ]
+  },
+  "operation_dag": {
+    "base": "2c0bc18ac7fb11bb6a8fed2b98aa73b3acceb26a99d5e976bc065038f1fc1c093647d75badf0d8310e44ff49e3ced47d36af8d7e4fe875da11bef763d2a1b0dd",
+    "fork_heads": [
+      "a8028135b9fdc3bf0a18ffea98395af046fab599bf940c95b9de3394dcf4639fd88672650a31dfb0a0981086574c949f70c53070366681c9cf6aec629180c656",
+      "d7ac2529896d0baab7b681137f353c3d82e79dd3fd140280d60c1cb54daf6a7ec3008cc62914ed39c62179d6d35716ab53e00a89fcad3870f9c15ae9082874a8"
+    ],
+    "ambiguous_read_stderr": "Error: The \"@\" expression resolved to more than one operation\nHint: Try specifying one of the operations by ID: a8028135b9fd, d7ac2529896d\n",
+    "merged_heads": [
+      "18fec19470a15b4858cecfa3c40fe430bb8080d948c713e6b45f1c4534ceb56ec3ec78c5a581bf6038ce23cc5ead38e7198ce635af514df4a26bcad194527167"
+    ],
+    "operation_and_parents": "18fec19470a15b4858cecfa3c40fe430bb8080d948c713e6b45f1c4534ceb56ec3ec78c5a581bf6038ce23cc5ead38e7198ce635af514df4a26bcad194527167 a8028135b9fdc3bf0a18ffea98395af046fab599bf940c95b9de3394dcf4639fd88672650a31dfb0a0981086574c949f70c53070366681c9cf6aec629180c656 d7ac2529896d0baab7b681137f353c3d82e79dd3fd140280d60c1cb54daf6a7ec3008cc62914ed39c62179d6d35716ab53e00a89fcad3870f9c15ae9082874a8\na8028135b9fdc3bf0a18ffea98395af046fab599bf940c95b9de3394dcf4639fd88672650a31dfb0a0981086574c949f70c53070366681c9cf6aec629180c656 2c0bc18ac7fb11bb6a8fed2b98aa73b3acceb26a99d5e976bc065038f1fc1c093647d75badf0d8310e44ff49e3ced47d36af8d7e4fe875da11bef763d2a1b0dd\nd7ac2529896d0baab7b681137f353c3d82e79dd3fd140280d60c1cb54daf6a7ec3008cc62914ed39c62179d6d35716ab53e00a89fcad3870f9c15ae9082874a8 2c0bc18ac7fb11bb6a8fed2b98aa73b3acceb26a99d5e976bc065038f1fc1c093647d75badf0d8310e44ff49e3ced47d36af8d7e4fe875da11bef763d2a1b0dd\n2c0bc18ac7fb11bb6a8fed2b98aa73b3acceb26a99d5e976bc065038f1fc1c093647d75badf0d8310e44ff49e3ced47d36af8d7e4fe875da11bef763d2a1b0dd ed53256bf17482dc498791ae48cfe224e9306d143d447bd8bbf02b1cdfee68a4a39b9045e0ea72de89e824ecfdd964016988d311facbf525dd7631db8f55eb27\n"
+  },
+  "planned_operation": {
+    "unintegrated_id": "895f6de62a17",
+    "output": "Rebased 1 descendant commits.\nOperation left uncommitted because --no-integrate-operation was requested: 895f6de62a17\n",
+    "frontier_unchanged_until_integration": true
+  },
+  "colocated": {
+    "main_dot_git_exists": true,
+    "added_workspace_dot_git_exists": true,
+    "git_in_added_workspace_exit": 0,
+    "git_stderr": ""
+  }
+}

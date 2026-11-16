@@ -22,7 +22,7 @@ Stack publish:
 
 Publishing is manual by default. Configurable eager modes may later push or open draft PRs automatically. Even then, exploratory threads should not become reviewer-facing merely because they exist.
 
-Before presenting the publish plan for approval, kiki pins the current operation view and the exact `thread_head_commit_id` — the commit at the thread's live head. It validates the v1 linear owned stack. It includes that head in the plan digest. After approval, and immediately before pushing, kiki proves the head is unchanged. It then checkpoints the thread bookmark to that exact commit. If the head has changed, the approval is invalid and kiki regenerates the plan. kiki never pushes whichever older commit the bookmark happened to retain.
+Before presenting the publish plan for approval, kiki pins the current operation view and the exact `thread_head_commit_id` — the commit at the thread's live head. It validates the v1 linear owned stack. It includes that head in the plan digest. After approval, and immediately before pushing, kiki proves the head is unchanged. It then checkpoints the thread bookmark to that exact commit. That checkpoint is an explicit placement: it records the placement and resets the expected bookmark target to the pushed commit. An unresolved bookmark projection issue (`BookmarkMissing`, `BookmarkMoved`, or `BookmarkConflicted`) blocks it, so kiki never pushes through a bookmark whose target it cannot explain. If the head has changed, the approval is invalid and kiki regenerates the plan. kiki never pushes whichever older commit the bookmark happened to retain.
 
 ## PR text
 

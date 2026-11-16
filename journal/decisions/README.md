@@ -40,11 +40,13 @@ owning chapter; do not use a journal entry to override it silently.
 
 ## Decision index
 
-| ID                                                  | Choice                                                                   | Topic                                    |
-| --------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------- |
-| [D-0001](0001-adopt-project-journal.md)             | Separate current guidance, research history, and consequential decisions | Documentation                            |
-| [D-0002](0002-use-mise-for-tasks-and-formatting.md) | Use pinned mise tooling for tasks and formatting                         | Development workflow                     |
-| [D-0003](0003-use-jj-and-shared-agent-guidance.md)  | Use colocated jj and one shared contributor guide                        | Version control and contributor workflow |
+| ID                                                           | Choice                                                                   | Topic                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------ | ---------------------------------------- |
+| [D-0001](0001-adopt-project-journal.md)                      | Separate current guidance, research history, and consequential decisions | Documentation                            |
+| [D-0002](0002-use-mise-for-tasks-and-formatting.md)          | Use pinned mise tooling for tasks and formatting                         | Development workflow                     |
+| [D-0003](0003-use-jj-and-shared-agent-guidance.md)           | Use colocated jj and one shared contributor guide                        | Version control and contributor workflow |
+| [D-0004](0004-use-herdr-as-terminal-runtime.md)              | Host threads in a dedicated Herdr server instead of tmux                 | Terminal runtime ownership and topology  |
+| [D-0005](0005-track-checkpoint-through-native-successors.md) | Track the checkpoint bookmark through jj's native successors             | Checkpoint bookmark and projection audit |
 
 ## Earlier design rationale
 
@@ -52,11 +54,11 @@ These notes predate the numbered log. They keep their published locations and
 are not retroactively assigned dates, deciders, or acceptance claims. New
 decisions can supersede a linked note or a specific part of it.
 
-| Note                                                                                                         | Topic                         |
-| ------------------------------------------------------------------------------------------------------------ | ----------------------------- |
-| [Embedded cascade outbox](../../docs/reference/book/17-decisions/cascade-outbox.md)                          | Reliable delivery             |
-| [Native evolution and workspace materialization](../../docs/reference/book/17-decisions/native-evolution.md) | jj reconciliation             |
-| [Transcript anchoring](../../docs/reference/book/17-decisions/transcript-anchoring.md)                       | Transcript                    |
-| [Thread head and lifecycle sagas](../../docs/reference/book/17-decisions/thread-head-and-sagas.md)           | Thread identity and lifecycle |
-| [Codex as a second v1 harness](../../docs/reference/book/17-decisions/codex-adapter.md)                      | Harness integration           |
-| [Rejected alternatives](../../docs/reference/book/17-decisions/rejected.md)                                  | Design boundaries             |
+| Note                                                                                                                                                                                                                                                                                  | Topic                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| [Embedded cascade outbox](../../docs/reference/book/17-decisions/cascade-outbox.md)                                                                                                                                                                                                   | Reliable delivery             |
+| [Native evolution and workspace materialization](../../docs/reference/book/17-decisions/native-evolution.md)                                                                                                                                                                          | jj reconciliation             |
+| [Transcript anchoring](../../docs/reference/book/17-decisions/transcript-anchoring.md)                                                                                                                                                                                                | Transcript                    |
+| [Thread head and lifecycle sagas](../../docs/reference/book/17-decisions/thread-head-and-sagas.md) — tmux commitments superseded by [D-0004](0004-use-herdr-as-terminal-runtime.md); fixed bookmark target superseded by [D-0005](0005-track-checkpoint-through-native-successors.md) | Thread identity and lifecycle |
+| [Codex as a second v1 harness](../../docs/reference/book/17-decisions/codex-adapter.md)                                                                                                                                                                                               | Harness integration           |
+| [Rejected alternatives](../../docs/reference/book/17-decisions/rejected.md)                                                                                                                                                                                                           | Design boundaries             |

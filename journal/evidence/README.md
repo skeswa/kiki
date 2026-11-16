@@ -24,3 +24,9 @@ drawing a compatibility conclusion. A new run must not overwrite these files.
 | 2026-10-30 | [Herdr and tmux lifecycle results](../../docs/public/research/herdr-runtime/results.json) | [Terminal runtime](../../docs/research/herdr-terminal-runtime.md) |
 
 The [research tools index](../tools/README.md) links the corresponding probes.
+
+## Runs
+
+| Recorded | Evidence | Investigation |
+| --- | --- | --- |
+| 2026-11-16 | [jj 0.46.0 revalidation: probe rerun and bookmark, operation-head, and snapshot probes](herdr-jj-revalidation/2026-11-16/README.md) | [2026-11-16 Herdr and jj revalidation](../investigations/2026/2026-11-16-herdr-jj-revalidation.md) |

@@ -8,8 +8,8 @@ kiki did not invent a workflow. It formalizes one that engineers who push agents
 
 - one jj repo, colocated with git;
 - a jj workspace per line of work, so parallel edits never collide;
-- a tmux session per workspace, so every line of work keeps its own terminal;
-- an agent — Claude Code or Codex — alive in a pane of each session;
+- a persistent terminal per workspace — by hand, usually a tmux session — so every line of work keeps its own terminal;
+- an agent — Claude Code or Codex — alive in a pane of each terminal;
 - at most one chain of revisions in flight per workspace, named by a single bookmark.
 
 ```mermaid
@@ -17,39 +17,39 @@ flowchart LR
     repo["~/code/app/<br/>the repo — shared jj repository state"]
     subgraph auth ["bookmark: auth"]
         direction LR
-        wsA["jj workspace<br/>~/code/app-auth/"] --- sA["tmux session"] --- pA["agent pane"]
+        wsA["jj workspace<br/>~/code/app-auth/"] --- sA["terminal"] --- pA["agent pane"]
     end
     subgraph billing ["bookmark: billing"]
         direction LR
-        wsB["jj workspace<br/>~/code/app-billing/"] --- sB["tmux session"] --- pB["agent pane"]
+        wsB["jj workspace<br/>~/code/app-billing/"] --- sB["terminal"] --- pB["agent pane"]
     end
     subgraph search ["bookmark: search"]
         direction LR
-        wsC["jj workspace<br/>~/code/app-search/"] --- sC["tmux session"] --- pC["agent pane"]
+        wsC["jj workspace<br/>~/code/app-search/"] --- sC["terminal"] --- pC["agent pane"]
     end
     repo --- wsA
     repo --- wsB
     repo --- wsC
 ```
 
-Every column of that picture pulls its weight: isolation from jj workspaces, persistence from tmux, initiative from the agents. The trouble is the glue. Which workspace pairs with which session, which bookmark names which chain, which agent is waiting on what — all of it lives in the engineer's head, and the tax compounds with every added line of work:
+Every column of that picture pulls its weight: isolation from jj workspaces, persistence from the terminal multiplexer, initiative from the agents. The trouble is the glue. Which workspace pairs with which terminal, which bookmark names which chain, which agent is waiting on what — all of it lives in the engineer's head, and the tax compounds with every added line of work:
 
 - **Where is that work?** Nothing maps a half-remembered change to the workspace that holds it.
-- **Who needs me right now?** An agent blocked on a permission prompt in session three looks exactly like an agent making progress.
-- **What is in flight?** There is no single view of the tree of work; assembling one means visiting every session.
-- **Another one is a ritual.** New workspace, `cd`, new session, name it, create the bookmark, launch the agent — every time, by hand.
+- **Who needs me right now?** An agent blocked on a permission prompt in terminal three looks exactly like an agent making progress.
+- **What is in flight?** There is no single view of the tree of work; assembling one means visiting every terminal.
+- **Another one is a ritual.** New workspace, `cd`, new terminal, name it, create the bookmark, launch the agent — every time, by hand.
 - **Staleness is homework.** Keeping N workspaces current against a moving trunk — and against each other — is a rebase-and-conflict chore that grows with N.
 - **`jj log` stops scaling.** Every workspace's revisions interleave in one log; finding your own chain means scrolling past everyone else's.
-- **A second machine multiplies all of it.** The state lives in one machine's tmux server and filesystem, so moving between machines means rebuilding the picture by hand.
+- **A second machine multiplies all of it.** The state lives in one machine's terminal server and filesystem, so moving between machines means rebuilding the picture by hand.
 
-kiki's move is to register the hand-maintained tuple — workspace, tmux session, agent, bookmark — as one durable object with a name: the **thread**. Once the tuple is a first-class thing a daemon watches, each friction has an owner:
+kiki's move is to register the hand-maintained tuple — workspace, terminal, agent, bookmark — as one durable object with a name: the **thread**. For the terminal, kiki standardizes on [Herdr](https://github.com/herdrdev/herdr): one dedicated Herdr server, with one Herdr workspace — a **terminal group** — per thread. Once the tuple is a first-class thing a daemon watches, each friction has an owner:
 
 | Friction                              | What kiki does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Where                                                            |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Where is that work?                   | Threads are named and listed from anywhere. `kk ls` works across every registered repo; the TUI shows the same tree interactively.                                                                                                                                                                                                                                                                                                                                                                                                    | [Commands](09-commands.md), [Interface](10-interface/)           |
-| Who needs me right now?               | Every thread's agent projects a display state — `idle`, `working`, `finished`, `blocked` — surfaced in listings, the sidebar's Activity section, the tmux status line, and OS notifications.                                                                                                                                                                                                                                                                                                                                          | [Interface](10-interface/), [Observability](12-observability.md) |
+| Who needs me right now?               | Every thread's agent projects a display state — `idle`, `working`, `finished`, `blocked` — surfaced in listings, Herdr's sidebar, the overlay's Activity section, and OS notifications.                                                                                                                                                                                                                                                                                                                                               | [Interface](10-interface/), [Observability](12-observability.md) |
 | What is in flight?                    | `kk log` renders your thread and its follows-ancestors in full and collapses everything else to one line each; `--wide` adds PR, CI, and agent state for a one-screen bird's-eye view.                                                                                                                                                                                                                                                                                                                                                | [Commands](09-commands.md#kk-log)                                |
-| Another one is a ritual               | `kk new <name>` runs the whole ritual — workspace, initial change, bookmark checkpoint, tmux session, hooks, agent — as one durable, crash-recoverable saga. Inside a thread, branching off the current thread is the default.                                                                                                                                                                                                                                                                                                        | [Threads](03-threads.md)                                         |
+| Another one is a ritual               | `kk new <name>` runs the whole ritual — workspace, initial change, bookmark checkpoint, terminal group, hooks, agent — as one durable, crash-recoverable saga. Inside a thread, branching off the current thread is the default.                                                                                                                                                                                                                                                                                                      | [Threads](03-threads.md)                                         |
 | Staleness is homework                 | A thread can follow another thread. kiki classifies every parent change, rebases or materializes the child at a safe agent boundary, and interrupts the human only for genuine ambiguity — textual conflicts or topology it refuses to guess through. A root thread does not follow the moving trunk in v1: catching it up to `main` remains a direct `jj rebase`, which kiki then cascades through every following descendant. When a parent lands, the v1.x GitHub integration moves each child onto the exact merged trunk commit. | [Cascade](05-cascade.md)                                         |
 | `jj log` stops scaling                | Stack-aware collapse. The chain you are working on renders revision by revision; sibling and unrelated threads compress to one summary line apiece.                                                                                                                                                                                                                                                                                                                                                                                   | [Commands](09-commands.md#kk-log)                                |
 | Naming work that keeps changing shape | `kk new` without a name derives a placeholder, and v1.x metadata evolution lets kiki rename threads and describe revisions as the work reveals its shape — never overwriting prose a human wrote.                                                                                                                                                                                                                                                                                                                                     | [Metadata Evolution](08-metadata.md)                             |
@@ -60,7 +60,7 @@ Because a thread can follow another thread, the flat sibling picture above gener
 ```mermaid
 flowchart BT
     main["main — the trunk, and it keeps moving"]
-    auth["thread auth<br/>workspace + session + agent + bookmark"]
+    auth["thread auth<br/>workspace + terminal group + agent + bookmark"]
     authui["thread auth-ui"]
     authe2e["thread auth-e2e"]
     billing["thread billing<br/>an unrelated thread: same repo, same daemon"]
@@ -74,13 +74,14 @@ The table names the mechanisms; whether each surface ships in the acceptance sli
 
 ## The tool
 
-kiki (`kk`) coordinates agentic coding work. It gives a developer one named unit for a line of work — the thread: a chain of jj revisions, its own workspace, its own tmux session, and its own agent. A thread can be paused, resumed, archived, and stacked on top of related work. Publishing to GitHub and transcript-backed recall build on that unit once the coordination core is proven.
+kiki (`kk`) coordinates agentic coding work. It gives a developer one named unit for a line of work — the thread: a chain of jj revisions, its own workspace, its own terminal group, and its own agent. A thread can be paused, resumed, archived, and stacked on top of related work. Publishing to GitHub and transcript-backed recall build on that unit once the coordination core is proven.
 
 The point is to make parallel work cheap. Today, switching between agent-led lines of work means stashes, branches, rebases, lost terminals, and rebuilt context. kiki runs the coordination in the background instead: threads branch from threads, children follow their parents' live changes, and enough state survives on disk that you can always see what needs you.
 
 ## Principles
 
-- kiki coordinates in the background. You may always use `jj`, `tmux`, and `gh` directly; kiki watches and reacts rather than standing in the way.
+- kiki coordinates in the background. You may always use `jj`, `gh`, and Herdr's own terminal controls directly; kiki watches and reacts rather than standing in the way.
+- The terminal is Herdr's; the thread is kiki's. Herdr owns panes, layout, and what you see. It never decides which thread a terminal belongs to, whether an agent is ready, or whether files are safe to delete.
 - Threads keep each other out of the way, not out. Separate workspaces prevent accidents between parallel agents; they are not a security sandbox against processes running as your user.
 - Your words are yours. kiki may draft names, descriptions, and PR text, but it must not silently overwrite something a human wrote.
 - Transcript data, when transcript capture ships, is stored locally and never feeds anything kiki publishes. The one exception is explicit: a reopen catch-up you ask for may send selected rows to the configured model provider, and only after you consent.
@@ -94,17 +95,24 @@ This chapter is the book's single scope ledger. When another chapter needs to sa
 
 The acceptance slice includes:
 
-- `kk init`, `kk repo unregister`, `kk new`, `kk switch`, `kk ls`, `kk close`, `kk reopen`, and `kk repair`
+- `kk init`, `kk repo unregister`, `kk new`, `kk attach`, `kk switch`, `kk ls`, `kk close`, `kk reopen`, and `kk repair`
 - `kk log`, `kk status`, `kk thread detach`, `kk thread audit`, and approval-gated `kk audit log`
-- the minimum `kk config get|show` inspection surface and configuration needed to select the harness and relocate state or workspaces
+- the minimum `kk config get|show` inspection surface and configuration needed to select the harness, select the Herdr executable and server name, and relocate state or workspaces
 - a per-user daemon, per-repo registration, durable lifecycle sagas, and restart recovery
-- stable thread identity, a workspace `@` as the live thread head, and a bookmark as a checkpoint/publication projection
+- stable thread identity, a workspace `@` as the live thread head, and a bookmark as a checkpoint/publication projection tracked through jj's native rewrite successors
 - a deliberately linear owned-stack contract that stops at ambiguous topology
-- jj workspace and tmux session lifecycle, including recoverable close and creation failure states
+- jj workspace lifecycle and terminal-group lifecycle on one dedicated Herdr server, including recoverable close and creation failure states
+- journaled terminal provisioning through the gated pane launcher, so a lost reply or crash never yields two agents
+- terminal restore as reconciliation: server-instance tracking, snapshot resync after event loss, and no thread reported `Active` from a restored pane
+- process supervision: fixed-point quiescence proof, verified resume, verified exit before deletion, and orphan detection before replacement or deletion
+- the thread's label in Herdr's sidebar and critical attention notifications
+- caller-local `kk switch`, which requires Herdr's client-targeted focus capability, plus the explicitly global `kk switch --all-clients`
 - the pluggable harness boundary, with the `claude-code` and `codex` adapters implemented
 - exclusive managed-hook setup, batch-aware cascade delivery, reconciliation/materialization, acknowledgement, and conflict recovery
 - broad projection-divergence detection, narrow automatic repair, and explicit human-directed repair for ambiguous cases
 - SQLite-backed scoped and unscoped operational audit and the two-phase one-shot human-approval path needed by consequential operations
+
+The Herdr-backed items above are adopted as contract, not yet proven. Two of them wait on Herdr itself: caller-local switching needs the client-targeted focus extension, and macOS needs a Herdr release that survives the terminal application quitting. [Terminal runtime](13-architecture/terminal-runtime.md#what-exists-what-kiki-builds-what-herdr-must-add) separates what Herdr provides today, what kiki's adapter builds, what must land upstream, and which gates are still open; [Build Sequencing](15-build-sequencing.md) orders the proofs.
 
 ## v1.x polish
 
@@ -112,7 +120,7 @@ These deepen v1 but must not block the acceptance slice unless explicitly promot
 
 - stack-aware GitHub publishing through `gh`, with authentication checked when publishing rather than at registration
 - transcript capture, human transcript reads, consented opt-in reopen catch-up, same-thread MCP consent, and provider-consent management
-- overlay TUI, persistent sidebar, status-line polish, and the full notification vocabulary
+- overlay TUI, the `shell` and `ui` role panes, Herdr sidebar tokens beyond the thread label, and the full notification vocabulary
 - metadata ownership tracking followed by AI auto-describe and auto-rename execution
 - PR merge polling, comments, CI presentation, and auto-archive
 - narrow same-thread read-only transcript MCP reads, after the human transcript surface is stable
@@ -126,7 +134,9 @@ These deepen v1 but must not block the acceptance slice unless explicitly promot
 - harness adapters beyond `claude-code` and `codex`
 - broad MCP substrate for cross-thread agent messaging or spawning
 - webhooks; later GitHub integration may poll instead
-- full-screen multiplexer behavior beyond tmux integration
+- terminal multiplexing itself: Herdr owns panes, layout, input, and rendering, and kiki does not fork it or embed its code
+- terminal runtimes other than Herdr
+- remote terminal hosting, Windows, and live terminal-server handoff, each gated on evidence in the [Roadmap](16-roadmap.md)
 
 ## Non-goals
 
@@ -134,7 +144,7 @@ v1 leaves these problems alone:
 
 - kiki does not sandbox agents from each other. Per-thread workspaces provide cooperative separation only.
 - kiki does not manage CPU, memory, token, or model spend.
-- kiki does not block direct use of `jj`, `gh`, or `tmux`.
+- kiki does not block direct use of `jj`, `gh`, or Herdr.
 - kiki does not mirror the full `jj` CLI surface. When users need arbitrary jj behavior, they should run `jj`.
 - kiki does not publish local transcript prose, summarize it into PRs, or feed it into auto-describe or auto-rename. Consented reopen catch-up is model input, not publication.
 - kiki does not defend against an actively malicious same-UID process that can read files and invoke `kk`.

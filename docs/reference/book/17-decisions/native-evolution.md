@@ -6,7 +6,7 @@ Kiki distinguishes jj repository evolution from on-disk workspace materializatio
 
 When an ancestor revision is rewritten, jj may immediately evolve descendant commits and the working-copy commit recorded for another workspace. The other workspace's files can remain stale. Kiki compares before/after operation views and the follows edge's last synchronized base, then records a `NativeRewrite` containing the exact `from_base_commit → to_base_commit` transition. It waits for the managed agent's safe boundary, verifies that the current child still descends from `to_base_commit`, and materializes the child's current jj state. It does not rebase history jj already evolved or pin a child working-copy commit that may evolve again before the boundary.
 
-When a parent's persisted workspace head gains a new commit that is not already an ancestor of the following child, jj has no knowledge of kiki's follows edge. Kiki records a `ParentAdvance` intent and explicitly rebases the child's provably single-parent owned stack onto that exact commit at the child's safe boundary. The thread bookmark is checkpointed separately and is not treated as the live head because jj does not move it merely when `jj new` creates a child.
+When a parent's persisted workspace head gains a new commit that is not already an ancestor of the following child, jj has no knowledge of kiki's follows edge. Kiki records a `ParentAdvance` intent and explicitly rebases the child's provably single-parent owned stack onto that exact commit at the child's safe boundary. The thread bookmark is checkpointed separately and is not treated as the live head because jj does not move it merely when `jj new` creates a child. jj does move it when the commit it names is rewritten; [D-0005](https://github.com/skeswa/kiki/blob/main/journal/decisions/0005-track-checkpoint-through-native-successors.md) records how kiki tracks that.
 
 ## Why
 
@@ -25,14 +25,23 @@ An explicit `ParentAdvance` on B may likewise cause jj to evolve C. C receives `
 
 ## Direct jj limitation
 
-Kiki remains an ambient coordinator. A human may run `jj` directly in a stale child workspace, and that command may materialize the new state before kiki's boundary. Some materialization changes files without producing a new op-log head, so the watcher alone cannot observe it. The hard guarantee is therefore about kiki-controlled mutations for the managed agent, not about gatekeeping every same-UID process. Kiki probes current workspace state at every boundary and informs the agent even when there was no new operation.
+Kiki remains an ambient coordinator. A human may run `jj` directly in a stale child workspace, and that command may materialize the new state before kiki's boundary. Some materialization changes files without producing a new op-log head, so the watcher alone cannot observe it. (On jj 0.46.0 this holds for a clean stale workspace in a non-colocated repository; a colocated repository records an operation for the same update. Either way an operation is not freshness evidence.) The hard guarantee is therefore about kiki-controlled mutations for the managed agent, not about gatekeeping every same-UID process. Kiki probes current workspace state at every boundary and informs the agent even when there was no new operation.
 
 ## Unsnapshotted edits
 
-`jj workspace update-stale` can preserve unsnapshotted edits in a divergent or conflicted successor while placing a different clean successor on disk. Treating command success as successful recovery would therefore hide work from the managed agent.
+`jj workspace update-stale` can preserve unsnapshotted edits in a divergent or conflicted successor while placing a different clean successor on disk. Treating command success as successful recovery would therefore hide work from the managed agent. A bookmark on the affected commit becomes conflicted in the same step.
 
 Immediately before materialization, kiki runs a non-mutating `WorkspaceProbe`. `FreshClean` and `FreshDirty` need no update for a `NativeRewrite`; `StaleClean` may take the normal materialization path. Any dirty or indeterminate state that must be mutated enters `RecoveryRequired`, hard-pauses the agent, and runs `WorkspaceRecovery` outside the source workspace. Recovery first saves a byte-and-hash bundle of changed and untracked non-ignored paths, then invokes jj's stale-workspace recovery, enumerates all divergent successors, verifies where the edits landed, and selects a conflict-bearing result only when edit preservation can be proved. Ambiguity requires human selection. Kiki never resumes the agent in a clean working tree that merely makes the edits harder to find.
 
+## Later records
+
+Added 2026-11-16. The reasoning above stands. Two later records refine what surrounds it:
+
+- [D-0005](https://github.com/skeswa/kiki/blob/main/journal/decisions/0005-track-checkpoint-through-native-successors.md) tracks the checkpoint bookmark through jj's native rewrite successors. The same native evolution this note describes for commits also carries bookmarks.
+- [D-0004](https://github.com/skeswa/kiki/blob/main/journal/decisions/0004-use-herdr-as-terminal-runtime.md) moves terminal hosting to Herdr. The safe boundary stays a harness proof; no terminal observation substitutes for it.
+
+The jj 0.46.0 rerun also established that kiki must read every view at an exact operation id with the working copy ignored, and that no supported command lists all operation heads. The [Op-log watcher](../13-architecture/op-log-watcher.md) chapter carries those contracts.
+
 ## Implementation gate
 
-The CLI proof of concept must validate `WorkspaceProbe`, `jj workspace update-stale`, divergent-successor enumeration, and the `--no-integrate-operation` / `jj op integrate` flow with unsnapshotted edits, conflicts, concurrent operations, daemon crashes, direct materialization with no new op-log head, and multi-workspace descendant evolution before the production `JjBackend` contract is frozen.
+The CLI proof of concept must validate `WorkspaceProbe`, `jj workspace update-stale`, divergent-successor enumeration, the `OpFrontierSampler`, and the `--no-integrate-operation` / `jj op integrate` flow with unsnapshotted edits, conflicts, concurrent operations, daemon crashes, direct materialization with no new op-log head, and multi-workspace descendant evolution before the production `JjBackend` contract is frozen.
