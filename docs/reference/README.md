@@ -39,6 +39,8 @@ Appendices:
 
 The numbered chapters and appendices are the live contract. The Decisions chapter explains why parts of the contract look the way they do, but the behavioral chapters remain authoritative.
 
+The repository's [project journal](https://github.com/skeswa/kiki/tree/main/journal) holds investigations, evidence, and the [numbered decision log](https://github.com/skeswa/kiki/blob/main/journal/decisions/README.md). Journal entries preserve findings and rationale; changes to behavior or scope must also update the owning chapters here.
+
 When two live chapters appear to conflict, use this order:
 
 1. [Invariants](book/02-invariants.md)

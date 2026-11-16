@@ -38,6 +38,8 @@ You keep using `jj`, `tmux`, and `gh` directly. kiki handles the thread bookkeep
 
 The [reference book](docs/reference/README.md) covers commands, safety rules, architecture, scope, and the roadmap. The [orientation](docs/reference/book/01-orientation.md) is the shortest tour of the planned first release.
 
+The [project journal](journal/README.md) connects investigations, evidence, and the [decision log](journal/decisions/README.md). Start there to understand what has been researched and why a design choice was made.
+
 Read the spec and [open an issue](https://github.com/skeswa/kiki/issues) if a design choice looks wrong or incomplete. This is the point when objections can still reshape the implementation.
 
 ## Documentation site

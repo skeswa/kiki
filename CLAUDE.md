@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Also read [AGENTS.md](AGENTS.md) for the shared journal and decision-recording workflow.
 
 ## Read this first
 
@@ -8,7 +8,8 @@ The canonical contract for what this repo is building lives in the reference boo
 
 - For behavior questions (what does `kk x` do?): `docs/reference/book/02-invariants.md` first, then the relevant chapter in `docs/reference/book/`.
 - For structure questions (which crate, which sqlite table, which gRPC method?): `docs/reference/book/13-architecture/`.
-- For "why is it this way?": `docs/reference/book/17-decisions/` for ADR-style rationale.
+- For "why is it this way?": `journal/decisions/README.md` for the numbered decision log and links to earlier book rationale.
+- For investigations, supporting evidence, and reproduction tools: `journal/README.md`.
 - For deferred surfaces (v2 MCP substrate, etc.): `docs/reference/book/16-roadmap.md`.
 - For terminology: `docs/reference/book/appendix-a-glossary.md`.
 - For product intent and v1 scope: `docs/reference/book/00-abstract.md`, `docs/reference/book/01-orientation.md`, and `docs/reference/book/appendix-b-user-stories.md`.

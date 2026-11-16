@@ -2,6 +2,8 @@
 
 This chapter keeps short design notes that explain why the contract took its current shape.
 
+New consequential choices go in the repository's [numbered decision log](https://github.com/skeswa/kiki/blob/main/journal/decisions/README.md). These earlier notes keep their published locations and are indexed there without invented dates or deciders. A later record can supersede a note or a specific part of it while updating the affected contract chapters.
+
 These notes are part of the book, but they are not a higher authority than the behavioral chapters. If a decision note and a normative chapter appear to disagree, use the authority order in [the book index](../../).
 
 Read:

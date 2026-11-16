@@ -146,6 +146,7 @@ export default defineConfig({
         activeMatch: "^/reference/book/16-roadmap",
       },
       { text: "home", link: "/", activeMatch: "^/$" },
+      { text: "journal ↗", link: "https://github.com/skeswa/kiki/tree/main/journal", noIcon: true },
       { text: "github ↗", link: "https://github.com/skeswa/kiki", noIcon: true },
     ],
     sidebar,

@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "README.md"
+      - "journal/**"
       - ".github/workflows/docs.yml"
       - "docs/**"
       - "scripts/check-docs.ts"
@@ -13,6 +17,10 @@ on:
   push:
     branches: [main]
     paths:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "README.md"
+      - "journal/**"
       - ".github/workflows/docs.yml"
       - "docs/**"
       - "scripts/check-docs.ts"

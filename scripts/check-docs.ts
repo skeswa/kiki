@@ -178,7 +178,13 @@ function decoded(value: string): string {
   }
 }
 
-const files = [resolve(root, "README.md"), ...(await markdownFiles(resolve(root, "docs")))].sort();
+const files = [
+  resolve(root, "README.md"),
+  resolve(root, "AGENTS.md"),
+  resolve(root, "CLAUDE.md"),
+  ...(await markdownFiles(resolve(root, "docs"))),
+  ...(await markdownFiles(resolve(root, "journal"))),
+].sort();
 const sources = new Map<string, string>();
 const anchorCache = new Map<string, Set<string>>();
 
@@ -236,6 +242,10 @@ for (const file of files) {
       diagnostics.push({ file: displayFile, line, message: `missing anchor: ${destination}` });
     }
   }
+
+  // Historical records may quote superseded contracts. Check their links,
+  // but do not rewrite history to satisfy the current product vocabulary.
+  if (displayFile.startsWith("journal/")) continue;
 
   const staleContracts: Array<{ pattern: RegExp; message: string }> = [
     { pattern: /#scenario-3-conflict\b/gi, message: "removed scenario-3-conflict anchor" },
