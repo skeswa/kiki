@@ -464,7 +464,7 @@ How to read the wireframe:
 The UI pane is the optional [`ui` role pane](../appendix-a-glossary.md#ui-role-pane). It keeps the Stack tree permanently visible beside the agent. It is opt-in in two ways:
 
 - via `[ui] ui_pane = true` in user config; or
-- per thread via `kk new --sidebar` / `--no-sidebar` (see [Commands](../09-commands.md#kk-new)).
+- per thread via `kk new --ui-pane` / `--no-ui-pane` (see [Commands](../09-commands.md#kk-new)).
 
 Herdr's sidebar is separate and is not controlled by these settings.
 

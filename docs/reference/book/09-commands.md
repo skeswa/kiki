@@ -89,7 +89,7 @@ The first installation may use explicit Admin bootstrap, but only to enroll or r
 
 It verifies prerequisites:
 
-- [jj](https://docs.jj-vcs.dev/latest/) is initialized — hard error if not. The message names `jj init --colocate` as the typical fix. (A [colocated](https://docs.jj-vcs.dev/latest/git-compatibility/) repository holds jj and [Git](https://git-scm.com/) data side by side.)
+- [jj](https://docs.jj-vcs.dev/latest/) is initialized — hard error if not. The message names `jj git init --colocate` as the typical fix. (A [colocated](https://docs.jj-vcs.dev/latest/git-compatibility/) repository holds jj and [Git](https://git-scm.com/) data side by side.)
 - [`kkd`](appendix-a-glossary.md#kkd) can write the per-repo state directory at `~/.config/kiki/repos/<repo_id>/` — hard error if it cannot.
   - kiki writes nothing into the source repo itself.
   - The only kiki file that may live there is the optional committed `<repo>/.kiki.toml` (the repo-shared config layer), and `kk init` does not create it.
@@ -155,7 +155,7 @@ Important flags:
 - `-m "<prompt>"` supplies an initial prompt, delivered to the [harness](appendix-a-glossary.md#harness) as the first user turn;
 - `--harness <name>` selects a harness for the thread;
 - `--harness-arg <arg>` passes harness-specific arguments;
-- `--sidebar` / `--no-sidebar` are reserved for the v1.x [`ui` role pane](appendix-a-glossary.md#ui-role-pane), the optional pane that keeps the Stack tree permanently visible (see [Interface](10-interface/spec.md#ui-pane)). They override `[ui] ui_pane` for one thread. Herdr's native sidebar is not controlled by these flags.
+- `--ui-pane` / `--no-ui-pane` are reserved for the v1.x [`ui` role pane](appendix-a-glossary.md#ui-role-pane), the optional pane that keeps the Stack tree permanently visible (see [Interface](10-interface/spec.md#ui-pane)). They override `[ui] ui_pane` for one thread. Herdr's native sidebar is not controlled by these flags.
 
 ### The initial prompt
 
@@ -547,6 +547,35 @@ The first comments surface is read-only. Feeding review comments into agent cont
 It hard-stops the thread's agent and reframes it through the harness resume path. It is the explicit human escape hatch for a stuck or off-track agent, and it uses the same [hard-escalation](appendix-a-glossary.md#hard-escalation) shape as cascade conflict handling.
 
 Interrupt destroys a process at a human's request, so it requires one-shot [foreground approval](#foreground-approval-flow) — even for the contextual thread. Kiki's own protocol restarts, such as a cascade hard restart, are daemon-initiated steps of the delivery protocol and need no approval.
+
+## `kk thread restart`
+
+`kk thread restart <thread> --harness <new>` moves a thread to a different [harness](appendix-a-glossary.md#harness), the coding-agent program that runs in the thread. It is a v1.x command; [Orientation](01-orientation.md) records the tier.
+
+A thread cannot change its harness in place. This command is the only way to change it:
+
+- It ends the thread's current agent and starts a new one under the new harness.
+- The new agent is a new [incarnation](appendix-a-glossary.md#incarnation). It goes through the same [launch gate and ready handshake](appendix-a-glossary.md#launch-gate) as creation and reopen, and it must prove exclusive hook control again before the thread counts as ready.
+- If a cascade delivery is waiting, the new agent receives the saved payload first, through [`RestartStartup`](appendix-a-glossary.md#restartstartup-delivery-proof).
+- `--harness` accepts the same names as `kk new --harness`. An unsupported name is an error.
+
+Ending a live agent is process-destructive, so the command requires one-shot human approval (see [Authority](04-authority.md#operations-that-require-human-approval)).
+
+This command is not the `restart-agent` repair plan. That plan restarts the same harness after it has already exited, ships in the acceptance slice, and needs no approval in the thread's own context (see [`kk repair`](#kk-repair)).
+
+The rest of the command's behavior is settled when it ships. [Harness adapter](13-architecture/harness-adapter.md#per-thread-harness-selection) reserves these rules now so that no later change edits a thread's harness identity in place.
+
+## `kk thread describe`
+
+`kk thread describe --refresh` hands a revision's description back to kiki. It is a v1.x command and ships with [auto-describe](appendix-a-glossary.md#auto-describe), the feature that writes revision descriptions.
+
+It exists because kiki never overwrites words a human wrote. Once a human edits a description that kiki wrote, that description becomes human-owned, and kiki leaves it alone. `--refresh` is the explicit way to opt back in:
+
+- It marks the description as kiki-owned again and queues a new auto-describe job for it.
+- The job follows every auto-describe rule in [Metadata Evolution](08-metadata.md#revision-descriptions). In particular, it does not read the thread transcript.
+- Without `--refresh`, kiki does not rewrite a human-owned description.
+
+How the command selects a revision other than the thread's current one is settled when the feature ships.
 
 ## `kk thread detach`
 

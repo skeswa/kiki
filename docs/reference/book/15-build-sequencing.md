@@ -325,4 +325,4 @@ The buffer belongs to these cases:
 - jj op-id dedupe, and
 - cascade retry paths.
 
-Additional harness and version diagnostics, and non-core op-log compatibility cases, remain in their v1.x tranche. Transcript and sidebar edge cases likewise do not consume the acceptance buffer.
+Additional harness and version diagnostics, and non-core op-log compatibility cases, remain in their v1.x tranche. Transcript and UI-pane edge cases likewise do not consume the acceptance buffer.

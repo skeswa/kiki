@@ -350,7 +350,7 @@ The chapters of this book link here the first time they use a special term. You 
 
 - <a id="overlay-tui"></a>**Overlay TUI** — the interactive `kk` screen (a [TUI](#ext-tui) is a text-based user interface).
   - It opens as a Herdr popup from a keybinding that kiki generates. It also opens inline in any terminal when you run bare `kk` inside a registered repo.
-  - It has two panes: a left sidebar with Stack and Activity sections, and a right preview pane (transcript / diff / PR comments).
+  - It has two panes: a left thread list with Stack and Activity sections, and a right preview pane (transcript / diff / PR comments).
   - It carries the full action set (spawn, publish, close, interrupt). Consequential verbs are gated by foreground approval cards that the daemon issues.
   - You dismiss it with `q` / `esc`.
 

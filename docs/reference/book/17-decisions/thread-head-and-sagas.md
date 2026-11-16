@@ -8,7 +8,7 @@ A [thread](../appendix-a-glossary.md#thread) is kiki's unit of work: a named seq
 
 An active thread's [live head](../appendix-a-glossary.md#live-head) is the exact commit at its managed [workspace](../appendix-a-glossary.md#workspace)'s `@`, persisted as `thread_head_commit_id`. (`@` is jj's name for a workspace's current working-copy commit.)
 
-Its [bookmark](../appendix-a-glossary.md#bookmark) is a human-facing checkpoint, reopen handle, and publication [projection](../appendix-a-glossary.md#projection). Kiki places that bookmark only at explicit checkpoints such as activation, publish, detach, and close. It does not assume jj moves a bookmark when `jj new` creates a child revision.
+Its [bookmark](../appendix-a-glossary.md#bookmark) is a human-facing checkpoint, reopen handle, and publication [projection](../appendix-a-glossary.md#projection). Kiki moves that bookmark only at explicit checkpoints such as activation, publish, detach, and close. It does not assume jj moves a bookmark when `jj new` creates a child revision.
 
 ### The owned stack
 

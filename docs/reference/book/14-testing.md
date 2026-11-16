@@ -28,7 +28,7 @@ These modules are also required. Each one is tested alongside the later surface 
 - `AICompose`
 - `MetadataLedger`
 - `ThreadTranscriptStore`
-- `SidebarController`
+- `UiPaneController`
 - `PaneLifecycle`
 - `OverlayController`. Its tests cover:
   - opening and closing
@@ -879,7 +879,7 @@ These are the [three modules](appendix-a-glossary.md#terminalruntime-terminalcli
 
 ### UI controllers
 
-`SidebarController`, `OverlayController`, `ToastQueue`, `FormController`, and `PaneLifecycle` tests cover:
+`UiPaneController`, `OverlayController`, `ToastQueue`, `FormController`, and `PaneLifecycle` tests cover:
 
 - navigation versus consequential-action gating
 - contextual-thread previews versus exact sibling-read approval
@@ -896,7 +896,7 @@ These are the [three modules](appendix-a-glossary.md#terminalruntime-terminalcli
 - Each is ensured at creation, at `kk reopen`, and at a terminal-restart repair.
 - Neither is re-ensured at `kk switch` or respawned after the user closes it.
 
-`SidebarController` drives the Stack tree in the optional [`ui` role pane](appendix-a-glossary.md#ui-role-pane), which never receives a toast.
+`UiPaneController` drives the Stack tree in the optional [`ui` role pane](appendix-a-glossary.md#ui-role-pane), which never receives a toast.
 
 `LogRenderer`, `StatusRenderer`, the overlay, and the `ui` pane render lifecycle, cascade, and [agent display states](appendix-a-glossary.md#agent-display-states) through one shared renderer. A golden test compares output against a saved, known-good copy. Here it asserts that the same summary row produces the same glyph and label on every surface.
 

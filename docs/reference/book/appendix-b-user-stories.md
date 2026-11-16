@@ -395,7 +395,8 @@ The [thread transcript](appendix-a-glossary.md#thread-transcript) is kiki's stor
       - Provider egress is never mislabeled as local-only.
 104.  As a developer, I want [auto-describe](appendix-a-glossary.md#auto-describe) and PR drafting to NOT read from the locally stored transcript, so that recall prose cannot silently leak into published artifacts.
       - This is the [no-publication rule](appendix-a-glossary.md#no-publication-rule).
-105.  As a developer, I want `kk thread destroy` to delete the thread transcript alongside the bookmark by default, so that destroy means destroy unless I say otherwise.
+105.  As a developer, I want `kk thread destroy` to delete the thread transcript by default, along with the local bookmark and the thread's other local projections, so that destroy means destroy unless I say otherwise.
+      - The thread's jj revisions are still kept by default (story 69).
       - `--keep-log` is the explicit retention opt-out.
 106.  As a developer, I want the capture path abstracted behind a [`TranscriptAdapter`](appendix-a-glossary.md#transcriptadapter) trait, so that both v1 harnesses (Claude Code and Codex) share one path and later harnesses can be added without touching the log schema or the read API.
 107.  As a developer, I do NOT want token-streaming deltas, structured tool-call inputs and outputs, or extended-thinking blocks captured in the initial transcript release, so that the log is a readable narrative rather than a verbose event stream.
@@ -442,7 +443,7 @@ The [thread transcript](appendix-a-glossary.md#thread-transcript) is kiki's stor
 
 The [overlay](appendix-a-glossary.md#overlay-tui) is kiki's interactive screen. [Interface](10-interface/spec.md#overlay) specifies it.
 
-123. As a developer, I want the overlay TUI to be a left sidebar plus a right-hand content pane, so that one panel answers both "where am I in the work?" and "who needs me?" without me leaving navigation.
+123. As a developer, I want the overlay TUI to be a thread list on the left plus a preview pane on the right, so that one panel answers both "where am I in the work?" and "who needs me?" without me leaving navigation.
      - The sidebar shows two sections.
      - On top is a Stack section: the same stack-aware log as `kk log`, with the current thread's status inlined under its bookmark line.
      - Below it is an Activity section: the same threads, flat-listed by most-recent agent event.
@@ -467,7 +468,7 @@ The [overlay](appendix-a-glossary.md#overlay-tui) is kiki's interactive screen. 
 
 130. As a developer, I want to opt into a UI pane in every thread's terminal group via `[ui] ui_pane = true` in my user-global config, so that I have the Stack tree permanently visible without invoking the overlay, alongside the list Herdr's sidebar gives me.
      - The UI pane sits left of the agent and is `[ui] ui_pane_width` columns wide.
-131. As a developer, I want `kk new <name> --sidebar` / `--no-sidebar` to override my UI-pane default per thread, so that one-off threads can opt in or out without changing global config.
+131. As a developer, I want `kk new <name> --ui-pane` / `--no-ui-pane` to override my UI-pane default per thread, so that one-off threads can opt in or out without changing global config.
 132. As a developer, I want each view to show one consistent thing, so that there is one mental model for each view regardless of where it lives and kiki does not rebuild what Herdr already draws.
      - The UI pane renders the same Stack tree and inlined status the overlay does.
      - Herdr's sidebar carries the cross-repo list and attention state.
