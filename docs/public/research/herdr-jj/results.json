@@ -1,0 +1,188 @@
+{
+  "recorded_at": "2026-10-30",
+  "herdr_source_commit": "ee5bfb5041bb3e4a49d591c72308aae3c81ecdde",
+  "herdr_tested_release_tag": "v0.9.5",
+  "herdr_tested_release_commit": "2ecf19a92fc3a7fff75b6ce3655ef04f4625ec01",
+  "herdr_binary_platform": "macos-aarch64",
+  "herdr_binary_sha256": "fb77c2232a05a8035421382c894392f4174e4e38a18e48af3dd0290157c3a7e2",
+  "limits": [
+    "Herdr source tests not executed",
+    "Herdr smoke uses shell only, no live coding agent or managed launch protocol",
+    "Operation concurrency fixture uses historical views, not a timing race",
+    "Staged-operation experiment tests description metadata only",
+    "Frontier helper uses jj 0.44 internal filesystem layout, not a stable interface",
+    "Root and binary paths identify original scratch evidence on the research machine"
+  ],
+  "jj": {
+    "root": "/Users/skeswa/repos/herdr-research/jj-experiment-jm1n7dxq",
+    "version": "jj 0.44.0",
+    "native_rewrite": {
+      "old_parent": [
+        "pnzvnwtsznmlywmttsormqtqkkxrzswx",
+        "3fa473e25d17f021dc22618492ae2866ed090738"
+      ],
+      "new_parent": [
+        "pnzvnwtsznmlywmttsormqtqkkxrzswx",
+        "450526e0cfed588f96fa000c75ad9ec9133c3a02"
+      ],
+      "old_child": [
+        "mymmyswvruznwyyvtzqktptszywxzylx",
+        "c2a98f17e177aadfbdba696e777cf8c351671bb1"
+      ],
+      "new_child": [
+        "mymmyswvruznwyyvtzqktptszywxzylx",
+        "22709ad5c93eb49e6b665e1bd7769632b78e1e26"
+      ],
+      "stale_status_exit": 1,
+      "stale_status_stderr": "Error: The working copy is stale (not updated since operation 9090012d44fc).\nHint: Run `jj workspace update-stale` to update it.\nSee https://docs.jj-vcs.dev/latest/working-copy/#stale-working-copy for more information.\n",
+      "update_stale_op_heads_unchanged": true,
+      "op_heads": [
+        "3c7549b59520843d8eab9c59f9f569f03ccb1d2cafa148fbcf02dfd4e7d5988eab1fd6d5565b4b1d28e820617ad01ac3b0da78a824b9ce8d27faf2f153b06958"
+      ],
+      "parent_dot_git_exists": false,
+      "child_dot_git_exists": false
+    },
+    "head_advance": {
+      "parent_head": [
+        "zurssulvnsozvpqwrslntmospypxxxtl",
+        "87f6b22a3f10c28f9266f038246c6fba970a3275"
+      ],
+      "checkpoint": [
+        "pnzvnwtsznmlywmttsormqtqkkxrzswx",
+        "450526e0cfed588f96fa000c75ad9ec9133c3a02"
+      ],
+      "child_unchanged_until_explicit_rebase": true,
+      "child_after_rebase": [
+        "mymmyswvruznwyyvtzqktptszywxzylx",
+        "43acb9fe8ae7d0c66b8ac79ebb47bc0349499f6e"
+      ]
+    },
+    "read_snapshot": {
+      "before": [
+        "mymmyswvruznwyyvtzqktptszywxzylx",
+        "43acb9fe8ae7d0c66b8ac79ebb47bc0349499f6e"
+      ],
+      "after_status": [
+        "mymmyswvruznwyyvtzqktptszywxzylx",
+        "68dff2048209194d2bbea1e33415b7a632e1b2f1"
+      ]
+    },
+    "dirty_stale": {
+      "old_child": [
+        "uwmlzppnowtsqqowysorqmkwpnplvrst",
+        "43336a79dfa6c37ddc54248cb482529143f071ce"
+      ],
+      "evolved_child": [
+        "uwmlzppnowtsqqowysorqmkwpnplvrst",
+        "124c41b3af1fd744bdc615c58f25371af393f25a"
+      ],
+      "update_exit": 0,
+      "update_stderr": "Concurrent modification detected, resolving automatically.\nRebased 1 descendant commits onto commits rewritten by other operation.\nWorking copy  (@) now at: uwmlzppn/2 124c41b3 (divergent) dirty child\nParent commit (@-)      : ltqzrxos 14c6a7de checkpoint | dirty parent\nAdded 0 files, modified 1 files, removed 1 files\nUpdated working copy to fresh commit 124c41b3af1f\n",
+      "edit_remains_on_disk": false,
+      "visible_successors": "25b99d98a7e2e4f1bac4167117a1d1c1f5c2a926 true false\n124c41b3af1fd744bdc615c58f25371af393f25a true false\n",
+      "successors_preserving_edit": [
+        "25b99d98a7e2e4f1bac4167117a1d1c1f5c2a926"
+      ]
+    },
+    "operation_dag": {
+      "base": "478915327aa7080d760f68a60cc05f644bfbd7d6c6252a36c82b845fce05d0d0a18d7d8d56e3061ff9733f7278f71b8c721b5040b09ef23011b325b9a5ede29f",
+      "fork_heads": [
+        "1652e7a0c367bde701f5386f7e84c57ddf7e32adf00800dbb3e33dcabefb3fa7cb003a3df0ed008b143c47a92d9a95cfc45dc07a29eed2c08297cdb5c2128ee5",
+        "dad314f56f5033362db5d3de2a00c3ab103af904a1fb6407204e7188216e58cfbd2b9c295dddd10c47ad393db4772ca474a35252ce9da1c76018727ff3caffd2"
+      ],
+      "ambiguous_read_stderr": "Error: The \"@\" expression resolved to more than one operation\nHint: Try specifying one of the operations by ID: dad314f56f50, 1652e7a0c367\n",
+      "merged_heads": [
+        "f2c70e8d2164b2a407c5a52868ba1d63f33bce046bfd7cdf0a74f8e0b9e5c13c8f1c939a4f89fa0c2f7aac89fbb7aeaa7bbb65a329d2b6b27ca656def4e64ebc"
+      ],
+      "operation_and_parents": "f2c70e8d2164b2a407c5a52868ba1d63f33bce046bfd7cdf0a74f8e0b9e5c13c8f1c939a4f89fa0c2f7aac89fbb7aeaa7bbb65a329d2b6b27ca656def4e64ebc dad314f56f5033362db5d3de2a00c3ab103af904a1fb6407204e7188216e58cfbd2b9c295dddd10c47ad393db4772ca474a35252ce9da1c76018727ff3caffd2 1652e7a0c367bde701f5386f7e84c57ddf7e32adf00800dbb3e33dcabefb3fa7cb003a3df0ed008b143c47a92d9a95cfc45dc07a29eed2c08297cdb5c2128ee5\ndad314f56f5033362db5d3de2a00c3ab103af904a1fb6407204e7188216e58cfbd2b9c295dddd10c47ad393db4772ca474a35252ce9da1c76018727ff3caffd2 478915327aa7080d760f68a60cc05f644bfbd7d6c6252a36c82b845fce05d0d0a18d7d8d56e3061ff9733f7278f71b8c721b5040b09ef23011b325b9a5ede29f\n1652e7a0c367bde701f5386f7e84c57ddf7e32adf00800dbb3e33dcabefb3fa7cb003a3df0ed008b143c47a92d9a95cfc45dc07a29eed2c08297cdb5c2128ee5 478915327aa7080d760f68a60cc05f644bfbd7d6c6252a36c82b845fce05d0d0a18d7d8d56e3061ff9733f7278f71b8c721b5040b09ef23011b325b9a5ede29f\n478915327aa7080d760f68a60cc05f644bfbd7d6c6252a36c82b845fce05d0d0a18d7d8d56e3061ff9733f7278f71b8c721b5040b09ef23011b325b9a5ede29f fee06ca84558ed7fb3215f99af22c529586af92e0afe798354b751933803e5ee4ab9275a6cbaa379fc04bec40a72f904fb115375faedcf238ba7f0dc7d8f2b27\n"
+    },
+    "planned_operation": {
+      "unintegrated_id": "da175e551fe7",
+      "output": "Rebased 1 descendant commits.\nOperation left uncommitted because --no-integrate-operation was requested: da175e551fe7\n",
+      "frontier_unchanged_until_integration": true
+    },
+    "colocated": {
+      "main_dot_git_exists": true,
+      "added_workspace_dot_git_exists": false,
+      "git_in_added_workspace_exit": 128,
+      "git_stderr": "fatal: not a git repository (or any of the parent directories): .git\n"
+    }
+  },
+  "herdr": {
+    "root": "/tmp/kiki-herdr-2bljndm0",
+    "binary": "/Users/skeswa/repos/herdr-research/bin/herdr-0.9.5",
+    "version": "herdr 0.9.5",
+    "ping": {
+      "type": "pong",
+      "version": "0.9.5",
+      "protocol": 22,
+      "capabilities": {
+        "live_handoff": true,
+        "detached_server_daemon": false,
+        "endpoint_protocol_generation": 1,
+        "surface_interest": true,
+        "health_check": true,
+        "ssh_agent_registration": true
+      }
+    },
+    "created": {
+      "type": "workspace_created",
+      "workspace": {
+        "workspace_id": "w1",
+        "number": 1,
+        "label": "kiki jj smoke",
+        "focused": true,
+        "pane_count": 1,
+        "tab_count": 1,
+        "active_tab_id": "w1:t1",
+        "agent_status": "unknown"
+      },
+      "tab": {
+        "tab_id": "w1:t1",
+        "workspace_id": "w1",
+        "number": 1,
+        "label": "1",
+        "focused": true,
+        "pane_count": 1,
+        "agent_status": "unknown"
+      },
+      "root_pane": {
+        "pane_id": "w1:p1",
+        "terminal_id": "term_65f0df85a95041",
+        "workspace_id": "w1",
+        "tab_id": "w1:t1",
+        "focused": true,
+        "cwd": "/private/tmp/kiki-herdr-2bljndm0/child",
+        "foreground_cwd": "/private/tmp/kiki-herdr-2bljndm0/child",
+        "agent_status": "unknown",
+        "scroll": {
+          "offset_from_bottom": 0,
+          "max_offset_from_bottom": 0,
+          "viewport_rows": 40
+        },
+        "revision": 0
+      }
+    },
+    "metadata": {
+      "type": "workspace_info",
+      "workspace": {
+        "workspace_id": "w1",
+        "number": 1,
+        "label": "kiki jj smoke",
+        "focused": true,
+        "pane_count": 1,
+        "tab_count": 1,
+        "active_tab_id": "w1:t1",
+        "agent_status": "unknown",
+        "tokens": {
+          "jj_status": "research",
+          "thread_id": "research-thread"
+        }
+      }
+    },
+    "cwd_verified": true,
+    "close_preserves_workspace_files": true,
+    "server_exit": 0
+  },
+  "herdr_tested_release_tag_object": "7573e821895d32c8d1f78b3f6c9a2f85a46df4ac"
+}

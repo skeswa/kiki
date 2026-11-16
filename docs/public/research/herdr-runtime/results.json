@@ -1,0 +1,353 @@
+{
+  "date": "2026-10-30",
+  "platform": "macOS arm64",
+  "herdr_source_commit": "ee5bfb5041bb3e4a49d591c72308aae3c81ecdde",
+  "herdr_tested_release_commit": "2ecf19a92fc3a7fff75b6ce3655ef04f4625ec01",
+  "herdr_binary_sha256": "fb77c2232a05a8035421382c894392f4174e4e38a18e48af3dd0290157c3a7e2",
+  "tmux_reviewed_source_commit": "7f2a35ad3321f9ba57a1062ca73b1f3ff26aca53",
+  "limits": [
+    "Synthetic processes, no live coding agents",
+    "No host reboot/logout or terminal-application quit test",
+    "No live handoff or full freeze/holder proof",
+    "No Linux/Windows execution or performance benchmark",
+    "Herdr master differs from tested stable binary",
+    "Tmux 3.8 source differs from tested local 3.7c",
+    "Paths and PIDs identify original disposable fixtures"
+  ],
+  "herdr": {
+    "root": "/tmp/kk-runtime-hp9vr_jd",
+    "version": "herdr 0.9.5",
+    "direct_argv_initial": {
+      "pid": 80999,
+      "child": 81000,
+      "pgid": 80999,
+      "sid": 80999,
+      "tag": "direct-tag",
+      "cwd": "/private/tmp/kk-runtime-hp9vr_jd",
+      "argv": [
+        "normal",
+        "literal;$() with spaces"
+      ]
+    },
+    "direct_argv_process_info": {
+      "type": "pane_process_info",
+      "process_info": {
+        "pane_id": "w1:p2",
+        "shell_pid": 80999,
+        "foreground_process_group_id": 80999,
+        "foreground_processes": [
+          {
+            "pid": 81000,
+            "name": "Python",
+            "argv0": "Python",
+            "argv": [
+              "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+              "/tmp/kk-runtime-hp9vr_jd/worker.py",
+              "/tmp/kk-runtime-hp9vr_jd/direct-initial",
+              "child"
+            ],
+            "cmdline": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python /tmp/kk-runtime-hp9vr_jd/worker.py /tmp/kk-runtime-hp9vr_jd/direct-initial child",
+            "cwd": "/private/tmp/kk-runtime-hp9vr_jd"
+          },
+          {
+            "pid": 80999,
+            "name": "Python",
+            "argv0": "Python",
+            "argv": [
+              "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+              "/tmp/kk-runtime-hp9vr_jd/worker.py",
+              "/tmp/kk-runtime-hp9vr_jd/direct-initial",
+              "normal",
+              "literal;$() with spaces"
+            ],
+            "cmdline": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python /tmp/kk-runtime-hp9vr_jd/worker.py /tmp/kk-runtime-hp9vr_jd/direct-initial normal literal;$() with spaces",
+            "cwd": "/private/tmp/kk-runtime-hp9vr_jd"
+          }
+        ]
+      }
+    },
+    "initial_env": {
+      "tag": "initial-tag",
+      "pid": 81002
+    },
+    "split_without_env": {
+      "tag": null,
+      "pid": 81004
+    },
+    "worker": {
+      "pid": 81001,
+      "child": 81005,
+      "pgid": 81001,
+      "sid": 81001,
+      "tag": "initial-tag",
+      "cwd": "/private/tmp/kk-runtime-hp9vr_jd",
+      "argv": [
+        "normal"
+      ]
+    },
+    "no_client_heartbeat": true,
+    "client_attach": {
+      "running": true,
+      "terminal_bytes": 14453
+    },
+    "client_detach_exit": 0,
+    "heartbeat_after_client_detach": true,
+    "second_client_attach": {
+      "running": true,
+      "terminal_bytes": 14769
+    },
+    "heartbeat_after_client_sigkill": true,
+    "before_restart_pane": {
+      "type": "pane_info",
+      "pane": {
+        "pane_id": "w2:p1",
+        "terminal_id": "term_65f0e718fc0093",
+        "workspace_id": "w2",
+        "tab_id": "w2:t1",
+        "focused": false,
+        "cwd": "/private/tmp/kk-runtime-hp9vr_jd",
+        "foreground_cwd": "/private/tmp/kk-runtime-hp9vr_jd",
+        "agent_status": "unknown",
+        "scroll": {
+          "offset_from_bottom": 0,
+          "max_offset_from_bottom": 0,
+          "viewport_rows": 27
+        },
+        "revision": 0
+      }
+    },
+    "process_info": {
+      "type": "pane_process_info",
+      "process_info": {
+        "pane_id": "w2:p1",
+        "shell_pid": 81001,
+        "foreground_process_group_id": 81001,
+        "foreground_processes": [
+          {
+            "pid": 81005,
+            "name": "Python",
+            "argv0": "Python",
+            "argv": [
+              "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+              "/tmp/kk-runtime-hp9vr_jd/worker.py",
+              "/tmp/kk-runtime-hp9vr_jd/live",
+              "child"
+            ],
+            "cmdline": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python /tmp/kk-runtime-hp9vr_jd/worker.py /tmp/kk-runtime-hp9vr_jd/live child",
+            "cwd": "/private/tmp/kk-runtime-hp9vr_jd"
+          },
+          {
+            "pid": 81001,
+            "name": "Python",
+            "argv0": "Python",
+            "argv": [
+              "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python",
+              "/tmp/kk-runtime-hp9vr_jd/worker.py",
+              "/tmp/kk-runtime-hp9vr_jd/live",
+              "normal"
+            ],
+            "cmdline": "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python /tmp/kk-runtime-hp9vr_jd/worker.py /tmp/kk-runtime-hp9vr_jd/live normal",
+            "cwd": "/private/tmp/kk-runtime-hp9vr_jd"
+          }
+        ]
+      }
+    },
+    "worker_dead_after_graceful_stop": true,
+    "child_dead_after_graceful_stop": true,
+    "persisted_snapshot_keys": [
+      "version",
+      "workspaces",
+      "active",
+      "selected",
+      "sidebar_width",
+      "sidebar_section_split",
+      "collapsed_space_keys"
+    ],
+    "restored_workspace": {
+      "type": "workspace_info",
+      "workspace": {
+        "workspace_id": "w2",
+        "number": 2,
+        "label": "lifecycle",
+        "focused": false,
+        "pane_count": 2,
+        "tab_count": 1,
+        "active_tab_id": "w2:t1",
+        "agent_status": "unknown"
+      }
+    },
+    "restored_pane": {
+      "type": "pane_info",
+      "pane": {
+        "pane_id": "w2:p1",
+        "terminal_id": "term_65f0e71dc64563",
+        "workspace_id": "w2",
+        "tab_id": "w2:t1",
+        "focused": false,
+        "cwd": "/private/tmp/kk-runtime-hp9vr_jd",
+        "foreground_cwd": "/private/tmp/kk-runtime-hp9vr_jd",
+        "agent_status": "unknown",
+        "scroll": {
+          "offset_from_bottom": 0,
+          "max_offset_from_bottom": 0,
+          "viewport_rows": 38
+        },
+        "revision": 0
+      }
+    },
+    "restored_env": {
+      "tag": null,
+      "pid": 81021
+    },
+    "restored_process_info": {
+      "type": "pane_process_info",
+      "process_info": {
+        "pane_id": "w2:p1",
+        "shell_pid": 81019,
+        "foreground_process_group_id": 81019,
+        "foreground_processes": [
+          {
+            "pid": 81019,
+            "name": "bash",
+            "argv0": "sh",
+            "argv": [
+              "/bin/sh"
+            ],
+            "cmdline": "/bin/sh",
+            "cwd": "/private/tmp/kk-runtime-hp9vr_jd"
+          }
+        ]
+      }
+    },
+    "direct_argv_after_restore": {
+      "type": "pane_process_info",
+      "process_info": {
+        "pane_id": "w1:p2",
+        "shell_pid": 81018,
+        "foreground_process_group_id": 81018,
+        "foreground_processes": [
+          {
+            "pid": 81018,
+            "name": "bash",
+            "argv0": "sh",
+            "argv": [
+              "/bin/sh"
+            ],
+            "cmdline": "/bin/sh",
+            "cwd": "/private/tmp/kk-runtime-hp9vr_jd"
+          }
+        ]
+      }
+    },
+    "before_process_exit": {
+      "type": "pane_info",
+      "pane": {
+        "pane_id": "w1:p3",
+        "terminal_id": "term_65f0e71df239a5",
+        "workspace_id": "w1",
+        "tab_id": "w1:t3",
+        "focused": false,
+        "cwd": "/private/tmp/kk-runtime-hp9vr_jd",
+        "foreground_cwd": "/private/tmp/kk-runtime-hp9vr_jd",
+        "agent_status": "unknown",
+        "scroll": {
+          "offset_from_bottom": 0,
+          "max_offset_from_bottom": 0,
+          "viewport_rows": 40
+        },
+        "revision": 0
+      }
+    },
+    "after_process_exit_info": {
+      "pane_closed": true
+    },
+    "other_workspace_survives_close": true,
+    "ignore_hup_worker_dead_after_workspace_close": true,
+    "ignore_hup_child_dead_after_workspace_close": true,
+    "crash_worker": {
+      "pid": 81034,
+      "child": 81035,
+      "pgid": 81034,
+      "sid": 81034,
+      "tag": null,
+      "cwd": "/private/tmp/kk-runtime-hp9vr_jd",
+      "argv": [
+        "ignore-hup"
+      ]
+    },
+    "server_sigkill_exit": -9,
+    "ignore_hup_worker_survives_server_sigkill": true,
+    "ignore_hup_heartbeat_after_server_sigkill": true,
+    "remaining_owned_workers": []
+  },
+  "tmux": {
+    "root": "/var/folders/kc/94jncx6s6pqc8g2g4f2kyvtr0000gn/T/kiki-tmux-runtime-e3z5frgo",
+    "socket_name": "kiki-research-7965581ee64f4b2c89f7c7cbf9109204",
+    "version": "tmux 3.7c",
+    "initial_ids": "$0 @0 %0 80570 80571",
+    "initial": {
+      "pid": 80571,
+      "argv": [
+        "literal;$() with spaces"
+      ],
+      "cwd": "/private/var/folders/kc/94jncx6s6pqc8g2g4f2kyvtr0000gn/T/kiki-tmux-runtime-e3z5frgo",
+      "env": "initial",
+      "pane": "%0"
+    },
+    "capture": "ready marker",
+    "two_clients_smallest": "80x24",
+    "two_clients_largest": "120x40",
+    "clients": "client-80573 120x 1\nclient-80574 80x 1",
+    "control_output": "%begin 1793365338 287 0\n%end 1793365338 287 0\n%session-changed $0 baseline\n%begin 1793365338 292 1\n%end 1793365338 292 1\n%layout-change @0 aafd,120x40,0,0,0 aafd,120x40,0,0,0 *\n%client-session-changed client-80574 $0 baseline\n%layout-change @0 b25d,80x24,0,0,0 b25d,80x24,0,0,0 *\n%layout-change @0 aafd,120x40,0,0,0 aafd,120x40,0,0,0 *\n",
+    "after_client_disconnect": "%0 80571 0",
+    "waiter_was_blocked": true,
+    "waiter_exit": 0,
+    "respawn": {
+      "pid": 80598,
+      "argv": [
+        "new process"
+      ],
+      "cwd": "/private/var/folders/kc/94jncx6s6pqc8g2g4f2kyvtr0000gn/T/kiki-tmux-runtime-e3z5frgo",
+      "env": "respawn",
+      "pane": "%0"
+    },
+    "respawn_ids": "$0 @0 %0 80598",
+    "server_crash_has_session": "",
+    "after_crash_has_session_exit": 1,
+    "after_crash_stderr": "no server running on /private/tmp/tmux-501/kiki-research-7965581ee64f4b2c89f7c7cbf9109204\n"
+  },
+  "tmux_orphans": {
+    "root": "/var/folders/kc/94jncx6s6pqc8g2g4f2kyvtr0000gn/T/kiki-tmux-orphan-_uisnss4",
+    "cases": {
+      "graceful": {
+        "socket": "kiki-research-64484b63a3a9493aaa712b6d778824c0",
+        "ids": "80824 80825",
+        "pids": {
+          "worker": 80825,
+          "child": 80826,
+          "group": 80825
+        },
+        "heartbeat_advanced": {
+          "worker": true,
+          "child": true
+        },
+        "has_session": ""
+      },
+      "sigkill": {
+        "socket": "kiki-research-6c446b43972b4044933e915cc6ab1304",
+        "ids": "80832 80833",
+        "pids": {
+          "worker": 80833,
+          "child": 80834,
+          "group": 80833
+        },
+        "heartbeat_advanced": {
+          "worker": true,
+          "child": true
+        },
+        "has_session": ""
+      }
+    },
+    "version": "tmux 3.7c"
+  }
+}
