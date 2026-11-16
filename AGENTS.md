@@ -43,12 +43,31 @@ Documentation setup and CI do not require initializing jj.
 
 ### Separate and describe draft changes
 
-Each logical change gets its own described jj revision. jj snapshots the
-working copy automatically; there is no staging step. Inspect `jj status`
-before editing and preserve existing work. Use `jj describe -m '<message>'`
-for the current change, then `jj new -m '<message>'` before starting another.
-Do not fold a second unrelated change into the first or leave nonempty work
-undescribed. These local draft operations are part of ordinary authorized work.
+Use small, frequent, well-described jj revisions throughout the work. Each
+revision should contain one coherent, reviewable change, with its directly
+related tests and documentation. Start a new revision at each completed
+logical step; do not wait for an entire task or conversation turn to finish.
+Split unrelated changes before the working revision becomes a large bundle.
+
+Describe work when starting it. Inspect `jj status` before editing and preserve
+existing work. Start each new revision with `jj new -m '<message>'`; if the
+current revision is undescribed, use `jj describe -m '<message>'` immediately,
+before making further edits. An undescribed working revision should exist only
+briefly during a transition, never as the normal working state.
+
+Keep the description accurate as the work develops. State the intended change
+and why it matters, then update the description when the scope or approach
+changes. Before moving to the next revision, review `jj diff` and describe the
+actual result, including relevant validation or known limits. Avoid generic
+descriptions such as `WIP`, `fixes`, or `updates`.
+
+Before a pause or handoff, check that the working revision and any other
+revisions created during the task have useful descriptions. If a command leaves
+an empty, undescribed working revision, describe it before continuing. When
+there is no next task, stay on the completed, described revision rather than
+creating a placeholder revision. jj snapshots automatically; there is no staging
+step. Creating, describing, and separating these local drafts are ordinary
+authorized work and do not require another confirmation.
 
 Finalize with `jj commit`, move `main`, or push only when the user asks.
 Published trunk history must only advance: do not force-push, rewrite it, or

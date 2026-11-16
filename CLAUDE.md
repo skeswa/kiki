@@ -14,8 +14,14 @@ Swingset-derived practices used by all agents:
 - **Formatting:** use `mise run fmt` and `mise run fmt:check`, with exact tool
   pins and the [evidence exclusions](AGENTS.md#formatting).
 - **Version control:** use [jj](AGENTS.md#version-control) for VCS operations,
-  keep logical changes in separate described drafts, and use non-interactive
-  commands. Finalize with `jj commit`, move `main`, or push only when asked.
+  with small, frequent revisions for coherent, reviewable steps. Start each
+  revision with `jj new -m '<message>'` and immediately describe an undescribed
+  working revision before editing. Keep descriptions specific about what and
+  why, refresh them as the work changes, and review them at each checkpoint
+  and before handoff. An undescribed working revision should be a brief
+  transition, never the normal state. Do not wait until the end of a task to
+  separate and describe its changes. Use non-interactive commands; finalize
+  with `jj commit`, move `main`, or push only when asked.
 
 Claude Code's Git-oriented tool hints do not change the jj workflow. Use
 `jj git fetch` and, when requested, `jj git push`; do not substitute Git write
