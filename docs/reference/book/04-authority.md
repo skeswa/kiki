@@ -250,8 +250,9 @@ A future export command may render the SQLite authority as [JSONL](https://jsonl
 
 ## Remote authority after v1
 
-In the planned remote system, the execution host checks both the device's
-grant for the selected profile and the authority required by the method.
-Profile membership alone cannot authorize an action. The enrolled host
-presenter confirms consequential plans until a remote presenter can meet
-its own proof requirements. See [Remote access through profiles](13-architecture/remote-access.md#connecting-and-granting-access).
+The host checks each request against the device's grant for that profile.
+It also checks what the requested action requires. For example, a device
+can have permission to reach a thread and still need a person's approval
+to close it. The host's enrolled presenter collects that approval. A viewer
+on another machine needs its own way to prove the person confirmed the plan
+before kiki can accept approval there. See [Remote access through profiles](13-architecture/remote-access.md#connecting-and-granting-access).

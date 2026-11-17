@@ -244,4 +244,8 @@ Breaking changes require a new service version. The daemon **may** host both ver
 
 A same-host native GUI can consume the unix-socket gRPC service directly.
 
-The planned remote client reuses these method and approval rules. Each remote call also needs an authenticated device and a host grant for its profile and target. The first transport to test is restricted SSH. See [Remote access through profiles](remote-access.md) for enrollment, reconnect, revocation, and release checks.
+A remote client will use the same rules for calling methods and getting
+approval. The host must also verify which device sent each request and
+check that its grant covers the profile and target. The first connection
+to test uses Secure Shell (SSH) restricted to a kiki command.
+See [Remote access through profiles](remote-access.md).

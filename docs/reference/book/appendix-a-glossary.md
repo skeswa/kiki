@@ -428,8 +428,8 @@ The chapters of this book link here the first time they use a special term. You 
 
 ## v2 / future
 
-- <a id="profile"></a>**Profile.** A user-defined, named collection of execution hosts, repo registrations, and harness choices for related work. Each viewing window can select its own profile. See [Remote access through profiles](13-architecture/remote-access.md).
-- <a id="execution-host"></a>**Execution host.** The machine and OS user whose daemon runs a thread and owns its workspace, terminal group, and harness session. Several profiles can use one execution host.
+- <a id="profile"></a>**Profile.** A group you name to keep related work together. You choose the hosts, registered repos, and harness accounts it includes. Each window can select its own profile. See [Remote access through profiles](13-architecture/remote-access.md).
+- <a id="execution-host"></a>**Execution host.** The machine and operating system user that run a thread. Their kiki daemon manages its workspace, terminal group, and harness session. Several profiles can use one execution host.
 
 - <a id="causal-chain"></a>**Causal chain**: a UUID (a unique id) stamped on each post that is driven by MCP (the [Model Context Protocol](#ext-mcp)). kiki uses it to detect cycles, too much depth, and branch fan-out in messaging between threads. See [Roadmap](16-roadmap.md).
 

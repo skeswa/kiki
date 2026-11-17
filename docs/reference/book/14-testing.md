@@ -1221,8 +1221,8 @@ Core interpretation logic belongs in deep-module tests against fakes.
 
 ## Multi-machine checks after v1
 
-The [remote release checks](13-architecture/remote-access.md#checks-before-release)
-cover profile enrollment on another device, host and account selection,
-reconnect, duplicate requests, and revocation during a live session.
-Run them against the remote client and the owning daemon before shipping
-the corresponding capability.
+Test each remote feature with a client on one machine and the thread's
+daemon on another. For example, revoke a viewer's terminal access while
+the connection is open. Its terminal should close while the agent keeps
+running. See the [checks before release](13-architecture/remote-access.md#checks-before-release)
+for profile setup, account selection, reconnects, and retries.

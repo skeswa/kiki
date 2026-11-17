@@ -101,8 +101,8 @@ Likely later swaps:
 - a native GUI, a web dashboard, or remote clients over the same [gRPC](https://grpc.io/) service;
 - daemon-to-daemon coordination, so one machine's `kk` can observe, and eventually drive, threads whose [workspaces](appendix-a-glossary.md#workspace) live on another machine's `kkd`.
 
-[Remote access through profiles](13-architecture/remote-access.md) defines how a person
-can reach their threads from another device after v1. The first milestone is
-listing authorized summaries across a profile's hosts. Terminal attach and
-remote commands follow once their access and recovery checks pass.
-Daemon-to-daemon delegation and moving running threads are separate future work.
+After v1, the first remote feature will let you list the threads you have
+permission to see on each host in a profile. Opening a terminal and running
+commands come later, once their access and recovery tests pass. Moving a
+running thread or asking another daemon to take on work is a separate step.
+See [Remote access through profiles](13-architecture/remote-access.md).

@@ -10,18 +10,19 @@
 
 Build on [D-0007](0007-use-portable-user-defined-profiles.md). Give each
 profile a stable ID and a directory a user can bring to another device.
-Each host enrolls devices and checks their grants for its own targets.
-Keep the thread, its harness account binding, and its permitted session
-history on one host. Start with summary access over restricted SSH.
+Each host pairs with devices and checks what each may do. The thread
+stays on the host that runs it. That host records which account runs the
+agent and which conversation history it may open. Start with repo summaries
+over a Secure Shell (SSH) connection restricted to a kiki command.
 
 ## Why
 
 A person can change devices while the owning daemon keeps the evidence it
 needs to supervise the agent, reconcile jj changes, and protect files.
-The Rex and T3 Code research exposed two independent sharing choices.
-Access to an interactive terminal can convey an OS user's privileges.
-Two provider logins can also share conversation history. Both choices
-need explicit handling even when the host and profile names are familiar.
+Rex shows why a terminal needs its own grant. A person who can type into
+a shell can read files available to its operating system user. T3 Code
+shows why the host also needs to check history. Two provider accounts can
+use the same conversation directory.
 
 The [remote design](../../docs/reference/book/13-architecture/remote-access.md)
 defines the checks required before release. The

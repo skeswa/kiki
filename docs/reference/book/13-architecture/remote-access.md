@@ -1,162 +1,198 @@
 # Remote access through profiles
 
-This chapter defines the planned multi-machine design after v1. Imagine you
-create a profile called Atlas, add your laptop and a build machine, and run
-a thread on the build machine. From a third device you can select Atlas and
-return to that thread. The build machine keeps its workspace, terminal, and
-signed-in agent. The third device needs permission to view the work. It can
-be a viewer even if it has no harness installed.
+In kiki's design for remote access after v1, you can leave a thread running
+on a build machine and open its terminal from your laptop. The build machine
+keeps the files and runs the agent. Your laptop needs permission to connect.
+It can open the terminal even if you have never installed the agent's
+harness, such as Claude Code or Codex, on the laptop.
 
 ## What belongs to whom
 
-| Owner          | State it keeps                                                                                                                                                                                                                      |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| User           | A profile with a stable ID, a name the user can change, and a directory of participating hosts. Users can create their own profiles. Each profile can span machines, and each machine can serve several profiles.                   |
-| Viewing device | Its own enrollment, the hosts it knows for each profile, and any permitted cached summaries. Each window chooses its own profile.                                                                                                   |
-| Execution host | One user's daemon on a machine. It owns the grants for its registrations, the available harness accounts, and all the files, processes, and durable records for threads it runs. Two OS users on one machine have separate daemons. |
-| Thread         | Its existing stable thread ID. The host records its repo registration, profile ID, and the local harness configuration and session history it may use.                                                                              |
+You choose a name for each profile and the machines where you want to use
+it. For example, a profile you call Atlas could include a desktop and a
+build machine. The desktop could also belong to another profile. Each
+window remembers which profile you selected there.
 
-A profile keeps its ID when renamed or added to another device. Independently
-created profiles with the same name have different IDs. During setup a user
-can transfer a profile's ID, name, and host directory to a new device.
-The device pairs with each host it wants to reach. Profile transfer excludes
-device keys, grants, harness credentials, and session history. Adding a
-viewer as an execution host is a separate choice.
+| Owner          | What it keeps                                                                                                                                                                                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User           | Each profile's name, permanent ID, and list of hosts.                                                                                                                                                                                                            |
+| Viewing device | Its own record of pairing with each host, the hosts it knows in each profile, and the summaries it has permission to save.                                                                                                                                       |
+| Execution host | The kiki daemon (background program) for one operating system (OS) user on one machine. It manages access to its repos and harness accounts. It keeps the files, processes, and records for its threads. Two OS users on the same machine have separate daemons. |
+| Thread         | Its permanent thread ID. The host also records the thread's repo registration and profile ID, which harness settings to use, and which history the harness may open.                                                                                             |
 
-For the first remote release, assign each participating repo registration to
-one profile. Use separate clones when two profiles need the same project.
-Reject a second profile's registration of the same underlying jj store on
-that host. An existing local registration stays local until its owner assigns
-it. Before remotely launching or resuming an older thread, the owner must
-select its harness binding and the host must verify the permitted history. A follows link stays inside its registration, where one daemon can
-observe both workspaces and enforce the [lock order](../02-invariants.md#locks-and-their-order).
+When you set up another device, you can bring the profile ID, name, and host
+list with you. The ID stays the same if you rename the profile. If someone
+creates a second profile called Atlas, it gets its own ID. Each new device
+must pair with the hosts it wants to reach. Copying a profile leaves behind
+device keys, access grants, harness credentials, and session history. You
+can add the new device as a host if you also want to run threads there.
+
+In the first remote release, each participating repo registration belongs to
+one profile. If two profiles need the same project on one host, use separate
+clones. The host must reject a second profile that tries to register the same
+jj store. A local repo stays local until its owner assigns it to a profile.
+To launch or resume an older thread remotely, the owner must first choose
+its harness settings. The host must check which history those settings allow.
+
+Keep both ends of a follows link in the same registration. That way one
+daemon can watch both workspaces and take their [locks in order](../02-invariants.md#locks-and-their-order).
 
 ## Finding and resuming work
 
-From outside a checkout, a human can select a profile, list authorized
-threads across its hosts, and attach to one. For example, the intended flow
-can be written as `kk --profile atlas ls` followed by
-`kk --profile atlas attach billing`. Command spelling is illustrative.
-Show the host and repo beside each match. If a name is ambiguous, require a
-choice before acting. Bind the choice to the authenticated daemon, repo ID,
-and thread ID. A Git URL, display name, network address, or restored pane
-cannot establish any of those identities.
+You can list and attach to threads from outside a checkout. For example,
+`kk --profile atlas ls` would list the threads you can see in Atlas, and
+`kk --profile atlas attach billing` would open the billing thread. These
+commands illustrate the planned interface. If two threads match, show the
+host and repo for each and ask which one to open. Remember the verified
+daemon, repo ID, and thread ID for that choice. A Git URL, display name,
+network address, or restored pane cannot identify the thread.
 
-Scope search, recent threads, cached results, and subscriptions to the
-selected profile. When a window switches profiles, discard late results from
-the old view. Background notifications from another profile require opt-in.
-A managed agent keeps the scope of its thread. Adding a host to a person's
-profile gives their agents no right to delegate work there.
+A window shows search results, recent threads, saved summaries, and live
+updates for its selected profile. If a reply from Atlas arrives after you
+switch profiles, discard it. Notifications from another profile require
+your opt-in. An agent keeps its thread's permissions when you switch views.
+Adding a host to your profile gives the agent no right to send work there.
 
-If a host sleeps, show the last permitted summary with its observation time.
-Wait for that host before performing a mutation. On reconnect, recheck
-access and refresh host state after any gap in the event stream. Attach
-opens a view of the current binding and moves only the invoking viewer.
-If the host rebooted, show its actual repair state. A lost connection gives
-no other machine ownership of a running thread. Herdr, the hooks, the jj
-workspace, and OS process checks all stay with the owning daemon.
+If the build machine sleeps, show the last summary you had permission to
+see and the time the host reported it. Changes must wait until the host is
+reachable. When you reconnect, the host checks access again. If the viewer
+missed events, it reads the current state from the host. Attaching opens
+the terminal currently bound to the thread and moves only your view. If the
+host rebooted, show whether the thread needs repair. Losing a connection
+never transfers ownership. The host's daemon still checks OS processes and
+keeps Herdr, the hooks, and the jj workspace on that machine.
 
 ## Harness accounts and conversation history
 
-At creation, resolve the profile, execution host, and harness configuration.
-Show the selected account and distinguish a user-supplied label from an
-account the provider verified. The same profile may use different accounts
-on different hosts. The viewing device's login has no role in this choice.
+When you create a thread, kiki shows the profile, execution host, harness
+settings, and selected account. You may have called an account “company.”
+Show whether the provider has verified who is signed in. One profile can
+use different accounts on different hosts. Signing in on the viewing device
+has no effect on the choice.
 
-Persist the host-local configuration ID, expected account when verifiable,
-and permitted session store before the agent receives its first prompt.
-On restart or reopen, check them again before releasing the launch gate
-or disclosing history. If the login expired or identifies another account,
-stop and name the binding that needs attention. If the profile requires
-account verification and the harness cannot supply it, block launch.
-A profile that permits an unverified login may start a fresh session. To
-resume or replay earlier history, the host must prove continuity with the
-account that received it. The same directory, label, or configuration ID
-cannot prove that. If proof is missing, offer a fresh session with an empty
-history and no automatic catch-up.
-Apply the [harness adapter's exclusive hook settings](harness-adapter.md)
-to every launch, including a resume.
+Before the agent gets its first prompt, the host records the ID of its
+local harness settings, the expected account when it can verify one, and
+where the harness may read session history. Check all three again on
+restart or reopen, before opening the [launch gate](../appendix-a-glossary.md#launch-gate)
+or sharing any history. If the login has expired or the provider reports a
+different account, stop and tell the user which login needs attention.
+Apply the [exclusive hook settings](harness-adapter.md) on every launch,
+including when an agent resumes.
 
-Keep conversation histories separate across profiles by default. Changing
-accounts requires an explicit new session. Sending prior conversation
-material to the new account requires separate disclosure and the applicable
-[transcript consent](../11-configuration.md#consent-is-not-configuration).
-A portable profile alone grants no permission to disclose a transcript.
+Some profiles require a verified account. If the harness cannot verify the
+login, block launch for those profiles. When a profile allows an unverified
+login, the user may start a fresh session. To resume a conversation or
+replay its history, the host must verify that the same account that received
+the history is still signed in. A familiar directory, account label, or
+settings ID cannot prove that. If the host cannot verify the earlier account, offer an empty session
+only when the profile allows the current login. Turn off automatic catch-up
+for that session.
+
+By default, each profile keeps its conversation history separate. To change
+accounts, the user must explicitly start a new session. Before sending any
+of the old conversation to the new account, explain what will be sent and
+obtain the required [transcript consent](../11-configuration.md#consent-is-not-configuration).
+Copying a profile to another device grants no such consent.
 
 ## Connecting and granting access
 
-Start with a restricted Secure Shell (SSH) connection to a host-side kiki
-command. Verify the host when pairing and bind the device's own key to the
-intended daemon. The host owner grants that device specific actions on
-specific targets in a profile. Negotiate supported protocol versions and
-actions before use. Each route to that daemon must verify the peer before
-sending private data and enforce the same limits on the grant. A changed
-identity requires explicit pairing. The exact wire protocol and enrollment
-exchange require testing before release.
+The first connection to test uses Secure Shell (SSH), restricted to a kiki
+command on the host. During pairing, the device verifies the host and links
+its own key to that host's daemon. The host owner chooses which actions the
+device may take and which targets it may use in the profile. These permissions
+make up a grant. Before use, the device and host agree on a protocol version
+and supported actions. Every route must verify the other end before sending
+private data and enforce the same grant. If the host's identity changes,
+pair again. Test the message format and pairing procedure before release.
 
-The host checks the device, profile, target, method, and existing approval
-requirements on every request. At enrollment or grant issuance, the host
-records the caller scope it is delegating. A grant to act as a specific
-thread carries that thread's scope, including its cross-thread approval
-rules. Outside a thread, a viewer starts with registration scope for each
-granted repo. That permits its summaries and beginning an approval.
-Choosing a target thread never changes the caller scope. Apply the host's
-existing approval flow when a request needs wider authority. Record the device and profile on the
-existing audit row. A host-side bridge must preserve the caller's identity.
-Keep bootstrap, hooks, launcher reports, and OS process proofs on the host.
-Neither forwarding the local daemon socket nor passing a reusable local
-credential to the viewer satisfies this contract.
+### How the host checks a request
 
-Use the [existing repo summary fields](../appendix-a-glossary.md#repo-summary-read-scope)
-for summary reads. Grant terminal access separately. A summary reader may
-see only the permitted repo summaries. Full terminal access can expose every
-pane on the dedicated Herdr server and files readable by its OS user. Limit
-the initial attach feature to viewers trusted with that execution environment.
-Use separate OS users or virtual machines when profiles require protection
-from each other's processes. A profile name supplies organizational separation
-within a shared OS account.
+For every request, the host checks who is calling, the selected profile,
+the action, its target, and any approval the action requires. When it enrolls
+a device or issues a grant, it records who the device may act as. A device
+allowed to act as a particular thread has that thread's limits, including
+the approval rules for acting on another thread.
 
-For a consequential action, the host prepares the exact plan and identifies
-the profile, host, and affected account where applicable. Use the host's
-enrolled foreground presenter and the existing [one-use approval](../04-authority.md#two-phase-foreground-approval).
-A future presenter on a viewing device requires separate enrollment and
-proof of fresh human confirmation outside the agent's control. Keep remote
-confirmation disabled until that platform can supply the proof.
+Outside a thread, the viewer starts with repo registration scope for each
+repo in its grant. This lets it read the permitted summaries and request
+approval. Selecting the billing thread tells the host which thread you want
+to reach. To act as billing, the device still needs a grant for that thread.
+Use the existing approval process for requests that need wider authority.
 
-A client gives each mutation a request ID. Within the caller and profile,
-the host binds the ID to the method, target, arguments, and operation journal
-before side effects. An exact retry after a lost reply returns the existing
-operation to a still-authorized caller. Conflicting reuse fails. Concurrent
-retries must produce one operation. Where approval is required, claim it in
-the same transaction that creates the journal.
+Include the device and profile in the existing audit record for the request.
+Any program passing the request to the daemon must preserve the caller's
+identity. Keep initial daemon setup, hooks, launcher reports, and OS process
+checks on the host. Forwarding the daemon's local socket would bypass those
+identity checks. Giving the viewer a reusable local credential would do
+the same.
 
-When a grant expires or is revoked, the host closes streams and terminal
-attachments using that grant, rejects its use on every route, and invalidates
-its unused challenges and approvals. A separate valid grant on the same
-device can still be used. Removing the device's enrollment ends all grants
-under it and prevents the old enrollment from pairing again. Already claimed
-operations recover from their host journals. Other authorized viewers and
-the agent can keep working.
+### Summary reads and terminal access
 
-For a profile spanning hosts, report removal per host. Show unreachable
-hosts as pending. Grants expire at a finite time that the host enforces on
-open connections as well as new requests. Independent SSH shell access
-remains under the host owner's control.
+A grant to read summaries covers only the allowed repos and the
+[existing summary fields](../appendix-a-glossary.md#repo-summary-read-scope).
+Opening a terminal needs a separate grant. Someone with full terminal access
+may reach every pane on the dedicated Herdr server and every file its OS
+user can read. In the first release, grant attach access only to people you
+trust with that whole environment. Profiles organize work under one OS
+account. Use separate OS users or virtual machines if processes in one
+profile must be kept out of another's files.
+
+### Approvals and retries
+
+For an action that needs human approval, the host prepares the exact plan.
+It names the profile, host, and any affected account. The host's enrolled
+presenter shows the plan to the person at the keyboard and asks for
+[one-use approval](../04-authority.md#two-phase-foreground-approval). To
+confirm from a viewing device in a future release, its presenter must enroll
+separately. Remote confirmation stays disabled until that platform can prove
+a person confirmed this request outside the agent's control.
+
+Suppose you ask kiki to create a thread and the connection drops before you
+get a reply. The client retries with the same request ID. For each request
+that changes state, the host records the ID for that caller and profile.
+Before making any change, it binds the ID to the action, target, arguments,
+and operation journal (the saved record of the job). If the action needs
+approval, the host claims that approval in the same database transaction
+that creates the journal.
+
+If you still have access, an exact retry returns the original operation.
+The host must carry out the operation only once, even if two retries
+arrive together. In this example, you get one thread. The host
+rejects reuse of that ID with different arguments, a different action, or
+a different target.
+
+### When access ends
+
+Say a laptop has two grants, one to read summaries and one to attach. If
+the owner revokes its attach grant, the host closes all streams and terminal
+views using that grant. It rejects the grant on every route and cancels all pending requests for approval and unused approvals tied to it. The laptop can still use its
+summary grant. Expiration has the same effect as revocation, even on an
+open connection.
+
+Removing a device's enrollment ends every grant under that enrollment.
+The host must refuse any attempt to pair again using the old enrollment. If an operation already claimed
+approval, the host uses its journal to recover the operation. The agent
+and other authorized viewers can keep working.
+
+Show the result of removing a device on each host. If one host is offline,
+show its removal as pending. Every grant has an expiry time, which the host
+enforces on open connections and new requests alike. The host owner manages
+any separate SSH shell access.
 
 ## Checks before release
 
-| Capability             | What a two-host test must show                                                                                                                                                                                                                                                                                                                  |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Profile discovery      | Import a user-named profile on a third device. It lists only its own grants. Rename it, create another profile with the same name, and put identically named threads on two hosts. Each command still reaches its chosen target.                                                                                                                |
-| Reconnect and attach   | Disconnect one of two viewers during a live session. The agent keeps the same incarnation and the other viewer keeps focus. Reconnect after an event gap, after a reboot, and with a changed host identity. Each case must show its actual state.                                                                                               |
-| Launch and resume      | Exercise Claude Code and Codex with two accounts and distinct histories. Check create, restart, and reopen. Expire a login and then replace it with the wrong account. Repeat with an unverified replacement login in the same history directory. Verify the old history is never replayed.                                                     |
-| Requests and approvals | Drop a reply after an approved mutation starts. Retry concurrently, then retry with a changed target. Observe one journal and one effect. From registration scope, select a thread and confirm that targeting it confers no same-thread authority. Reject confirmation without presenter proof.                                                 |
-| Sharing and revocation | Give a second device summary access to one repo. Direct requests for another profile, a transcript, or a terminal must fail. Revoke only attach while connected. Summary access must survive. Let a live grant expire without reconnecting. Remove the device and try every saved route, including after an offline host processes the removal. |
+Start with summary reads. Before shipping each kind of access, test a
+request without permission, revoke a grant in use, and let a grant expire
+with its connection open.
 
-Start with summary reads. Before each capability ships, test unauthorized
-requests, expiry on open connections, and revocation for that capability.
-Attach also requires caller-local focus and uninterrupted host execution.
-Remote mutations require account and history checks where applicable,
-retry safety, and the required approval proof. Live thread
-migration, agent delegation across hosts, and running Herdr apart from its
-daemon have separate proof requirements. See the [roadmap](../16-roadmap.md).
+| Feature                | What to test with two hosts                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Profile selection      | Import a user-named profile on a third device. Check that it lists only threads its grants allow. Rename the profile, create another with the same name, and give two threads on different hosts the same name. Each command must reach the target the user chose.                                                                                                      |
+| Reconnect and attach   | Disconnect one of two viewers. The same agent process must keep running and the other viewer must keep focus. After missed events, check that the viewer reads fresh state. After a reboot, check the repair state. After a host identity change, require pairing.                                                                                                      |
+| Launch and resume      | Test create, restart, and reopen with two accounts and separate histories in both Claude Code and Codex. Expire a login, then replace it with the wrong account. Try an unverified replacement login in the same history directory. Check that the replacement never receives the old history.                                                                          |
+| Requests and approvals | Drop the reply after an approved change starts. Retry twice at the same time, then change the target and try again. Check for one journal and one effect. Select a thread using repo registration scope. Verify that this gives no permission to act as that thread. Reject confirmation without proof from the enrolled presenter.                                     |
+| Sharing and removal    | Give a device summary access to one repo. Try direct requests for another profile, a transcript, and a terminal. All must fail. Grant attach access, connect, and revoke only that grant. Summary reads must still work. Let a live grant expire without reconnecting. Remove the device and try every saved route. Repeat after an offline host processes the removal. |
+
+Moving a running thread to another machine, letting an agent delegate work
+to another host, and running Herdr apart from its daemon each need their
+own tests before they can ship. See the [roadmap](../16-roadmap.md).
