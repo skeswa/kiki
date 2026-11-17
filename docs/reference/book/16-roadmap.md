@@ -101,9 +101,8 @@ Likely later swaps:
 - a native GUI, a web dashboard, or remote clients over the same [gRPC](https://grpc.io/) service;
 - daemon-to-daemon coordination, so one machine's `kk` can observe, and eventually drive, threads whose [workspaces](appendix-a-glossary.md#workspace) live on another machine's `kkd`.
 
-Working across machines is part of the product vision, not an accident of scope. The same-host boundary exists for one reason. Peer daemons, like remote clients, wait on the future transport and authentication contract. They do not inherit unix-socket assumptions.
-
-In the planned remote system, users create and name their own profiles. The
-same profile can be used from any authorized machine and can run work on
-any host the user adds to it. A machine can participate in several profiles.
-Each host can use a different harness account for the same profile.
+[Remote access through profiles](13-architecture/remote-access.md) defines how a person
+can reach their threads from another device after v1. The first milestone is
+listing authorized summaries across a profile's hosts. Terminal attach and
+remote commands follow once their access and recovery checks pass.
+Daemon-to-daemon delegation and moving running threads are separate future work.

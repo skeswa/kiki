@@ -13,6 +13,7 @@ Read in this order:
 5. [State schema](schema.md)
 6. [Op-log watcher](op-log-watcher.md)
 7. [Harness adapter](harness-adapter.md)
+8. [Remote access through profiles (after v1)](remote-access.md)
 
 The architectural rule is simple: [`kkd`](../appendix-a-glossary.md#kkd) owns behavior; clients observe and request. `kkd` is the kiki [daemon](../appendix-a-glossary.md#ext-daemon), a program that runs in the background. A client is any program that asks `kkd` to do something.
 

@@ -21,3 +21,5 @@ change independently of the account a host uses to run an agent.
 The [roadmap](../../docs/reference/book/16-roadmap.md#later-architecture)
 records this product requirement. Profile IDs, transfer between devices,
 and host enrollment are still [design proposals](../investigations/2026/2026-11-17-multi-machine-access.md).
+
+[D-0008](0008-keep-execution-and-remote-grants-on-the-host.md) adopts the later design for profile identity, enrollment, and host ownership.

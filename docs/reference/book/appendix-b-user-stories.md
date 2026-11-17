@@ -342,7 +342,7 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
 ## Pluggable UI architecture
 
 81. As a future local UI author, I want a stable [gRPC](https://grpc.io/) contract over a [unix socket](https://en.wikipedia.org/wiki/Unix_domain_socket) exposing daemon state and behavior, so that I can build another same-host UI without modifying kkd.
-    - Remote and mobile clients may reuse service semantics, but require a future transport and authentication contract.
+    - After v1, a user can open their own profile from another authorized device. The execution host checks each request and keeps the thread’s workspace, harness login, and history. See [Remote access through profiles](13-architecture/remote-access.md).
 82. As a future UI author, I want server-streaming events for thread state changes, so that my UI reacts in real-time without polling.
 83. As a developer, I want `kk` CLI, `kk` TUI, and `kk-hook` to be pure clients of the same gRPC API (no privileged internals), so that UIs and the daemon evolve independently.
 

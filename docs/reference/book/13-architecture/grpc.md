@@ -244,4 +244,4 @@ Breaking changes require a new service version. The daemon **may** host both ver
 
 A same-host native GUI can consume the unix-socket gRPC service directly.
 
-Web, remote, and mobile clients **may** reuse the service semantics. But they require a future contract for four things: network transport, peer identity, approval presentation, and revocation. The local socket and filesystem credentials are not presented as a remote-ready security design.
+The planned remote client reuses these method and approval rules. Each remote call also needs an authenticated device and a host grant for its profile and target. The first transport to test is restricted SSH. See [Remote access through profiles](remote-access.md) for enrollment, reconnect, revocation, and release checks.

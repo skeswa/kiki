@@ -247,3 +247,11 @@ Who may read the audit log:
 - Cross-thread or detailed reads require one-shot human approval.
 
 A future export command may render the SQLite authority as [JSONL](https://jsonlines.org/). But no second audit store is authoritative.
+
+## Remote authority after v1
+
+In the planned remote system, the execution host checks both the device's
+grant for the selected profile and the authority required by the method.
+Profile membership alone cannot authorize an action. The enrolled host
+presenter confirms consequential plans until a remote presenter can meet
+its own proof requirements. See [Remote access through profiles](13-architecture/remote-access.md#connecting-and-granting-access).

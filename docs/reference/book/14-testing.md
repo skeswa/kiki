@@ -1218,3 +1218,11 @@ The service-manager gate is also integration-only. Under real launchd and real s
 An upstream version that fails its probes uses hard restart or is unsupported. It is never modeled optimistically.
 
 Core interpretation logic belongs in deep-module tests against fakes.
+
+## Multi-machine checks after v1
+
+The [remote release checks](13-architecture/remote-access.md#checks-before-release)
+cover profile enrollment on another device, host and account selection,
+reconnect, duplicate requests, and revocation during a live session.
+Run them against the remote client and the owning daemon before shipping
+the corresponding capability.
