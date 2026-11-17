@@ -136,9 +136,11 @@ Every stage runs against one explicitly pinned [Herdr](appendix-a-glossary.md#he
 Build the smallest end-to-end path: `kk init`, `kk new <name>`, `kk attach`, and the read-only `kk ls`. That path needs more than it looks like, and all of it belongs to this stage:
 
 - the approval broker that `kk init` and `kk new` require;
+- the [automation policy](appendix-a-glossary.md#automation-policy) engine, [`PolicyApproval`](04-authority.md#policyapproval), [automation credentials](appendix-a-glossary.md#automation-credential), and [`kk automation`](09-commands.md#kk-automation). They are here because kiki's own end-to-end tests need unattended approvals: those tests present an automation credential and rely on an activated policy;
+- [`kk daemon install`](09-commands.md#kk-daemon-install), the [exit codes](09-commands.md#exit-codes), [`--json`](09-commands.md#output-for-scripts) on every command this stage ships, and [`kk events`](09-commands.md#kk-events) with the `StreamRepoEvents` call behind its repo-wide form;
 - the attach half of [`TerminalClient`](appendix-a-glossary.md#terminalclient);
 - the minimal `ConfigLoader`;
-- [`kkd`](appendix-a-glossary.md#kkd) bootstrapped under the user's service manager;
+- [`kkd`](appendix-a-glossary.md#kkd) bootstrapped under the user's service manager, or run as `kkd --foreground` on a host that has none;
 - the inventory half of [`ProcessSupervisor`](appendix-a-glossary.md#processsupervisor), for the [orphan scan](appendix-a-glossary.md#orphan-scan) and launcher verification;
 - [`kk-hook`](appendix-a-glossary.md#kk-hook), with two jobs only: the session-start ready report, and a pre-tool hook that always passes through (no cascade exists yet);
 - both harness adapters' `launch_spec`, and the exclusive-hook proof for each;
@@ -178,8 +180,27 @@ Stage 1 gate:
   - Under each real service manager, kill `kkd`, restart it, and upgrade it, each in turn.
   - Each time, the server and every agent keep running, with the same process identities.
   - When `kkd` comes back it finds the same [server instance](appendix-a-glossary.md#server-instance).
+  - Two more placement modes must pass the same proof. Both are unproven gates, and a mode that fails is unsupported:
+    - a host with no user service manager, such as many containers and CI runners. `kkd --foreground` runs under the operator's own supervisor and starts the Herdr server as a detached process in its own session;
+    - macOS over SSH with no GUI login, where `kkd` and the server use launchd's per-user domain, not the GUI domain.
 - **Server start record.** `kkd` writes a `terminal_servers` row in state `Starting` before it spawns a server, and moves it to `Open` once it has read the server's peer identity. Killing `kkd` between those two points leaves a state that the next start recovers from. It never leaves two servers.
-- **Approvals.** `kk init` and `kk new` each show their plan through the enrolled presenter and run only after a one-shot approval. A replayed, expired, or non-interactive approval is refused and changes nothing.
+- **Approvals.** `kk init` and `kk new` each run only after a one-shot approval of their plan. That is a human approval through the enrolled presenter, or a [policy approval](appendix-a-glossary.md#policy-approval) from a matching rule. A replayed or expired approval is refused and changes nothing. A caller with no terminal is refused with exit code 3 when no rule matches, and nothing changes.
+- **Automation policy.** An activated policy can stand in for the human's confirmation, and for nothing else.
+  - A matching `allow` rule lets `kk init` and `kk new` run with no terminal and no prompt. `kk` prints the plan and the rule's name.
+  - A matching `require-human` rule beats any `allow` rule, and it matches whatever labels the plan carries. An `allow` rule does not match a plan that carries a [risk label](appendix-a-glossary.md#risk-label) the rule does not accept.
+  - An edited `[automation]` section changes nothing until `kk automation apply` [activates](04-authority.md#activating-a-policy) it, with a foreground presenter confirmation or the Admin credential.
+  - A `PolicyApproval` is single-use and bound to the plan digest. A replayed, expired, or drifted one is refused.
+  - A plan that a safety proof refuses is still refused under `accept = ["*"]`.
+  - Each `PolicyApproval` writes one audit row with the rule name, policy digest, principal, operation, and risk labels.
+- **Headless first run.** On a machine with no human, no desktop session, and no enrolled presenter, this sequence succeeds from flags alone: `kk daemon install`; `kk automation apply --admin-credential-file <path>`; `kk automation credential create <name> --admin-credential-file <path>`; then `kk init` and `kk new` with the automation credential.
+  - `kk daemon install` asks no question. This first install needs no credential, creates the Admin bootstrap credential, and prints its path.
+  - `kk init` begins its approval with the automation credential, not Admin, and needs an `init` rule.
+  - An operation with no matching rule fails closed with exit code 3.
+- **No UI.** The whole Stage 1 path runs with zero attached Herdr clients and no desktop session. The Herdr server starts and serves with no client. See [headless](appendix-a-glossary.md#headless).
+- **No prompt without a terminal.** With no terminal, `kk` never prompts. A command that would ask a question fails, changes nothing, and names the flag that answers it.
+- **Scripting surface.** Every Stage 1 command prints its final result as JSON under `--json`, and the flag changes rendering only.
+  - Each exit code from `0` to `5` is observed in its own case. Code `6` is observed with `kk wait` in Stage 2.
+  - `kk events` prints one thread's events and the repo-wide events, replays from `--since <seq>` with no gap, and keeps printing under `--follow`.
 - **Launcher verification.** A launcher report is refused when its caller is not a child of the current server process, or when its pane's root process is not the caller. A report left over from a previous server lifetime that names a recycled Herdr id binds nothing and closes nothing.
   - A repeat of an accepted report from the same process identity gets the same answer. A different process presenting for a consumed role is refused and exits.
   - `agent` is the only [required role](appendix-a-glossary.md#required-role). A `shell` or `ui` launcher that does not report within `[timeouts] launcher_report` is recorded as absent with a warning, and provisioning still succeeds.
@@ -219,7 +240,7 @@ Stage 1 gate:
 
 ### Stage 2: restart, reconciliation, and safe close
 
-Add `kk switch`, `kk close`, `kk reopen`, `kk repair`, the rest of the projection audit, and the freeze, resume, and termination halves of [`ProcessSupervisor`](appendix-a-glossary.md#processsupervisor).
+Add `kk switch`, `kk close`, `kk reopen`, `kk repair`, the rest of the projection audit, and the freeze, resume, and termination halves of [`ProcessSupervisor`](appendix-a-glossary.md#processsupervisor). Add [`kk wait`](09-commands.md#kk-wait) and the `command` notification provider, and extend `--json` to the commands this stage ships.
 
 Add a second thread and a second attached client at the start of this stage. They expose wrong-target actions and focus broadcasts that a single-pane demo hides.
 
@@ -328,8 +349,13 @@ Stage 2 gate:
 - **Workspace repair.** Delete a thread's workspace directory, forget its jj workspace record, and move its directory, each in turn. Kiki raises `WorkspaceDirectoryMissing`, `WorkspaceRecordMissing`, and `WorkspacePathMismatch`. The plans [`recreate-workspace`](appendix-a-glossary.md#recreate-workspace), [`reattach-workspace`](appendix-a-glossary.md#reattach-workspace), and [`repoint-workspace`](appendix-a-glossary.md#repoint-workspace) clear them.
 - **Failed lifecycle states.** A `CloseFailed` thread is finished by [`retry-close`](appendix-a-glossary.md#retry-close). A `CreateFailed` thread and a failed reopen are cleaned up by `cleanup-failed-create` and `cleanup-failed-reopen`.
 - **Thread identity.** A thread keeps the same `thread_id` through close, reopen, a terminal restart, and adoption of an external bookmark rename.
-- **Unregister.** `kk repo unregister` runs only after a one-shot foreground approval, and refuses when run non-interactively. Once it succeeds, the repo's registry row and its centralized state directory are gone, the source repo's files and jj history are untouched, `kk ls --all-repos` no longer lists the repo, and `kk init` registers it again with a new `repo_id`.
+- **Unregister.** `kk repo unregister` runs only after a one-shot approval. With no terminal it runs under a matching `unregister` rule, and with no matching rule it is refused with exit code 3. Once it succeeds, the repo's registry row and its centralized state directory are gone, the source repo's files and jj history are untouched, `kk ls --all-repos` no longer lists the repo, and `kk init` registers it again with a new `repo_id`.
 - **Attention notifications.** Each of these fires exactly one notification at its configured level: a blocked agent, a crashed agent, a failed lifecycle operation, and a projection issue. Setting an event's key to `silent` stops the notification and leaves the status mark.
+- **Command notifications.** With `[notifications] command` set in the user config file and no desktop session, `os_provider = "auto"` resolves to `command`. `kkd` runs the program once per `loud` event, with the event as JSON on its standard input. A slow or failing program is stopped at the timeout and is not retried. With no `command` set on such a host, `auto` resolves to `off`.
+- **`kk wait`.** `kk wait --for <state>` exits 0 when the thread reaches `quiescent`, `blocked`, `closed`, or `issue`, and exits 6 when `--timeout` runs out first. The `conflicted` and `goal-complete` states are checked in Stage 3, with the cascade and the goal report that produce them.
+- **Headless lifecycle.** With zero attached Herdr clients, and under an automation credential and an activated policy, `kk close`, `kk reopen`, and the `restart-agent` repair each run to their end state. Every safety proof still runs. The script is not the thread, so the `restart-agent` repair needs a rule that allows `thread-op`.
+  - A close whose plan carries `live-processes` or `work-loss` runs only under a rule that accepts those labels. Otherwise it is refused with exit code 3 and nothing is frozen.
+  - A harness permission prompt raises `agent_blocked`, which shows in `kk events`. Kiki does not answer the prompt.
 
 ### Stage 3: follows and cascade
 
@@ -352,11 +378,11 @@ Stage 3 gate:
 - **`RestartStartup`.** For each harness, a replacement incarnation receives the saved payload as its first input, its session-start hook reports the startup delivery id, and its first pre-tool call acknowledges the intent.
 - **Conflict notification.** A cascade whose result contains jj conflicts fires exactly one attention notification, and the thread's cascade state reads `conflicted`.
 - **Exhausted delivery and abandoned parent.** An intent whose delivery attempts are exhausted fires exactly one attention notification. So does abandoning a followed parent's live head or owned revisions; the child then shows topology divergence.
-- **Goal complete.** An agent that reports its goal complete gets the `finished` status mark at `soft`, and no OS notification.
+- **Goal complete.** An agent that reports its goal complete gets the `finished` status mark at `soft`, and no OS notification. `kk wait --for goal-complete` then exits 0, and `kk wait --for conflicted` exits 0 for a conflicted cascade.
 - **Detach.** `kk thread detach` with no argument detaches the contextual thread from its parent. The child keeps its commits and stops receiving cascades. The parent's later commits raise no intent for it.
-- **`kk log` and `kk status`.** For a three-thread stack, `kk log` prints the stack with the current thread expanded. `kk status` prints the live head, the bookmark, the checkpoint relationship, and the cascade state. Both stay readable with `NO_COLOR=1`.
+- **`kk log` and `kk status`.** For a three-thread stack, `kk log` prints the stack with the current thread expanded. `kk status` prints the live head, the bookmark, the checkpoint relationship, and the cascade state. Both stay readable with `NO_COLOR=1`, and both print the same facts under `--json`.
 - **Configuration reads.** `kk config get <key>` prints the effective value and the layer it came from. `kk config show` prints the merged configuration with the layer each value came from.
-- **Audit reads.** `kk thread audit` lists the contextual thread's own rows. `kk audit log` runs only after an approval, and every accepted and rejected call made during the gate appears exactly once.
+- **Audit reads.** `kk thread audit` lists the contextual thread's own rows. `kk audit log` runs only after a one-shot approval, and every accepted and rejected call made during the gate appears exactly once.
 - **jj concurrency.** Produce two operation heads from concurrent commands.
   - The watcher records both, classifies each head's view without merging them, and blocks checkpoint-dependent lifecycle steps while the views disagree.
   - Kiki's own mutations name one exact head. When another operation lands at the same moment and leaves two heads, the journal that made the mutation owns the integration and raises no issue.
@@ -373,16 +399,17 @@ Stage 3 gate:
 
 Within the stages, build modules in this order. Each item names the stage that delivers it.
 
-1. **Stage 1.** Minimal `ConfigLoader`; `kkd` under the user's service manager, with the Herdr server as its own service-manager unit; [`TerminalRuntime`](appendix-a-glossary.md#terminalruntime) with its Herdr adapter and fake, the pane launcher, server-instance tracking, and `TerminalClient::attach`.
-2. **Stage 1.** `AuthEnforcer`, the enrolled foreground presenter, the two-phase one-shot approval broker, and scoped/unscoped [SQLite](https://www.sqlite.org/) audit interception.
+1. **Stage 1.** Minimal `ConfigLoader`; `kk daemon install`; `kkd` under the user's service manager, with the Herdr server as its own service-manager unit, and `kkd --foreground` with a detached server where no service manager exists; [`TerminalRuntime`](appendix-a-glossary.md#terminalruntime) with its Herdr adapter and fake, the pane launcher, server-instance tracking, and `TerminalClient::attach`.
+2. **Stage 1.** `AuthEnforcer`, the enrolled foreground presenter, the two-phase one-shot approval broker, and scoped/unscoped [SQLite](https://www.sqlite.org/) audit interception. Then the automation policy engine with risk labels, `PolicyApproval`, automation credentials, and `kk automation`. The end-to-end tests of every later item use an automation credential.
 3. **Stage 1.** `ProcessSupervisor` inventory with its OS adapter and fake, and the [orphan scan](appendix-a-glossary.md#orphan-scan); `ThreadLifecycleSaga` for creation; the database-backed harness gate; both adapters' `launch_spec` and exclusive-hook proof; `kk-hook` with the session-start ready report and a pass-through pre-tool hook.
 4. **Stage 1.** The watcher subset: `OpFrontierSampler`, the op-DAG cache, classifier rules 0–6, attribution of kiki's own operations (`OpAttribution`), the ancestry query for the owned chain (`AncestryQuery`), detection of rewritten operation history with silent re-anchoring, and restart catch-up for bookmarks and rewrites; bookmark checkpointing with successor tracking; and the audit that raises `TerminalMissing` and the bookmark issues.
-5. **Stage 2.** The rest of `ProcessSupervisor` (freeze, resume, and termination), then freeze/recheck close, and reopen.
-6. **Stage 2.** `ProjectionReconciler`, the rest of the projection audit, stable repair plans, `kk repair`, `kk repo unregister`, and attention notifications.
-7. **Stage 2.** `TerminalClient` caller resolution and `kk switch`.
-8. **Stage 3.** The rest of `OpLogWatcher`, `OpAttribution`, and `AncestryQuery`: follows classification, and restart catch-up for follows and cascade intents.
-9. **Stage 3.** `CascadeOrchestrator` base-transition classification; `WorkspaceProbe`/`WorkspaceRecovery`; the intent-owned batch barrier and delivery; native materialization; and explicit advance, integrated with the cascade half of `kk-hook` and `PostToolBatch`.
-10. **Stage 3.** `kk config get|show`, `LogRenderer`, `StatusRenderer`, `kk log`, `kk status`, `kk thread detach`, and the audit-read commands.
+5. **Stage 1.** The exit codes, `--json` output, `StreamRepoEvents`, and `kk events`.
+6. **Stage 2.** The rest of `ProcessSupervisor` (freeze, resume, and termination), then freeze/recheck close, and reopen.
+7. **Stage 2.** `ProjectionReconciler`, the rest of the projection audit, stable repair plans, `kk repair`, `kk repo unregister`, attention notifications with the `command` provider, and `kk wait`.
+8. **Stage 2.** `TerminalClient` caller resolution and `kk switch`.
+9. **Stage 3.** The rest of `OpLogWatcher`, `OpAttribution`, and `AncestryQuery`: follows classification, and restart catch-up for follows and cascade intents.
+10. **Stage 3.** `CascadeOrchestrator` base-transition classification; `WorkspaceProbe`/`WorkspaceRecovery`; the intent-owned batch barrier and delivery; native materialization; and explicit advance, integrated with the cascade half of `kk-hook` and `PostToolBatch`.
+11. **Stage 3.** `kk config get|show`, `LogRenderer`, `StatusRenderer`, `kk log`, `kk status`, `kk thread detach`, and the audit-read commands.
 
 [v1.x polish](appendix-a-glossary.md#v1-x-polish) (enumerated in [Orientation](01-orientation.md)) builds on top of that, in this order:
 
@@ -419,11 +446,19 @@ One thing must exist in [Herdr](appendix-a-glossary.md#herdr) before the [accept
 
 The gate runs on the build that carries the client-targeted focus extension. It re-runs every stage gate above on that build, because results from an earlier build are not evidence for it.
 
+The gate runs unattended. It presents an automation credential and relies on an activated policy. It attaches a Herdr client, or uses a foreground presenter, only for the criteria that are about a client or a human.
+
 Each ledger item has one observable criterion in a stage gate. The ones that are easy to miss are:
 
 | Ledger item              | Stage gate criterion                                                                                                                 |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | approvals                | Stage 1, "Approvals"                                                                                                                 |
+| automation policy        | Stage 1, "Automation policy"                                                                                                         |
+| headless operation       | Stage 1, "Headless first run", "No UI", and "No prompt without a terminal"; Stage 2, "Headless lifecycle"                            |
+| exit codes and `--json`  | Stage 1, "Scripting surface"                                                                                                         |
+| `kk events`              | Stage 1, "Scripting surface"                                                                                                         |
+| `kk wait`                | Stage 2, "`kk wait`"; Stage 3, "Goal complete"                                                                                       |
+| `command` notifications  | Stage 2, "Command notifications"                                                                                                     |
 | `kk repo unregister`     | Stage 2, "Unregister"                                                                                                                |
 | attention notifications  | Stage 2, "Attention notifications"; Stage 3, "Conflict notification", "Exhausted delivery and abandoned parent", and "Goal complete" |
 | `kk thread detach`       | Stage 3, "Detach"                                                                                                                    |

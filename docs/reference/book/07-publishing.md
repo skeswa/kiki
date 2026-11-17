@@ -8,7 +8,7 @@ Stack-aware publishing is the first [v1.x](appendix-a-glossary.md#v1-x-polish) w
 
 ## Defaults
 
-This section lists what `kk publish` does when you give it no extra instructions. It also says how kiki makes sure it pushes exactly the commit the human approved.
+This section lists what `kk publish` does when you give it no extra instructions. It also says how kiki makes sure it pushes exactly the commit that was approved.
 
 - PRs open as drafts by default. Opening one ready-for-review requires an explicit flag.
 - When a thread is stacked on a parent, its PR base, the branch the PR merges into, is the parent thread's branch. (A thread is stacked on a parent when it [follows](appendix-a-glossary.md#follows) that parent thread.)
@@ -45,7 +45,7 @@ Publish pushes the thread [bookmark](appendix-a-glossary.md#bookmark), so it fir
 
 jj refuses to push a commit that has no description. So publish checks first, before it places the bookmark. It looks at every commit the push would send: the checkpoint target and each commit below it on the owned chain that the remote does not have yet.
 
-If any of those commits has no description, publish refuses and names the commits. Nothing is placed and nothing is pushed. The human adds the descriptions and runs `kk publish` again.
+If any of those commits has no description, publish refuses and names the commits. Nothing is placed and nothing is pushed. Once the descriptions are added, `kk publish` is run again.
 
 ### Placing the bookmark and pushing
 
@@ -56,7 +56,7 @@ That checkpoint is an explicit placement (see [checkpoint placement](appendix-a-
 Four things stop the push:
 
 - An unresolved bookmark [projection issue](appendix-a-glossary.md#projection-issue) ([`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing), [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted), or `CheckpointAbandoned`) blocks the checkpoint. So kiki never pushes through a bookmark whose target it cannot explain.
-- A [checkpoint relationship](appendix-a-glossary.md#checkpoint-relationship) of `ahead` or `diverged` blocks the checkpoint, because the placement would move the bookmark backward or sideways. Publish stays blocked until the human applies [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target).
+- A [checkpoint relationship](appendix-a-glossary.md#checkpoint-relationship) of `ahead` or `diverged` blocks the checkpoint, because the placement would move the bookmark backward or sideways. Publish stays blocked until a caller applies [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target).
 - A commit without a description fails the description check above.
 - If the head has changed, the approval is invalid and kiki regenerates the plan.
 
@@ -102,9 +102,14 @@ kiki reuses the `gh` authentication already on the user's machine.
 
 ### Approval
 
-Publishing is externally visible, so it always uses the two-phase foreground flow: kiki presents a plan, and pushes only after the human approves that exact plan (see [human approval](appendix-a-glossary.md#human-approval)).
+Publishing is externally visible, so it always uses the two-phase [approval flow](09-commands.md#foreground-approval-flow): kiki builds a plan, and pushes only after that exact plan is approved (see [human approval](appendix-a-glossary.md#human-approval)).
 
-`BeginApproval` returns these items for the presenter to show:
+The approval comes from one of two places:
+
+- **A person.** The presenter shows the plan at a foreground terminal, and the person confirms it.
+- **A policy rule.** `kkd` issues a [`PolicyApproval`](appendix-a-glossary.md#policy-approval) when a rule in the activated [automation policy](appendix-a-glossary.md#automation-policy) allows the plan (see [Authority](04-authority.md#policyapproval)). The rule must name the `publish` operation, and it must accept the `externally-visible` [risk label](appendix-a-glossary.md#risk-label), which every publish plan carries. `publish` rules arrive with this feature.
+
+`BeginApproval` returns these items. The presenter shows them to a person, and `kk` prints them when a rule approves the plan:
 
 - the exact thread heads;
 - checkpoints;
@@ -113,4 +118,6 @@ Publishing is externally visible, so it always uses the two-phase foreground flo
 - the operation; and
 - security-relevant flags.
 
-An approval covers one PR or one stack plan. It cannot authorize a later refresh, force-push, comment, changed text, or different stack. Non-interactive publishing is unavailable in v1.x unless the authority model is explicitly revised.
+An approval covers one PR or one stack plan. It cannot authorize a later refresh, force-push, comment, changed text, or different stack. That holds for both kinds of approval: each later action is a new plan, and it needs its own approval.
+
+Publishing with no person present is available only through such a rule. kiki is [headless](appendix-a-glossary.md#headless), so `kk publish` needs no attached terminal view, but it never opens an editor without a terminal: the caller passes `--no-edit`. Without a terminal and without a rule that allows the plan, `kk publish` fails closed with [exit code](09-commands.md#exit-codes) 3 and pushes nothing. There is still no `--yes` flag and no reusable approval.

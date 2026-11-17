@@ -287,7 +287,7 @@ Creation is the one exception. It places the bookmark on the new thread's first 
 - **Adopt and choose.** The approved repair plans [`adopt-bookmark`](../appendix-a-glossary.md#adopt-bookmark) and [`choose-bookmark-target`](../appendix-a-glossary.md#choose-bookmark-target) may place the bookmark on the live head or on any commit on the validated owned chain. That includes a commit behind the expected target. These plans may pass `--allow-backwards`.
 - **Restore.** [`restore-bookmark`](../appendix-a-glossary.md#restore-bookmark) puts the bookmark back on the expected target. jj may see that as a backward move, so the plan may pass `--allow-backwards`. It still needs no approval in the thread's own context; applied to a different thread, it needs a one-shot approval. It is offered only while the expected target is visible.
 - **Unhide.** [`unhide-checkpoint`](../appendix-a-glossary.md#unhide-checkpoint) may also pass the flag.
-- **Never off the chain.** Kiki never places the bookmark on a commit that is off the owned chain. v1 has no plan for that. The human first fixes the shape with jj, for example with a rebase that puts the commit on the chain. Then the human adopts or chooses.
+- **Never off the chain.** Kiki never places the bookmark on a commit that is off the owned chain. v1 has no plan for that. The shape is first fixed with jj, for example with a rebase that puts the commit on the chain. Then an adopt or choose plan is applied.
 
 [Threads](../03-threads.md) owns this rule. [Commands](../09-commands.md) owns the table of plans.
 
@@ -387,7 +387,7 @@ A closed thread has no workspace. Its checkpointed commit can still be rewritten
   - Every applied plan is a placement that appends a `thread_checkpoints` row. The row's `reason` names the plan.
   - [`restore-bookmark`](../appendix-a-glossary.md#restore-bookmark) (`RepairRestore`) recreates or moves the bookmark to the expected target, `bookmark_expected_commit_id`. It never moves it to the older placed commit. It needs no approval in the thread's own context, and a one-shot approval when applied to a different thread.
   - [`adopt-bookmark`](../appendix-a-glossary.md#adopt-bookmark) (`RepairAdopt`) places it at the single observed target. It is offered for `BookmarkMoved` when that target is the live head or on the owned chain. It needs a one-shot approval.
-  - [`choose-bookmark-target`](../appendix-a-glossary.md#choose-bookmark-target) (`RepairChoose`) places it at the live head or at an on-chain commit the human picks. It is offered for any bookmark issue. It needs a one-shot approval.
+  - [`choose-bookmark-target`](../appendix-a-glossary.md#choose-bookmark-target) (`RepairChoose`) places it at the live head or at an on-chain commit the caller names with `--target <commit>`. It is offered for any bookmark issue. It needs a one-shot approval.
   - [`unhide-checkpoint`](../appendix-a-glossary.md#unhide-checkpoint) (`RepairUnhide`) is described in the next rule.
 - **Restore never targets a hidden commit.** A restore plan is offered only while the expected target is visible in the pinned view. Placing a bookmark on a hidden commit makes it visible again beside its successor and can create a [divergent change](https://docs.jj-vcs.dev/latest/glossary/). When the expected target is hidden, the plans are:
   - `choose-bookmark-target`, which is always the exit when the expected target is hidden; and

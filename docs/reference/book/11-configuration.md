@@ -10,7 +10,8 @@ The [acceptance slice](appendix-a-glossary.md#acceptance-slice) is the part of k
 - select a [harness](appendix-a-glossary.md#harness) (the coding-agent program kiki runs in a thread);
 - locate the terminal runtime;
 - place state and workspaces;
-- deliver critical notifications.
+- deliver critical notifications;
+- approve operations when no human is present, through the [automation policy](appendix-a-glossary.md#automation-policy). This is part of running kiki [headless](appendix-a-glossary.md#headless): with no UI attached and with no person at the keyboard.
 
 The full layering and the feature-specific sections below are staged according to the sole scope ledger in [Orientation](01-orientation.md).
 
@@ -31,9 +32,17 @@ Precedence is the order in which layers win. From lowest to highest:
 
 ### Keys that only the user config file can set
 
-Some keys are structural to the daemon: every key in `[terminal]`, and `[paths] herdr_dir`. They shape the one terminal server that [`kkd`](appendix-a-glossary.md#kkd) runs for the user, and `kkd` does not run inside anyone's terminal.
+Some keys count only when they are in the user config file. There are two groups.
 
-For these keys, only the user config file counts. The environment and the flags of the terminal that invoked `kk` are ignored for them, with a warning. Repo-local config is ignored for them too.
+- **Keys that are structural to the daemon:** every key in `[terminal]`, and `[paths] herdr_dir`. They shape the one terminal server that [`kkd`](appendix-a-glossary.md#kkd) runs for the user, and `kkd` does not run inside anyone's terminal.
+- **Keys that grant authority or run a program:** the whole `[automation]` section, and `[notifications] command`.
+  - `[automation]` holds the rules that let kiki approve an operation with no human present. See [Automation keys](#automation-keys).
+  - `[notifications] command` names a program that `kkd` runs. See [The `command` provider](#the-command-provider).
+  - A repository, a thread, or the terminal that happened to run `kk` must not be able to set either one.
+
+For these keys, only the user config file counts. The environment and the flags of the terminal that invoked `kk` are ignored for them, with a warning. Repo-local config is ignored for them too. So are the two v1.x layers described next, repo-shared config and per-thread config.
+
+Being in the user config file is not enough for `[automation]`. The section does nothing until it is activated. See [The file does nothing until it is activated](#the-file-does-nothing-until-it-is-activated).
 
 Those five layers are the acceptance-slice precedence. v1.x ([later polish](appendix-a-glossary.md#v1-x-polish)) inserts two more layers:
 
@@ -66,6 +75,7 @@ A changed setting does not always apply right away. This section says when each 
 - **The default harness** takes effect at the next `kk new`. It does not restart live threads.
 - **`workspaces_root`** applies to the next `kk new`. Existing workspaces stay where they are.
 - **`[timeouts]` keys and `[cascade] delivery_attempts`** reload live. A new value applies to the next wait that starts.
+- **`[automation]`** never reloads. Not even a daemon restart applies an edit. A changed section takes effect only when `kk automation apply` activates it. See [Automation keys](#automation-keys).
 - **Cosmetic keys** may hot-reload: the change applies immediately.
 - **Some keys** take effect at the next thread-lifecycle event (`kk new` or `kk reopen`) rather than hot-reloading or requiring a daemon restart.
 - **Deferred UI keys** may instead take effect at the next overlay open.
@@ -92,10 +102,12 @@ Acceptance-slice sections:
 - `[agent]`: the default harness and harness-specific args.
   - The key is `default_harness = "claude-code" | "codex"`, initially `claude-code`. These name [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [Codex](https://github.com/openai/codex).
   - Args are keyed per harness, so one repo can default to Claude Code while a thread spawns with `--harness codex`.
-- `[notifications]`: per-event `loud | soft | silent` behavior for acceptance-slice [attention events](appendix-a-glossary.md#attention-event), plus `os_provider` (`auto | notify-rust | osascript | herdr | off`).
+- `[notifications]`: per-event `loud | soft | silent` behavior for acceptance-slice [attention events](appendix-a-glossary.md#attention-event), plus `os_provider` (`auto | notify-rust | osascript | herdr | command | off`) and `command`.
   - Per-event keys hot-reload.
-  - `os_provider` resolves at the next dispatch.
+  - `os_provider` and `command` resolve at the next dispatch.
+  - `command` is the program the `command` provider runs. Only the user config file can set it. The `command` provider ships in Stage 2 of the [build sequence](15-build-sequencing.md).
   - See [Notification keys](#notification-keys) and [Observability](12-observability.md).
+- `[automation]`: the rules of the [automation policy](appendix-a-glossary.md#automation-policy). An activated rule can approve an operation in place of a human. Only the user config file can set it, and it does nothing until it is activated. See [Automation keys](#automation-keys).
 - `[paths]`: overrides for state, socket, generated-Herdr-configuration, and workspace-root paths.
 - `[terminal]`: where the [Herdr](appendix-a-glossary.md#herdr) executable is and which named Herdr server kiki owns. Herdr is the [terminal multiplexer](https://en.wikipedia.org/wiki/Terminal_multiplexer) that hosts kiki's terminals. See [Terminal keys](#terminal-keys).
 - `[timeouts]`: how long kiki waits at each step that has a time limit. See [Timeout keys](#timeout-keys).
@@ -115,26 +127,77 @@ Transcript-egress consent is your permission to send [transcript](appendix-a-glo
 
 - It is keyed in the registered repo's SQLite database by thread, normalized provider identity, purpose (`catch_up | transcript_mcp`), and disclosure version.
 - You can inspect it, grant it for MCP (the [Model Context Protocol](https://modelcontextprotocol.io/)), and revoke it through `kk privacy consent`.
-- It cannot be pre-approved by committed TOML, environment, CLI flags, MCP, or a generic operational approval.
-- A grant must come from the enrolled foreground presenter after the provider-specific disclosure. (The presenter is the [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter): the enrolled local program that shows a plan to a person at the keyboard and collects the answer.)
+- No plain configuration key can grant it. That holds for every layer: the user config file, repo-local config, committed TOML, the environment, and CLI flags. MCP cannot grant it, and neither can a generic operational approval.
+- A grant comes from one of two places:
+  - the enrolled foreground presenter, after the provider-specific disclosure. (The presenter is the [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter): the enrolled local program that shows a plan to a person at the keyboard and collects the answer.)
+  - an activated [automation policy](appendix-a-glossary.md#automation-policy) rule that names both the purpose and the provider.
+
+The second path exists so that a machine with no human can still use a provider-backed feature. It is deliberately narrow:
+
+- The rule must list the operation as `consent:<purpose>`, for example `consent:catch_up`. A `*` in `operations` never matches a consent operation.
+- The rule must also carry `providers`, a list of normalized provider identities. A consent rule without `providers` is invalid. There is no `*` for providers.
+- The rule counts only after the policy is activated. Writing it in the file grants nothing. See [The file does nothing until it is activated](#the-file-does-nothing-until-it-is-activated).
+- The rule stands in for the human's confirmation of that one grant. The grant is still recorded in the repo database under the same key, and `kk privacy consent` can still inspect and revoke it.
+
+Consent rules ship with the provider-backed features they gate, which are v1.x. [Automation keys](#automation-keys) owns the rule schema.
 
 ## Notification keys
 
-`[notifications]` holds one key per [attention event](appendix-a-glossary.md#attention-event). Each key takes a level: `loud`, `soft`, or `silent`. This chapter owns the key names and what each level does. [Observability](12-observability.md#attention-events) describes the events themselves.
+`[notifications]` holds one key per [attention event](appendix-a-glossary.md#attention-event). Each key takes a level: `loud`, `soft`, or `silent`. It also holds two transport keys, `os_provider` and `command`. This chapter owns the key names and what each level does. [Observability](12-observability.md#attention-events) describes the events themselves.
 
 ### What each level does
 
-kiki has four places to show an event. A level decides which of them it uses.
+kiki has five places to show an event. A level decides which of them it uses.
 
-| Level    | OS notification                               | Herdr toast                        | Overlay toast (v1.x) | Status mark |
-| -------- | --------------------------------------------- | ---------------------------------- | -------------------- | ----------- |
-| `loud`   | yes, unless `os_provider` is `herdr` or `off` | only when `os_provider` is `herdr` | yes                  | yes         |
-| `soft`   | no                                            | no                                 | yes                  | yes         |
-| `silent` | no                                            | no                                 | no                   | yes         |
+| Level    | OS notification                                           | Herdr toast                        | Notification command                 | Overlay toast (v1.x) | Status mark |
+| -------- | --------------------------------------------------------- | ---------------------------------- | ------------------------------------ | -------------------- | ----------- |
+| `loud`   | yes, unless `os_provider` is `herdr`, `command`, or `off` | only when `os_provider` is `herdr` | only when `os_provider` is `command` | yes                  | yes         |
+| `soft`   | no                                                        | no                                 | no                                   | yes                  | yes         |
+| `silent` | no                                                        | no                                 | no                                   | no                   | yes         |
 
-- **OS notification and Herdr toast** are the two forms of the configured transport, `os_provider`. Exactly one of them is used for a `loud` event: the OS notification by default, or the Herdr [toast](appendix-a-glossary.md#toast) when `os_provider = "herdr"`. With `os_provider = "off"`, neither is sent.
+In this table, "`os_provider` is" means the value after `auto` has been resolved. See [Transport keys](#transport-keys).
+
+- **OS notification, Herdr toast, and notification command** are the three forms of the configured transport, `os_provider`. Exactly one of them is used for a `loud` event: the OS notification on a desktop by default, the Herdr [toast](appendix-a-glossary.md#toast) when `os_provider = "herdr"`, or the notification command when `os_provider = "command"`. With `os_provider = "off"`, none is sent.
 - **Overlay toast** is kiki's own toast inside the [overlay](appendix-a-glossary.md#overlay-tui). It appears only while an overlay is open, and only after the overlay ships.
-- **Status mark** is the event's durable state, shown by `kk ls`, `kk status`, and the sidebar projection. No level turns it off. A level changes how hard kiki tries to get your attention; it never hides state.
+- **Status mark** is the event's durable state, shown by `kk ls`, `kk status`, `kk events`, and the sidebar projection. No level turns it off. A level changes how hard kiki tries to get your attention; it never hides state.
+
+### Transport keys
+
+| Key           | Type            | Default | Who can set it                 |
+| ------------- | --------------- | ------- | ------------------------------ |
+| `os_provider` | string          | `auto`  | any layer                      |
+| `command`     | list of strings | empty   | the user config file, and only |
+
+`os_provider` takes `auto`, `notify-rust`, `osascript`, `herdr`, `command`, or `off`. [Observability](12-observability.md#choosing-a-provider) describes each provider.
+
+`auto` picks a provider each time kiki sends a notification. The choice depends on whether the host has a desktop session. A desktop session is a logged-in graphical session where the operating system can draw a notification. A server reached only over SSH, a container, and a CI runner have none.
+
+| Host                 | `command` is set | `auto` resolves to |
+| -------------------- | ---------------- | ------------------ |
+| Linux with a desktop | either           | `notify-rust`      |
+| macOS with a desktop | either           | `osascript`        |
+| no desktop session   | yes              | `command`          |
+| no desktop session   | no               | `off`              |
+
+`auto` never resolves to `herdr`.
+
+### The `command` provider
+
+The `command` provider hands each `loud` event to a program you choose. It is how a headless host tells something outside kiki that a thread needs attention: a chat webhook, a pager, or a log collector. It ships in Stage 2 of the [build sequence](15-build-sequencing.md).
+
+```toml
+[notifications]
+os_provider = "command"
+command     = ["/usr/local/bin/kiki-notify", "--channel", "builds"]
+```
+
+- `command` is a list. The first item is the program and the rest are its arguments. Give the program's full path. `kkd` runs the program directly, not through a shell.
+- `kkd` runs it once for each `loud` event. It writes the event to the program's standard input as one JSON object. This is the same object that [`kk events --json`](09-commands.md#kk-events) prints for that event.
+- `kkd` waits for the program for a short time, the [`notification_command`](#timeout-keys) timeout. A program still running then is stopped.
+- `kkd` never retries. A program that fails, or that is stopped at the timeout, loses that one notification. It does not lose the event: the status mark and the event stream still carry it.
+- The program runs as you, with the same constructed environment `kkd` gives the terminal server (see [Who starts the server](#who-starts-the-server)). It gets no kiki credential.
+- Only the user config file can set `command`, because the key makes `kkd` run a program. A value from repo-local config, the environment, or `--config` is ignored with a warning. `os_provider` itself may still come from any layer; choosing `command` there runs only the program the user config file named.
+- If `os_provider` is `command` and `command` is empty, nothing is sent, and `kk config show` warns.
 
 ### Event keys
 
@@ -163,20 +226,208 @@ Notes:
 - v1.x keys are ignored with a warning until their feature ships. The state behind a v1.x event still shows in `kk ls` and `kk status` where the slice already tracks it.
 - The silence threshold for `agent_silent` is a separate deferred key.
 
+## Automation keys
+
+`[automation]` holds the rules of the [automation policy](appendix-a-glossary.md#automation-policy). The policy is how kiki runs with no human present.
+
+Many kiki operations need a one-shot approval before they run. Normally a person gives it: they read the plan in a terminal and confirm it. That is a [`HumanApproval`](appendix-a-glossary.md#human-approval). A policy rule can stand in for that person. When an activated rule allows the exact plan, `kkd` issues a [`PolicyApproval`](appendix-a-glossary.md#policy-approval) and the operation goes ahead without a prompt.
+
+This chapter owns the rule schema: every key, its allowed values, and its default. [Authority](04-authority.md#automation-policy) owns what a rule means: how `kkd` evaluates it, what a [`PolicyApproval`](04-authority.md#policyapproval) is bound to, and what a policy can never do. [Commands](09-commands.md#kk-automation) owns `kk automation`.
+
+Three facts frame everything below:
+
+- **The default is no policy.** With an empty or absent `[automation]` section, kiki asks a human for every approval, and a caller with no terminal is refused.
+- **A rule replaces only the human's confirmation.** Every safety check still runs: the plan, its digest, the drift and expiry checks, the freeze, the holder scan, and the final proof. No rule can make kiki run a plan that those checks refuse.
+- **Only the user config file counts.** See [Keys that only the user config file can set](#keys-that-only-the-user-config-file-can-set).
+
+The policy engine and `kk automation` are in the acceptance slice, in Stage 1 of the [build sequence](15-build-sequencing.md). kiki's own end-to-end tests need unattended approvals.
+
+### The file does nothing until it is activated
+
+Editing `[automation]` changes nothing by itself. `kkd` never reads the section to decide an approval. It decides from a stored copy, and only one command writes that copy:
+
+1. You edit `[automation]` in `~/.config/kiki/config.toml`.
+2. You run `kk automation apply`. `kkd` reads the section, puts it in a canonical form, and computes a digest of it.
+3. The activation must be approved in one of two ways:
+   - a person confirms it in a foreground terminal, where the enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) shows the full policy and how it differs from the active one; or
+   - the caller passes the Admin bootstrap credential with `--admin-credential-file <path>`. This is the path for a machine that never has a human.
+4. `kkd` stores the activated policy. From then on it evaluates that stored copy and nothing else.
+
+A `PolicyApproval` can never approve an activation. A policy cannot widen itself.
+
+`kk automation status` shows the active policy and says whether the file now differs from it. `kk automation revoke` clears the active policy. Revoking only removes authority, so it needs no approval, and any credential of this user may run it.
+
+This step is why an agent cannot give itself authority by editing a config file. It is hygiene, not a security boundary: kiki's processes and the agents all run as the same user, and kiki does not claim to stop a hostile process running as that user. [Authority](04-authority.md#activating-a-policy) owns the full activation contract.
+
+### Rule keys
+
+A policy is a list of rules. Each rule is one `[[automation.rule]]` table. The double brackets are TOML's way of writing one entry of a list. `[automation]` has no other keys.
+
+| Key          | Type            | Allowed values                                                                       | Default                               |
+| ------------ | --------------- | ------------------------------------------------------------------------------------ | ------------------------------------- |
+| `name`       | string          | any non-empty string, unique among the rules                                         | none; required                        |
+| `principals` | list of strings | see [`principals`](#principals)                                                      | none; required                        |
+| `repos`      | list of strings | repo ids, canonical repo paths, or `*`                                               | none; required                        |
+| `operations` | list of strings | see [`operations`](#operations)                                                      | none; required                        |
+| `accept`     | list of strings | [risk labels](appendix-a-glossary.md#risk-label), or `*`. Used by `allow` rules only | empty: the rule accepts no risk label |
+| `effect`     | string          | `allow` or `require-human`                                                           | none; required                        |
+| `providers`  | list of strings | normalized provider identities                                                       | empty; required on a consent rule     |
+
+`name` identifies the rule. It appears in every audit row the rule produces and in the message `kk` prints when the rule approves or refuses a plan.
+
+`repos` says which registered repos the rule covers. A repo id is the UUID that `kk init` assigned. A canonical repo path is the repo's real path with symbolic links resolved. `*` covers every registered repo, and it also covers `kk init` for a repo that is not registered yet.
+
+`kk automation apply` checks the whole section before it activates anything. It refuses the policy if a rule lacks a required key, repeats a `name`, uses a value outside the allowed set, or has a key this table does not list. The active policy then stays as it was. This is stricter than the general rule that unknown keys only warn. A mistyped key in a rule about authority must not pass silently.
+
+#### `principals`
+
+A principal is who is asking. A rule matches a caller when the caller is at least one of the principals it lists.
+
+| Value               | The caller is…                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `credential:<name>` | a process that presents the [automation credential](appendix-a-glossary.md#automation-credential) called `<name>`               |
+| `thread:self`       | a thread-scoped caller, such as a thread's agent, acting on its own thread                                                      |
+| `thread:descendant` | a thread-scoped caller acting on a thread that [follows](appendix-a-glossary.md#follows) its own thread, directly or indirectly |
+| `thread:any`        | a thread-scoped caller acting on any thread in its repo, or creating a thread there                                             |
+| `registration`      | a caller that holds only the repo's registration credential                                                                     |
+| `*`                 | any caller at all                                                                                                               |
+
+An automation credential is a named credential made for scripts. It is created with `kk automation credential create <name>` and kept in `~/.config/kiki/automation/<name>.cred`. kiki never gives it to an agent. The `thread:` principals are the only way an agent gets authority from the policy.
+
+A `thread:` principal covers any holder of the thread's credential. That is the thread's agent, and it is also a person who runs `kk` in that thread's workspace. kiki cannot tell the two apart, so a `thread:` rule applies to both.
+
+#### `operations`
+
+An operation is the kind of thing being approved. A rule matches a plan when the plan's operation is in the rule's list.
+
+| Value                | Approves…                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------- |
+| `init`               | registering a repo with `kk init`                                                                  |
+| `new`                | creating a thread with `kk new`                                                                    |
+| `reopen`             | `kk reopen`                                                                                        |
+| `close`              | `kk close`                                                                                         |
+| `destroy`            | `kk thread destroy`                                                                                |
+| `unregister`         | `kk repo unregister`                                                                               |
+| `detach`             | `kk thread detach`, where it needs approval                                                        |
+| `interrupt`          | `kk thread interrupt`                                                                              |
+| `restart`            | `kk thread restart`, where it needs approval                                                       |
+| `publish`            | `kk publish` (v1.x)                                                                                |
+| `audit-log`          | `kk audit log`                                                                                     |
+| `sensitive-read`     | a read of another thread's transcript, diff, PR comments, or detailed audit arguments              |
+| `thread-op`          | any ordinary change to a thread that needs approval only because the caller is not that thread     |
+| `repair:<plan-name>` | one named [repair plan](appendix-a-glossary.md#repair-plan), for example `repair:restart-terminal` |
+| `repair:*`           | every repair plan that has a `repair:` name                                                        |
+| `consent:<purpose>`  | a transcript-egress consent grant for one purpose (v1.x). Needs `providers`                        |
+| `*`                  | every operation above except `consent:<purpose>`                                                   |
+
+`publish` and `consent:<purpose>` rules arrive with the features they gate. [Consent is not configuration](#consent-is-not-configuration) explains the consent rule.
+
+`thread-op` is one name for many small changes. A thread may checkpoint itself, describe itself, or restart its own harness after the harness exited, all with no approval. The same change needs an approval when someone else makes it: a script holding an automation credential, or another thread. `thread-op` is the operation for that case. For a thread-scoped caller the plan carries the `cross-thread` risk label. For an automation credential it carries no label.
+
+Repair plans follow the same split. `repair:<plan-name>` names a plan that needs an approval whoever applies it, such as `restart-terminal` or `terminate-orphans`. A plan that needs no approval in the thread's own context, such as `restart-agent` or `restore-bookmark`, has no `repair:` name. When a caller that is not the thread applies it, the operation is `thread-op`. The [repair table](09-commands.md#every-issue-and-its-plan) in Commands shows which plans need which approval, and [Authority](04-authority.md#the-thread-op-operation) owns the rule.
+
+Three operations are never on this list, because no rule can approve them: activating a policy, creating or rotating an automation credential, and enrolling or recovering the approval presenter. Those need the presenter or the Admin credential.
+
+#### `accept`
+
+Some plans carry risk. `kkd` works out the risk of each plan before it asks for approval and attaches a [risk label](appendix-a-glossary.md#risk-label) for each kind. For example, a close that would stop running processes carries `live-processes`, and a plan that would lose uncommitted work carries `work-loss`. [Authority](04-authority.md#risk-labels) owns the closed list of labels and what each one means.
+
+`accept` lists the labels an `allow` rule is willing to take on. An `allow` rule matches a plan only if every label on the plan is in the rule's `accept` list. With `accept` left empty, the rule matches only plans that carry no label.
+
+Only `allow` rules use `accept`. A `require-human` rule ignores it. Such a rule matches on `principals`, `repos`, and `operations` alone, whatever labels the plan carries.
+
+#### `effect`
+
+`effect` says what a matching rule does.
+
+- `allow`: `kkd` approves the plan with a `PolicyApproval`.
+- `require-human`: a person must confirm the plan, as if no policy existed.
+
+When several rules match one plan, `require-human` wins over any `allow`. The order of the rules in the file does not matter. When no rule matches, a person must confirm.
+
+So a plan ends in one of three ways:
+
+| Result                                                  | What `kk` does                                                                                                                                                                     |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| allowed by a rule                                       | prints the plan and "approved by rule `<name>`", then runs it. No prompt. `--confirm` forces the human prompt anyway                                                               |
+| a human is required, and `kk` has a foreground terminal | shows the ordinary approval prompt                                                                                                                                                 |
+| a human is required, and `kk` has no terminal           | refuses with [exit code](09-commands.md#exit-codes) 3. The message names the operation, the plan's risk labels, and the reason: no rule matched, or rule `<name>` requires a human |
+
+### A worked example
+
+```toml
+[[automation.rule]]
+name       = "ci-lifecycle"
+principals = ["credential:ci"]
+repos      = ["*"]
+operations = ["init", "new", "reopen", "close", "repair:restart-terminal"]
+accept     = ["live-processes"]
+effect     = "allow"
+
+[[automation.rule]]
+name       = "people-destroy-threads"
+principals = ["*"]
+repos      = ["*"]
+operations = ["destroy"]
+effect     = "require-human"
+```
+
+The first rule lets a script holding the `ci` automation credential register repos, create threads, reopen them, close them, and restart a thread's missing terminal, in every repo. The second rule says that destroying a thread always needs a person, whoever asks and whatever the risk. It has no `accept` key, because a `require-human` rule ignores risk labels.
+
+After `kk automation apply`, this is what a script holding the `ci` credential sees:
+
+| The script runs…                                                                                          | Labels on the plan            | Result                                                                                                                                    |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `kk new fix-login -m "…"`                                                                                 | none                          | approved by rule `ci-lifecycle`                                                                                                           |
+| `kk close fix-login`, with a shell still running                                                          | `live-processes`              | approved by rule `ci-lifecycle`; the processes are frozen, terminated, and verified gone as in any close                                  |
+| `kk close fix-login`, with work the close would lose                                                      | `live-processes`, `work-loss` | refused, exit code 3: no rule matched, because `ci-lifecycle` does not accept `work-loss`                                                 |
+| `kk close fix-login`, and an editor outside the thread's terminals opens the workspace after the approval | `live-processes`              | approved by the rule, then refused by the final holder scan with exit code 4. The files are kept. A rule never overrides a safety proof   |
+| `kk thread destroy fix-login`                                                                             | any                           | refused, exit code 3: rule `people-destroy-threads` requires a human                                                                      |
+| `kk repair`, applying the `terminate-orphans` plan                                                        | `live-processes`              | refused, exit code 3: no rule matched, because `ci-lifecycle` lists only `repair:restart-terminal`                                        |
+| `kk repair`, applying the `restart-agent` plan to a harness that exited                                   | none                          | refused, exit code 3: no rule matched. The script is not the thread, so the operation is `thread-op`, and `ci-lifecycle` does not list it |
+
+An agent in a thread gets nothing from this policy. No rule names a `thread:` principal, so every approval an agent asks for still needs a person.
+
+### What `*` gives away
+
+Every key that takes a list also takes `*`, and kiki does not stop you from using it everywhere:
+
+```toml
+[[automation.rule]]
+name       = "everything"
+principals = ["*"]
+repos      = ["*"]
+operations = ["*"]
+accept     = ["*"]
+effect     = "allow"
+```
+
+Once activated, this rule hands every approval to any local caller. Any process running as you can then close and destroy threads, lose uncommitted work, abandon revisions, and stop the whole terminal server, with no person asked. That includes every agent and every script an agent starts. The safety proofs still run, and consent still needs its own rule. Nothing else stands in the way.
+
+Each `*` gives away one thing:
+
+- `principals = ["*"]` lets every caller use the rule, agents included.
+- `repos = ["*"]` covers every repo, including ones registered later.
+- `operations = ["*"]` covers every operation except consent, including operations a later kiki version adds.
+- `accept = ["*"]` accepts every risk label, including `work-loss`, `abandon-revisions`, and labels a later kiki version adds.
+
+Prefer a rule that names one credential, the operations a script really runs, and the labels you have decided to accept.
+
 ## Timeout keys
 
 Many steps in kiki wait for something, and each wait has a limit. `[timeouts]` names every one of those limits. When another chapter says a step is "bounded" or has a "deadline", it names one of these keys.
 
-| Key                | Default | Used for                                                                                                                        |
-| ------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `launcher_report`  | `10s`   | waiting for role launchers to report                                                                                            |
-| `ready_handshake`  | `60s`   | launch until the [ready handshake](appendix-a-glossary.md#ready-handshake); expiry is `CreateFailed` (or the restart's failure) |
-| `freeze_stabilize` | `5s`    | the [freeze](appendix-a-glossary.md#freeze) reaching a fixed point (two passes that find the same set of processes)             |
-| `frozen_step`      | `30s`   | any single step while processes are frozen                                                                                      |
-| `verified_exit`    | `10s`   | waiting for a terminated process to be gone                                                                                     |
-| `hook_connect`     | `1s`    | [`kk-hook`](appendix-a-glossary.md#kk-hook) connecting to `kkd` and being admitted                                              |
-| `slow_path`        | `30s`   | one reconciliation holding a tool batch (the [slow-path bound](appendix-a-glossary.md#slow-path-bound))                         |
-| `frontier_retry`   | `2s`    | [frontier sampler](appendix-a-glossary.md#frontier-sampler) retries                                                             |
+| Key                    | Default | Used for                                                                                                                        |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `launcher_report`      | `10s`   | waiting for role launchers to report                                                                                            |
+| `ready_handshake`      | `60s`   | launch until the [ready handshake](appendix-a-glossary.md#ready-handshake); expiry is `CreateFailed` (or the restart's failure) |
+| `freeze_stabilize`     | `5s`    | the [freeze](appendix-a-glossary.md#freeze) reaching a fixed point (two passes that find the same set of processes)             |
+| `frozen_step`          | `30s`   | any single step while processes are frozen                                                                                      |
+| `verified_exit`        | `10s`   | waiting for a terminated process to be gone                                                                                     |
+| `hook_connect`         | `1s`    | [`kk-hook`](appendix-a-glossary.md#kk-hook) connecting to `kkd` and being admitted                                              |
+| `slow_path`            | `30s`   | one reconciliation holding a tool batch (the [slow-path bound](appendix-a-glossary.md#slow-path-bound))                         |
+| `frontier_retry`       | `2s`    | [frontier sampler](appendix-a-glossary.md#frontier-sampler) retries                                                             |
+| `notification_command` | `5s`    | one run of the [notification command](#the-command-provider); on expiry `kkd` stops the program and does not retry              |
 
 One more limit lives in its own section:
 
@@ -289,7 +540,9 @@ Only `kkd` starts the server. But the server must outlive `kkd`, so `kkd` does n
 
 launchd and systemd are the system services that keep background programs running. A "transient" unit is one created at run time by a command, with no unit file on disk.
 
-A `kkd` crash, restart, or upgrade must not stop the server, because stopping the server ends every thread's processes. This is a proof gate, not an assumption: the test kills `kkd` under each real service manager and checks that the server and the agents keep running (see [Testing](14-testing.md)).
+Some hosts have no user service manager. Many containers and CI runners are like this. There the operator runs `kkd --foreground` under a supervisor of their own choosing, and `kkd` starts the server as a detached process in its own session. ("Detached" means the process is not tied to `kkd`'s own lifetime or terminal.) On macOS reached over SSH with no graphical login, `kkd` uses launchd's per-user domain, not the GUI one. Both modes are unproven and sit behind the same gate described next. A platform mode that fails it is unsupported. See [`kk daemon install`](09-commands.md#kk-daemon-install).
+
+A `kkd` crash, restart, or upgrade must not stop the server, because stopping the server ends every thread's processes. This is a proof gate, not an assumption: the test kills `kkd` under each real service manager, and in the `kkd --foreground` mode, and checks that the server and the agents keep running (see [Testing](14-testing.md)).
 
 `kkd` starts the server with a constructed environment: the user's login baseline of `HOME`, `USER`, `SHELL`, `PATH`, and locale. It never uses the environment of the terminal that invoked `kk`.
 

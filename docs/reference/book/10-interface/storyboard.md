@@ -57,6 +57,8 @@ state       ~/.config/kiki/repos/2e7a8c5b/state.db
 
 The card is drawn by the `kk` process the developer ran. That process is the enrolled [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter), the program allowed to show and confirm an approval. The presenter was enrolled on the earlier project, so `kk init` does not enroll one again here (see [Commands · First run](../09-commands.md#first-run)). Every later approval in this story uses the same card shape. The story draws the card the first time each kind of command runs and says "after approval" afterwards.
 
+This developer has not activated an [automation policy](../appendix-a-glossary.md#automation-policy), so a person confirms every approval in this story. The card is the human path. On a machine with an activated policy, a matching rule approves the same `kk` command with no card (see [Interface · spec](spec.md#approval-without-a-card)).
+
 The developer returns to `kestrel-mobile` and types bare `kk`. The repo is registered and the TUI ships, so the [overlay](../appendix-a-glossary.md#overlay-tui) opens in `NAVIGATE` mode. The overlay is kiki's interactive screen. There are no threads to navigate, so it shows the empty-state placeholder, with `n` and `?` as the only active verbs (see [Interface · spec](spec.md#overlay)).
 
 ```text

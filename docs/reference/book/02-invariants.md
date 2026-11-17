@@ -24,7 +24,7 @@ Code should treat a jj bookmark like a bookmark left in a book. It marks a check
 - a missing [terminal group](appendix-a-glossary.md#terminal-group);
 - a surviving [orphaned](appendix-a-glossary.md#orphan) process.
 
-kiki may repair a projection automatically only when it can prove what the correct result is. Otherwise the thread enters `ProjectionDiverged`. It then waits for `kk repair` or another explicit human choice. See [projection divergence](appendix-a-glossary.md#projection-divergence).
+kiki may repair a projection automatically only when it can prove what the correct result is. Otherwise the thread enters `ProjectionDiverged`. It then waits for `kk repair` or another explicit choice. A human makes that choice, or a caller that an activated [automation policy](appendix-a-glossary.md#automation-policy) allows. kiki never guesses. See [projection divergence](appendix-a-glossary.md#projection-divergence).
 
 A broken projection does not erase the abilities kiki can still prove:
 
@@ -264,22 +264,59 @@ Some flows do send data out. Egress means data leaving the machine. Two flows ma
 - a catch-up sent to a hosted [harness](appendix-a-glossary.md#harness);
 - a transcript-derived [MCP](https://modelcontextprotocol.io/) result returned to a hosted model.
 
-Before that happens, kiki must disclose the boundary and obtain a grant. The grant is remembered, revocable, and bound to the thread, the provider, and the purpose.
+Before that happens, kiki must disclose the boundary and obtain a grant. The grant is remembered, revocable, and bound to the thread, the provider, and the purpose. A person gives it. On a host with no human, an activated automation policy rule can give it, and only a rule that names both the purpose and the provider. A wildcard rule or a plain config key never can.
 
 This is a confidentiality rule. Treat it accordingly.
 
 ## Authority is explicit
 
-Some daemon actions are high-stakes: destructive actions, cross-thread actions, sensitive reads, and externally visible actions. Each one requires a one-shot [human approval](appendix-a-glossary.md#human-approval). That approval:
+Some daemon actions are high-stakes: destructive actions, cross-thread actions, sensitive reads, and externally visible actions. Each one requires a one-shot approval. That approval:
 
 - is bound to the method, target, arguments, and rendered plan;
-- is issued through a persisted begin/display/confirm exchange with an enrolled interactive [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter).
+- is single-use, and is claimed into a durable operation journal before any external effect;
+- comes from exactly one of two sources.
+
+The two sources are:
+
+- **A human.** A [human approval](appendix-a-glossary.md#human-approval) is issued through a persisted begin/display/confirm exchange with an enrolled interactive [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter).
+- **An activated policy.** A [policy approval](appendix-a-glossary.md#policy-approval) is issued by `kkd` when a rule in the activated [automation policy](appendix-a-glossary.md#automation-policy) allows the exact plan.
+
+With no activated policy, or no matching rule, only a human can approve. A caller with no terminal then [fails closed](appendix-a-glossary.md#fail-closed).
+
+Unattended approval has no other source. There is no `--yes`, no piped confirmation, no approval by environment variable, and no reusable approval token. Editing a config file approves nothing: a policy takes effect only when the enrolled presenter or the Admin credential activates it.
 
 A reusable [Admin credential](appendix-a-glossary.md#bootstrap-admin-credential) must not be loaded automatically by every `kk` subprocess. It cannot replace confirmation for an operational call.
+
+### Policy replaces confirmation, never proof
+
+An automation policy replaces one thing: the human's confirm step. It replaces nothing else.
+
+- Preflight, the canonical plan, the plan digest, and the drift and expiry checks all still run.
+- Freeze, [holder](appendix-a-glossary.md#holder) scans, the [final proof](appendix-a-glossary.md#final-proof), and [verified exit](appendix-a-glossary.md#verified-exit) all still run.
+- A policy can never make a plan run that a safety proof refuses.
+
+The choices that used to need a human's informed consent are [risk labels](appendix-a-glossary.md#risk-label) on the plan. A rule approves a plan only when it accepts every label the plan carries.
 
 [Thread-scoped credentials](appendix-a-glossary.md#threadscoped-credential) may operate on their own thread. They may also read the narrow same-repo summary surface (the [repo-summary read scope](appendix-a-glossary.md#repo-summary-read-scope)). They must not read sibling transcripts, inspect sibling diffs, or mutate sibling threads.
 
 See [Authority](04-authority.md) for the full model.
+
+## kiki runs headless
+
+kiki is fully operable [headless](appendix-a-glossary.md#headless). That word covers two separate properties.
+
+**No UI is required.** This is a v1 invariant.
+
+- No command, lifecycle step, or safety proof needs an attached Herdr client, the overlay, a popup, the UI pane, or a desktop session.
+- The dedicated Herdr server runs with zero attached clients. Threads are created, run, closed, and repaired the same way whether or not anyone is watching.
+- The `kk` CLI and the gRPC service are the complete surface. The overlay, the UI pane, and Herdr's sidebar are views. Anything they show is also available from a command with `--json`.
+- Without a terminal, `kk` never prompts. Every question it can ask has a flag or argument that answers it. A command that is missing an answer fails and names the flag.
+
+**No human is required, when a policy says so.** An activated automation policy can stand in for the human's confirmation, as [Authority is explicit](#authority-is-explicit) states. Events that would call for a person's attention still surface as events and states that a script can read with [`kk events`](09-commands.md#kk-events) and `--json` output.
+
+One thing stays outside kiki's reach. kiki never answers a harness's own permission prompt. On a host with no human, the operator sets the harness's own permission settings. A waiting prompt still shows as a `blocked` agent.
+
+See [Automation policy](04-authority.md#automation-policy) for the rules.
 
 ## State is distinguishable without color
 

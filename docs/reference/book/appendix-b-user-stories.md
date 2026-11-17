@@ -244,7 +244,7 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
 60. As a developer, I want PR descriptions to be human-territory after creation, so that my reviewer-facing prose is stable.
     - Kk does not silently overwrite them.
     - `kk publish --refresh` is an opt-in regenerator.
-61. As a developer, I want a child thread to be reconciled locally onto the exact merged default-branch commit when its parent merges, so that stacked PRs survive landing without granting unattended remote authority.
+61. As a developer, I want a child thread to be reconciled locally onto the exact merged default-branch commit when its parent merges, so that stacked PRs survive landing and kiki never changes the remote before that exact change is approved.
     - The child then receives an exact one-shot approval plan for `--force-with-lease` and the PR-base update.
     - The plan comes before those remote mutations occur.
 62. As a developer, I want the v1.x `kk thread comments` surface to list a thread's PR review comments read-only inside the thread context, so that I can respond with full context.
@@ -260,6 +260,7 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
       5. After that, terminate the frozen processes, close the terminal group, forget the workspace, and remove the directory.
     - I want the approval card to list the processes it found.
     - I want the card to say plainly that it covers every process in the listed terminal containers at freeze time.
+    - When an automation policy rule approves the close and no card is drawn, I want the plan that `kk` prints to carry the same list and the same statement (story 149).
 
     63a. As a developer, I want `kk close` to terminate the frozen processes itself and verify each exit by OS process identity, so that a background job that ignored the hangup can never be writing into a directory kiki is deleting.
     - It treats the terminal server's "closed" reply as cleanup and never as proof.
@@ -383,7 +384,9 @@ A [harness](appendix-a-glossary.md#harness) is the agent program kiki runs, such
 
 93. As a developer, I want destructive, cross-thread, sensitive-read, and externally visible operations to require a one-use [approval](appendix-a-glossary.md#human-approval), so that a buggy hook or agent invoking `kk` cannot inherit reusable human authority.
     - The approval is bound to the exact method and target.
-    - It is issued through an interactive foreground flow.
+    - By default it is issued through an interactive foreground flow, where I confirm the plan myself.
+    - The only other source is an [automation policy](appendix-a-glossary.md#automation-policy) rule that I wrote and activated (stories 144 to 149). Such a rule issues a one-use [`PolicyApproval`](appendix-a-glossary.md#policy-approval) for the exact plan.
+    - There is no `--yes` flag, no piped confirmation, no approval from an environment variable, and no reusable approval token.
 94. As a developer, I want each thread's `kk-hook` to be issued a [`ThreadScoped`](appendix-a-glossary.md#threadscoped-credential) credential bound to that thread's id, so that even if a hook's behavior is wrong it cannot mutate any other thread's state.
 95. As a developer, I want every parseable daemon transport attempt recorded exactly once in [SQLite](https://www.sqlite.org/), so that operational history is queryable without inventing a repo for bootstrap or failed routing.
     - This covers every attempt: accepted or rejected, gRPC or [MCP](https://modelcontextprotocol.io/).
@@ -393,6 +396,7 @@ A [harness](appendix-a-glossary.md#harness) is the agent program kiki runs, such
     - I understand that append-only is enforced by daemon APIs and is not tamper-proof against my UID (my own user account).
 97. As a developer, I want the trust model to state its protections and limits.
     - One-shot approvals reduce accidental agent authority.
+    - Policy activation is hygiene of the same kind. It keeps an agent from granting itself authority by editing a config file. It is not a security boundary.
     - They do not defend against an actively malicious same-UID process that can impersonate user interaction or modify local state.
 
 ## Thread transcript
@@ -527,7 +531,7 @@ Stories 137a and 137b are v1.x: the `shell` role pane is v1.x polish. In the acc
 - The pane is positioned below the agent in the default layout, or to the right via `[ui] shell_pane_position`.
 - Its cwd is set to the jj workspace.
 - `KIKI_THREAD_ID` is set explicitly.
-- No approval or Admin credential is in its environment.
+- No approval, Admin, or automation credential is in its environment.
 - The rest of its environment comes from my login baseline rather than from whichever terminal ran `kk new`.
 - The shell process is taken from my `$SHELL`.
 
@@ -548,3 +552,103 @@ Stories 137a and 137b are v1.x: the `shell` role pane is v1.x polish. In the acc
      - A security boundary here would mean filesystem ACLs (access control lists) or [sandboxing](<https://en.wikipedia.org/wiki/Sandbox_(computer_security)>).
      - That is a future-version concern.
      - v1 promises only cooperative separation.
+
+## Headless operation
+
+kiki must be fully operable [headless](appendix-a-glossary.md#headless). That word covers two things:
+
+- **No UI.** Nothing needs an attached [Herdr client](appendix-a-glossary.md#herdr-client), the overlay, a popup, the UI pane, or a desktop session.
+- **No human.** An activated [automation policy](appendix-a-glossary.md#automation-policy) can stand in for the person who would confirm an approval.
+
+The operator in these stories runs kiki on a machine like a build server, a container, or a cloud host reached over SSH. Stories 142 to 154 and 156 to 158 are in the [acceptance slice](appendix-a-glossary.md#acceptance-slice). Stories 142 to 152 and 156 to 158 are built in Stage 1 of the [build sequence](15-build-sequencing.md), because kiki's own end-to-end tests need them. Stories 153 and 154 are built in Stage 2. Story 155 is v1.x. Running with no UI is a v1 [invariant](02-invariants.md).
+
+142. As an operator, I want every kiki command, lifecycle step, and safety proof to work with no UI attached, so that kiki runs the same on a server as on my laptop.
+     - The terminal server runs with zero clients attached.
+     - A thread is created, reconciled, repaired, and closed the same way whether or not anyone is watching.
+     - The overlay, the UI pane, and Herdr's sidebar are views. Anything they show, I can also get from a command with `--json`.
+143. As an operator, I want `kk daemon install` to install and start `kkd` without asking me anything, so that a setup script can bring up a new machine.
+     - A first install needs no credential. It creates the Admin bootstrap credential and prints the path of its file.
+     - A later run that changes an existing installation needs my confirmation at a foreground terminal, or `--admin-credential-file <path>`.
+     - The interactive first-run question stays for people at a terminal (story 4).
+     - On a host with no user service manager, such as many containers and CI runners, I run `kkd --foreground` under my own supervisor. `kkd` then starts the terminal server as a detached process. On its first start it creates the Admin bootstrap credential and logs its path.
+     - The same proof gate applies there: the terminal server and the agents must outlive a `kkd` crash. A platform that fails that proof is unsupported.
+     - See [`kk daemon install`](09-commands.md#kk-daemon-install).
+144. As an operator of a machine that never has a human, I want to activate my automation policy with the Admin credential, so that no person has to be at a keyboard to turn it on.
+     - I write the rules in the `[automation]` section of my user config file. See [Configuration · Automation keys](11-configuration.md#automation-keys).
+     - I run `kk automation apply --admin-credential-file <path>`.
+     - On a machine with a person, the same command instead shows the full policy, and how it differs from the active one, in a foreground terminal for me to confirm.
+     - The Admin credential is still never loaded automatically and never given to an agent.
+     - No approval presenter needs to be enrolled on such a machine.
+     - See [Authority · Activating a policy](04-authority.md#activating-a-policy).
+145. As a developer, I want an edit to `[automation]` to do nothing until I activate it, so that an agent or a stray script cannot grant itself authority by editing a file.
+     - `kkd` evaluates only the stored copy of the policy that was activated.
+     - `kk automation status` shows the active policy, its digest, who activated it and when, and whether the file now differs from it.
+     - `kk automation revoke` clears the active policy. It only removes authority, so it needs no approval.
+     - Only my user config file can hold the policy. A repository, a thread, the environment, and `--config` cannot set it.
+     - A policy rule can never approve activating a policy.
+146. As an operator, I want a named [automation credential](appendix-a-glossary.md#automation-credential) for my scripts, so that a script can ask for approvals without holding Admin or a thread's credential.
+     - I create it with `kk automation credential create <name>`. Creating or rotating one needs the same gate as activation: a person's foreground confirmation, or the Admin credential.
+     - `kk automation credential revoke <name>` needs no approval, and any credential of mine may call it. `list` shows what exists.
+     - It lives at `~/.config/kiki/automation/<name>.cred`, readable only by me, outside every managed workspace.
+     - kiki never puts it into a harness, a hook, or a pane's environment.
+     - My script presents it with `KIKI_AUTOMATION_CREDENTIAL_FILE` or `--automation-credential-file <path>`.
+     - By itself it can only read repo summaries, read each thread's status and non-sensitive state, and ask for approvals. Everything consequential it does goes through the policy.
+     - Even an ordinary change to a thread, such as a checkpoint, needs a rule when my script makes it, because the script is not that thread. The rule names the `thread-op` operation.
+     - It can never confirm a human's approval, and it is never accepted in place of Admin.
+     - See [`kk automation`](09-commands.md#kk-automation).
+147. As an operator, I want to script a whole thread lifecycle with that credential, so that work can start, run, and finish with no person present.
+     - The script runs `kk init`, then `kk new <name> -m "<prompt>"`, waits for the agent, reads the result, and runs `kk close`.
+     - Each step that needs an approval gets one from a rule that names my credential and that operation. `kk` prints the plan and "approved by rule `<name>`", and does not prompt.
+     - `kk init` run with an automation credential needs a rule that allows `init`.
+     - The first prompt is given with `kk new -m`.
+148. As an operator, I want the rules for unattended approval to be fully configurable, so that I decide exactly how much kiki may do without me.
+     - A rule names who is asking (`principals`), which repos, which `operations`, and which [risk labels](appendix-a-glossary.md#risk-label) it will `accept`.
+     - A rule either allows the plan or requires a human. A rule that requires a human wins over any rule that allows.
+     - Only a rule that allows uses `accept`. A rule that requires a human matches whatever risk labels the plan has.
+     - A plan that no rule matches needs a human, as it does with no policy at all.
+     - An agent gets authority from the policy only through a `thread:` principal I chose to write. An agent can never confirm a human's approval.
+     - I may write `*` in every field. I understand that this hands every approval to any local caller, and the book says so plainly.
+149. As an operator, I want a policy rule to replace only the human's confirmation and never a safety check, so that unattended does not mean unsafe.
+     - The plan, its digest, the drift and expiry checks, the freeze, the holder scan, the final proof, and verified exit all still run.
+     - A plan that a safety proof refuses is refused under any rule, even one that accepts every label.
+     - The plan that `kk` prints carries what the approval card would have shown, including its risk labels.
+     - A [`PolicyApproval`](appendix-a-glossary.md#policy-approval) is single-use and bound to the exact plan, like a human's approval.
+150. As an operator, I want `kk` never to prompt when it has no terminal, so that a script fails fast and never hangs on a question nobody will answer.
+     - Every question `kk` can ask has a flag or argument that answers it.
+     - Without a terminal, `kk` fails and names the missing flag.
+     - When an approval is needed and no rule allows the plan, `kk` refuses. The message names the operation, the plan's risk labels, and the reason: no rule matched, or a named rule requires a human.
+151. As an operator, I want every `kk` command to end with a documented exit code, so that my script can branch on what happened without reading text.
+     - `0` is success, `1` the operation failed, and `2` a usage error.
+     - `3` means an approval was needed and none was available.
+     - `4` means a precondition or a safety proof refused.
+     - `5` means the daemon is unreachable or not installed.
+     - `6` means a timeout.
+     - See [Commands · Exit codes](09-commands.md#exit-codes).
+152. As an operator, I want `--json` output and a live event stream, so that I can watch a headless host with scripts.
+     - `--json` works on every read command and on every command's final result. It changes only how the output is drawn. See [Output for scripts](09-commands.md#output-for-scripts).
+     - [`kk events`](09-commands.md#kk-events) prints the event stream for one thread or for the whole repo.
+     - `--follow` keeps the stream open, and `--since <seq>` resumes after the last event my script saw.
+     - This is the command-line face of the event stream in story 82.
+153. As an operator, I want `kk wait [<thread>] --for <state>` to block until a thread reaches a state, so that a script can wait for an agent without polling. (Stage 2.)
+     - The states are `quiescent`, `goal-complete`, `blocked`, `conflicted`, `closed`, and `issue`.
+     - `--timeout <dur>` limits the wait. The command exits `0` when the state is reached and `6` on timeout.
+     - See [`kk wait`](09-commands.md#kk-wait).
+154. As an operator, I want a `loud` attention event to run a program I name, so that a machine with no desktop can still reach me. (Stage 2.)
+     - I set `[notifications] command` to the program and its arguments. Only my user config file can set it, because it makes `kkd` run a program.
+     - `kkd` runs it once for each `loud` event, with the event as JSON on standard input, with a short timeout, and never retries.
+     - With `os_provider = "auto"` on a host with no desktop session, kiki uses the command when one is set and sends nothing otherwise.
+     - See [Configuration · The `command` provider](11-configuration.md#the-command-provider).
+155. As an operator, I want to allow transcript-egress consent for a named purpose and provider in my policy, so that a provider-backed feature can run with no person present. (v1.x, with those features.)
+     - The rule must name `consent:<purpose>` and list the providers. A `*` in `operations` never matches consent.
+     - A plain configuration key still cannot grant consent.
+156. As an operator, I want kiki never to answer a harness's own permission prompt, so that what my agent may do stays set in the harness and not in kiki.
+     - On a headless host I set the harness's own permission settings ahead of time.
+     - If a prompt still appears, the agent waits and the blocked-agent event fires. It shows in `kk events` and reaches my notification command.
+     - I can answer later by running `kk attach` over SSH.
+157. As an operator, I want every approval a rule gives to be recorded, so that I can later see what ran without me and why it was allowed.
+     - Each `PolicyApproval` writes an audit row with the rule name, the policy digest, the principal, the operation, and the risk labels.
+     - Policy activation and revoke are audited at the user level. So are automation credential create, rotate, and revoke.
+     - An audit reader can always tell a person's approval from a rule's.
+158. As a developer who activated no policy, I want kiki to behave exactly as it did before, so that headless support costs me nothing.
+     - A person confirms each approval at a foreground terminal.
+     - A caller with no terminal is refused.

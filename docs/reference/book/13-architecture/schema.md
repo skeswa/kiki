@@ -10,10 +10,10 @@ kiki keeps its state in two [SQLite](https://www.sqlite.org/) databases. SQLite 
 
 One database belongs to the user. The other belongs to one registered repository, and there is one of those per repository.
 
-| Path                                      | Scope    | Contents                                                                                                 |
-| ----------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------- |
-| `~/.config/kiki/state.db`                 | per-user | repo registry, daemon meta, terminal server instances, the Admin credential, presenters, unscoped audit  |
-| `~/.config/kiki/repos/<repo_id>/state.db` | per-repo | threads, thread events, terminal bindings, process records, agent sessions, transcripts, cascades, audit |
+| Path                                      | Scope    | Contents                                                                                                                                     |
+| ----------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `~/.config/kiki/state.db`                 | per-user | repo registry, daemon meta, terminal server instances, the Admin credential, presenters, automation policies and credentials, unscoped audit |
+| `~/.config/kiki/repos/<repo_id>/state.db` | per-repo | threads, thread events, terminal bindings, process records, agent sessions, transcripts, cascades, audit                                     |
 
 Both databases live under `~/.config/kiki/`. This is kiki's centralized state directory.
 
@@ -91,27 +91,52 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - Columns: `(cred_id, kind: 'Admin', credential_hash, issued_at, revoked_at?)`.
   - The `Admin` credential belongs to the user, not to a repository. So it lives in this database and never in a per-repo `credentials` table.
   - Admin is accepted only by the bootstrap, presenter-enrollment, and presenter-recovery endpoints, and by `BeginApproval` for the approvals of `kk init` and first run. No thread or registration credential exists yet at that point. It is also accepted by the diagnose call and the `BeginApproval` of the user-scoped `replace-terminal-server` plan, which work from any directory.
-  - Operational calls cannot substitute Admin for [human approval](../appendix-a-glossary.md#human-approval).
+  - Admin is also accepted for three automation steps: activating a policy, and creating or rotating an automation credential. See `automation_policies` and `automation_credentials` below.
+  - Operational calls cannot substitute Admin for [human approval](../appendix-a-glossary.md#human-approval) or for a [`PolicyApproval`](../appendix-a-glossary.md#policy-approval).
 
 - **`approval_presenters`**: enrollments of foreground channels. A presenter (an [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter)) is an interactive CLI or TUI through which a human confirms an action.
   - Columns: `(presenter_id, frontend_kind, credential_hash, channel_binding, enrolled_at, last_seen_at, revoked_at?)`.
   - Enrollment requires the [bootstrap Admin credential](../appendix-a-glossary.md#bootstrap-admin-credential). Enrollment is not approval for an operation.
   - A presenter proves that a confirmation came from a registered interactive CLI or TUI channel.
   - A presenter cannot mint a [capability](https://en.wikipedia.org/wiki/Capability-based_security) without completing a persisted challenge.
+  - This table may be empty. A machine that never has a human enrolls no presenter. Operations that the active policy does not allow then fail closed.
+
+- **`automation_policies`**: every [automation policy](../appendix-a-glossary.md#automation-policy) that was ever activated. An automation policy is the set of rules that says which plans may run with no human confirming them.
+  - Columns: `(policy_id, policy_digest, canonical_text, activated_at, activated_by: Presenter | Admin, activating_presenter_id?, superseded_at?)`.
+  - `canonical_text` is the policy in the one fixed form that `kkd` computed from the `[automation]` tables. `policy_digest` is the [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of that text.
+  - The **active policy** is the one row whose `superseded_at` is empty. `kkd` evaluates that stored row and nothing else. It never evaluates the configuration file.
+  - Activation inserts a row. Revoke inserts none. Both set `superseded_at` on the row that was active.
+  - No row is active on a fresh install or after a revoke. kiki then behaves as if no rule matched: a human must confirm.
+  - `activated_by` records which gate let the activation through. `activating_presenter_id` is filled only for `Presenter`.
+  - Rows are never deleted and never edited after `superseded_at` is set. So an approval's `policy_digest` can always be traced to the exact text that allowed it.
+  - See [Authority](../04-authority.md#activating-a-policy).
+
+- **`automation_credentials`**: the [automation credentials](../appendix-a-glossary.md#automation-credential) kiki has issued. An automation credential belongs to the user, not to a repo or a thread. A script or a continuous-integration (CI) job presents one.
+  - Columns: `(cred_id, name, credential_hash, created_at, rotated_at?, revoked_at?)`.
+  - `kkd` stores only the hash. The secret itself is in `~/.config/kiki/automation/<name>.cred`, mode `0600`.
+  - `name` is unique among rows that are not revoked. It is the `<name>` in the policy principal `credential:<name>` and in the credential class `AutomationScoped<name>`.
+  - Rotation replaces `credential_hash` on the same row and sets `rotated_at`. The old secret stops working at once.
+  - Revoke sets `revoked_at`. A revoked row never works again. A later credential with the same name is a new row with a new `cred_id`.
+  - Create and rotate commit the row before `kkd` writes the file. A crash between the two leaves a row that no caller can present. A later rotate replaces it.
+  - A per-repo row that names an automation caller, such as `approval_challenges.requester_cred_id`, holds this table's `cred_id`.
 
 - **`user_approval_challenges` and `user_human_approvals`**: approval records for operations that have no repository target.
-  - The approvals for `kk init` and first run are stored here. Their requester is the user's Admin bootstrap credential, because the repo has no registration credential yet.
+  - The approvals for `kk init` and first run are stored here. Their requester is the user's Admin bootstrap credential, because the repo has no registration credential yet. When an automation credential begins `kk init`, that credential is the requester instead, and the approval is a `PolicyApproval` from an `init` rule. The same holds for the user-scoped `replace-terminal-server` plan: its requester is Admin, or the automation credential when the caller presents one.
+  - The presenter-confirmed approvals for policy activation and for creating or rotating an automation credential are stored here too. Their `kind` is always `Human`.
   - They are the same two-phase challenge and one-use-capability records described below for `approval_challenges` and `human_approvals`.
   - Repository-scoped confirmations are stored only in the target repository database.
 
 - **`user_approved_operations` and `user_approved_operation_steps`**: durable records of approved operations whose authority must survive without a repo database.
   - They are durable claim envelopes and [idempotent](https://en.wikipedia.org/wiki/Idempotence) step journals. An idempotent step is safe to run again.
   - They cover registration, unregister, and `replace-terminal-server`, among others.
+  - Policy activation needs no journal here. It has no effect outside this database, so its approval is claimed and consumed in the one transaction that swaps the active row.
+  - Creating or rotating an automation credential under a presenter approval is journaled here, because it writes a file.
   - Their shape matches the per-repo tables below.
   - Unregister completes its user-level journal only after the target repo state is deleted.
 
 - **`user_audit_log`**: an append-only log of attempts that have no valid repository target.
   - These attempts include bootstrap, `ListRepos`, registration, malformed repo selectors, and authorization failures that happen before a repo can be resolved.
+  - Every policy activation and policy revoke is logged here. So is every creation, rotation, and revoke of an automation credential.
   - Its row shape matches per-repo `audit_log`.
   - It permits null credential, approval, and presenter identities.
 
@@ -165,13 +190,13 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - **Checkpoints only move forward.** A checkpoint placement (`Creation | Publish | Close | Detach`) only moves the bookmark forward along the owned chain. It is refused unless the placed commit equals or descends from the expected target. It never passes `--allow-backwards`.
   - **Repair placements.** Each applied bookmark plan writes its own `reason` with that plan's `lifecycle_op_id`:
 
-    | `reason`        | Plan                                                                          | Placed commit                                       | Approval                                                                      |
-    | --------------- | ----------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------- |
-    | `RepairRestore` | [`restore-bookmark`](../appendix-a-glossary.md#restore-bookmark)              | the expected target (`bookmark_expected_commit_id`) | none in the thread's own context; one-shot when applied to a different thread |
-    | `RepairAdopt`   | [`adopt-bookmark`](../appendix-a-glossary.md#adopt-bookmark)                  | the single observed target                          | one-shot                                                                      |
-    | `RepairChoose`  | [`choose-bookmark-target`](../appendix-a-glossary.md#choose-bookmark-target)  | the live head or an on-chain commit the human picks | one-shot                                                                      |
-    | `RepairUnhide`  | [`unhide-checkpoint`](../appendix-a-glossary.md#unhide-checkpoint)            | the expected target, made visible again             | one-shot                                                                      |
-    | `Reanchor`      | [`reanchor-history`](../appendix-a-glossary.md#reanchor-history) (repo level) | the observed commit, where the bookmark already is  | one-shot, repo scope                                                          |
+    | `reason`        | Plan                                                                          | Placed commit                                        | Approval                                                                      |
+    | --------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+    | `RepairRestore` | [`restore-bookmark`](../appendix-a-glossary.md#restore-bookmark)              | the expected target (`bookmark_expected_commit_id`)  | none in the thread's own context; one-shot when applied to a different thread |
+    | `RepairAdopt`   | [`adopt-bookmark`](../appendix-a-glossary.md#adopt-bookmark)                  | the single observed target                           | one-shot                                                                      |
+    | `RepairChoose`  | [`choose-bookmark-target`](../appendix-a-glossary.md#choose-bookmark-target)  | the live head or an on-chain commit the caller names | one-shot                                                                      |
+    | `RepairUnhide`  | [`unhide-checkpoint`](../appendix-a-glossary.md#unhide-checkpoint)            | the expected target, made visible again              | one-shot                                                                      |
+    | `Reanchor`      | [`reanchor-history`](../appendix-a-glossary.md#reanchor-history) (repo level) | the observed commit, where the bookmark already is   | one-shot, repo scope                                                          |
 
   - `RepairRestore` never places the bookmark at an older placed commit. jj may see the restore as a backward move, so the plan may pass `--allow-backwards`.
   - `RepairAdopt` and `RepairChoose` may place the bookmark on the live head or on any commit on the validated owned chain. That includes a commit behind the expected target, so these plans may pass `--allow-backwards`. `RepairUnhide` may pass it too.
@@ -485,20 +510,30 @@ Four of these tables form the [operation-history cache](../appendix-a-glossary.m
 - **`credentials`**: the repo-scoped credentials kiki has issued.
   - Columns: `(cred_id, kind: 'ThreadScoped' | 'RegistrationScoped', thread_id?, repo_id?, issued_at, revoked_at?)`.
   - The `Admin` credential is not stored here. It lives in the user-level database, in `user_credentials`.
-  - Operational calls cannot substitute Admin for [human approval](../appendix-a-glossary.md#human-approval).
+  - Automation credentials are not stored here either. They belong to the user and live in `automation_credentials`.
+  - Operational calls cannot substitute Admin for [human approval](../appendix-a-glossary.md#human-approval) or for a `PolicyApproval`.
 
-- **`approval_challenges`**: foreground confirmations that are still pending.
-  - Columns: `(challenge_id, requester_cred_id, presenter_id?, method, repo_id, thread_id?, args_digest, rendered_plan, nonce, created_at, expires_at, confirmed_at?, confirmed_foreground_tty?, cancelled_at?)`.
+- **`approval_challenges`**: one row per `BeginApproval`. Each row is a plan waiting for a decision, or a plan the active policy already allowed.
+  - Columns: `(challenge_id, requester_cred_id, presenter_id?, method, repo_id, thread_id?, args_digest, rendered_plan, risk_labels, policy_decision: Allowed | RequireHuman | NoMatch, policy_rule_name?, nonce, created_at, expires_at, confirmed_at?, confirmed_foreground_tty?, cancelled_at?)`.
   - `BeginApproval` persists the exact plan before returning it for display.
+  - `risk_labels` is the plan's set of [risk labels](../appendix-a-glossary.md#risk-label), computed in preflight. It is part of the rendered plan, so `args_digest` covers it.
+  - `policy_decision` and `policy_rule_name` record what the active policy said about this plan. `NoMatch` is also the value when no policy is active.
+  - When the decision is `Allowed`, the same transaction inserts the `Policy` approval row. The challenge is then closed. No presenter can confirm it.
+  - The one exception is a request that asks for a human anyway (`kk --confirm`). Then no approval row is inserted, and the challenge stays open for the presenter.
   - Only an enrolled foreground presenter may bind itself and confirm the nonce and digest.
   - Presenter binding, confirmation evidence, and capability issuance occur in one target-database [transaction](https://en.wikipedia.org/wiki/Database_transaction).
 
-- **`human_approvals`**: one-use capabilities. Each row is one [human approval](../appendix-a-glossary.md#human-approval).
-  - Columns: `(approval_id, challenge_id, requesting_cred_id, approving_presenter_id, method, repo_id?, thread_id?, args_digest, issued_at, expires_at, claimed_at?, operation_id?, consumed_at?, consuming_audit_id?)`.
+- **`human_approvals`**: one-use capabilities. Each row is one one-shot approval: a [human approval](../appendix-a-glossary.md#human-approval) or a `PolicyApproval`. The table keeps its name, and the `kind` column tells the two apart.
+  - Columns: `(approval_id, kind: Human | Policy, challenge_id UNIQUE, requesting_cred_id, approving_presenter_id?, policy_digest?, rule_name?, risk_labels, method, repo_id?, thread_id?, args_digest, issued_at, expires_at, claimed_at?, operation_id?, consumed_at?, consuming_audit_id?)`.
+  - A `Human` row has `approving_presenter_id` and no `policy_digest` or `rule_name`. A `Policy` row has `policy_digest` and `rule_name` and no `approving_presenter_id`.
+  - `policy_digest` names the `automation_policies` row that was active when the approval was issued. `rule_name` is the rule that allowed the plan.
+  - `risk_labels` is copied from the challenge for both kinds.
+  - Both kinds are claimed, resumed, and consumed by the same rules below.
   - Claim and creation of the exact `approved_operations` envelope occur atomically, before external effects.
   - A claimed approval can resume only that operation id. It cannot authorize another plan.
   - Completion marks it consumed.
   - Approvals fail closed (kiki refuses them) when they are expired, replayed, method-mismatched, target-mismatched, argument-drifted, unconfirmed, or channel-mismatched.
+  - A `Policy` approval also fails closed when its requesting credential has been revoked. Revoking the policy issues no new approvals. An approval already issued stays valid until its short expiry.
 
 - **`approved_operations`**: the generic approval-claim envelope. It ties one approval to the one operation it authorized.
   - Columns: `(operation_id, approval_id UNIQUE, kind, thread_id?, plan_digest, state: Claimed | Running | Completed | Failed | OutcomeUnknown, claimed_at, updated_at, completed_at?, result_digest?, last_error?)`.
@@ -513,16 +548,19 @@ Four of these tables form the [operation-history cache](../appendix-a-glossary.m
   - Read-only approved snapshots record their repository observation and result digest as one completed step. They do not leave an unjournaled reusable capability.
 
 - **`audit_log`**: the append-only log of attempts against this repo.
-  - Columns: `(audit_id, timestamp, cred_id?, approval_id?, presenter_id?, transport_peer, declared_scope?, method, args_summary, outcome)`.
+  - Columns: `(audit_id, timestamp, cred_id?, approval_id?, presenter_id?, transport_peer, declared_scope?, method, args_summary, outcome, policy_digest?, rule_name?, policy_principal?, policy_operation?, risk_labels?)`.
+  - The five policy columns are filled on the `BeginApproval` row that issues a `PolicyApproval`. `policy_principal` is the principal the rule matched, such as `credential:ci` or `thread:self`. `policy_operation` is the operation name the rule matched, such as `close`.
+  - A `BeginApproval` that ends in `RequireHuman` or `NoMatch` fills `risk_labels` and, for `RequireHuman`, `rule_name`.
   - Null identities explicitly represent unidentified or rejected callers.
   - Parseable attempts with a resolved repo go here. Attempts without a resolvable repo go to per-user `user_audit_log`. So there is exactly one authoritative row per attempt.
 
 #### Thread events
 
 - **`thread_events`**: the append-only event log behind `StreamThreadEvents`.
-  - Columns: `(thread_id, seq, kind, payload_json, recorded_at)` with `UNIQUE (thread_id, seq)`.
+  - Columns: `(thread_id, seq, repo_seq, kind, payload_json, recorded_at)` with `UNIQUE (thread_id, seq)` and `UNIQUE (repo_seq)`.
   - Each row is one event for one thread: a state transition, a cascade event, or a transcript append.
   - `seq` is the monotonic number that `StreamThreadEvents` carries. It only goes up, per thread. `kkd` allocates it and inserts the row in the same transaction as the change the event reports. So `seq` survives a `kkd` restart and never repeats or goes backward.
+  - `repo_seq` is a second monotonic number, counted across every thread in this repo database. `kkd` allocates it in the same transaction. `StreamRepoEvents` orders by it, and `kk events --since` without `--thread` names it.
   - A client that reconnects compares the `seq` values it receives with the last one it saw. A gap tells it that it missed events.
   - A row is a notice, not authority. The tables above remain the source of truth for state. See [gRPC](grpc.md).
 
@@ -649,6 +687,7 @@ This section lists rules that must hold across columns and tables. Several of th
 ### `thread_events`
 
 - `(thread_id, seq)` is unique, and `seq` only goes up per thread.
+- `repo_seq` is unique, and it only goes up across the repo database.
 - A row is inserted only in the transaction that commits the change it reports.
 - Rows are never updated.
 
@@ -656,6 +695,25 @@ This section lists rules that must hold across columns and tables. Several of th
 
 - The CHECK constraint is: `(anchor_unknown=FALSE AND change_id IS NOT NULL AND commit_id IS NOT NULL AND op_id IS NOT NULL) OR (anchor_unknown=TRUE AND change_id IS NULL AND commit_id IS NULL AND op_id IS NULL)`.
 - In plain words: a row either has a full anchor and is not marked unknown, or has no anchor and is marked unknown. The two states cannot drift apart.
+
+### `automation_policies` and `automation_credentials`
+
+- At most one `automation_policies` row has an empty `superseded_at`.
+- Activation sets `superseded_at` on the old row and inserts the new row in one transaction. The policy `kkd` evaluates changes when that transaction commits, never before.
+- Activation with a presenter claims and consumes its `user_human_approvals` row in that same transaction. That row's `args_digest` must cover the new `policy_digest`.
+- `policy_digest` must equal the hash of `canonical_text`. `kkd` checks this when it loads the active row. On a mismatch, or on text it cannot parse, it loads no policy and reports the fault.
+- At most one `automation_credentials` row per `name` has an empty `revoked_at`.
+- An automation credential never appears in `approval_presenters` or `user_credentials`, and nothing accepts it in place of either.
+
+### `approval_challenges` and `human_approvals`
+
+- `human_approvals.challenge_id` is unique. One challenge yields at most one approval, of one kind.
+- A `Policy` row is inserted only in the transaction that inserts its challenge, and only when that challenge's `policy_decision` is `Allowed`.
+- A `Policy` row's `policy_digest` must name the `automation_policies` row that is active in that same transaction.
+- A `Policy` row's `rule_name` and `risk_labels` must equal its challenge's `policy_rule_name` and `risk_labels`.
+- A `Human` row is inserted only in the transaction that records the presenter's confirmation on its challenge.
+- A `Policy` row is never inserted for policy activation, for creating or rotating an automation credential, or for presenter enrollment or recovery.
+- The same rules hold for `user_approval_challenges` and `user_human_approvals`.
 
 ### `approved_operations`
 
@@ -686,12 +744,12 @@ This section lists rules that must hold across columns and tables. Several of th
   - Retry bounds are evaluated against that column and the persisted replacement-incarnation rows. They are never evaluated against an in-memory counter.
 - **Exhaustion.**
   - [`delivery_exhausted_at`](../appendix-a-glossary.md#exhausted-intent) may be set only by the transaction that abandons the final permitted attempt.
-  - While it is set, exactly two writes are valid. Both are human-directed `kk repair` plans: a retry plan and a discard plan.
+  - While it is set, exactly two writes are valid. Both are explicit `kk repair` plans: a retry plan and a discard plan.
   - **Retry plan.** In one journaled transaction, a retry plan clears `delivery_exhausted_at`, increments [`delivery_epoch`](../appendix-a-glossary.md#delivery-epoch) (an integer starting at 0, monotonic per intent), records `delivery_rearmed_at` for display, and resets `soft_redelivery_count`.
   - Every replacement attempt is stamped with the intent's `delivery_epoch` at creation.
   - Attempt bounds count only rows whose stamp matches the current epoch. This is an exact id comparison, never a timestamp one. So clock skew or rollback cannot move an attempt between epochs.
   - A re-armed intent therefore gets exactly one fresh cycle and may exhaust again.
-  - **Discard plan.** A one-shot-approved discard plan is the sole path to `Acknowledged` without delivery proof. It must record the human resolution in `recovery_details`.
+  - **Discard plan.** A one-shot-approved discard plan is the sole path to `Acknowledged` without delivery proof. It must record the resolution, and the approval that allowed it, in `recovery_details`.
   - Absent either plan:
     - no new barrier tuple or replacement incarnation may reference the intent;
     - restart recovery re-surfaces the blocked thread instead of retrying;

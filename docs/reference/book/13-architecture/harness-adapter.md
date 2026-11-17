@@ -132,7 +132,7 @@ A crashed harness under a live launcher is restarted by the `kk repair` plan [`r
 - It starts a replacement incarnation on the live launcher after the remnant check, with a fresh gate, and with `RestartStartup` if an intent is pending.
 - It is same-thread and needs no approval in thread context.
 
-Kiki's own protocol restarts are a cascade hard restart or a `RestartStartup` replacement. They are daemon-initiated steps of the delivery protocol, and they need no `HumanApproval` either. A human-requested interruption or close does need one.
+Kiki's own protocol restarts are a cascade hard restart or a `RestartStartup` replacement. They are daemon-initiated steps of the delivery protocol, and they need no `HumanApproval` either. A requested interruption or close does need a one-shot approval. That is a `HumanApproval` or, when the activated [automation policy](../appendix-a-glossary.md#automation-policy) allows the plan, a [`PolicyApproval`](../appendix-a-glossary.md#policy-approval). See [Authority](../04-authority.md#policyapproval).
 
 ### Credential rotation
 
@@ -187,6 +187,22 @@ A permission prompt can show `blocked` only when the adapter proves the `attenti
 
 - The capability names the exact harness event that says "the agent is waiting on a person", and a proof step shows that event fires for the pinned version.
 - For a harness version without that proof, permission-prompt detection is v1.x. Crash detection still gives `blocked` for that version.
+
+**Kiki never answers the prompt.** A permission prompt is the harness's own question to a person. It is not a kiki approval.
+
+- No adapter method, hook answer, or terminal input from kiki answers one. The adapter never sends terminal input at all.
+- [`kk-hook`](../appendix-a-glossary.md#kk-hook)'s non-blocking answer at the pre-tool boundary leaves the harness's own permission decision in place. Its blocking answer is about cascade delivery, not about permission.
+- An automation policy approves kiki's own operations only. No rule and no `PolicyApproval` answers a harness prompt.
+
+On a [headless](../appendix-a-glossary.md#headless) host, where no human is present, this looks as follows:
+
+- The operator sets the harness's own permission settings ahead of time, so that the agent does not stop to ask. Those settings stay the harness's, and kiki writes none of them.
+  - The settings must reach the managed process through a source that kiki's launch isolation leaves in place. See [Exclusive hook boundary and settings ownership](#exclusive-hook-boundary-and-settings-ownership).
+  - For Claude Code, the isolation excludes other `PreToolUse` hooks. It does not exclude the harness's permission settings.
+  - For Codex, the generated `CODEX_HOME` replaces the user layer. So permission settings in the user's real `~/.codex/` do not apply. They must come from the workspace's `.codex/` configuration or from the harness arguments passed at launch.
+- If a prompt appears anyway, the agent waits. Where `attention_events` is proved, the `agent_blocked` event still fires, the thread shows `blocked`, and the event appears in [`kk events`](../09-commands.md#kk-events).
+- A human can answer later. They connect over Secure Shell (SSH), run `kk attach`, and answer in the agent's pane.
+- See [Observability](../12-observability.md).
 
 ### The open gate for Claude Code
 
@@ -618,6 +634,7 @@ trait TranscriptAdapter {
 `kk new` performs the durable creation [saga](../appendix-a-glossary.md#saga) defined in [Threads](../03-threads.md). A saga is a multi-step operation that kiki records step by step, so it can retry or undo.
 
 - For the harness portion, credentials and exclusive settings must exist before the external process receives an initial prompt.
+- No step below needs an attached Herdr client or a human. The harness runs in its pane whether or not anyone is viewing it.
 - Reopen, explicit restart, and recovery reuse the same per-incarnation gate and ready proof, even though they have different lifecycle journals.
 
 The creation order is:

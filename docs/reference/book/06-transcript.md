@@ -120,7 +120,7 @@ Catch-up gives a reopened thread's agent some context from the earlier conversat
 
 ### When the preview is released
 
-A closed thread has no live thread credential. `BeginApproval` therefore discloses that catch-up was requested but returns no transcript text. (`BeginApproval` is the call that starts a [human approval](appendix-a-glossary.md#human-approval).)
+A closed thread has no live thread credential. `BeginApproval` therefore discloses that catch-up was requested but returns no transcript text. (`BeginApproval` is the call that starts a one-shot approval: a [human approval](appendix-a-glossary.md#human-approval), or a [`PolicyApproval`](appendix-a-glossary.md#policy-approval) when a rule in the activated [automation policy](appendix-a-glossary.md#automation-policy) allows the plan.)
 
 The daemon releases the preview at one point only: after the exact reopen approval is claimed into its durable journal, and before the harness starts. It releases the preview:
 
@@ -128,6 +128,8 @@ The daemon releases the preview at one point only: after the exact reopen approv
 - only as an authorized, reversible step.
 
 If the human declines [provider egress](appendix-a-glossary.md#provider-egress), kiki drops the catch-up and continues as a plain reopen, unless the human cancels the whole operation. No transcript text reaches the harness first.
+
+When consent comes from a remembered grant or from a policy rule (see [Consent with no person present](#consent-with-no-person-present)), there is no one to show a preview to. The daemon releases no preview, and the catch-up goes to the harness at the same point in the reopen.
 
 ### Asking for consent
 
@@ -137,9 +139,20 @@ Before the first provider-bound catch-up, kiki shows that selected local transcr
 - remember approval for that thread, provider, and purpose; or
 - cancel.
 
-A remembered preference is revocable, and a change in provider identity invalidates it. Remembering privacy consent suppresses that prompt only. It does not bypass the separate authority required to reopen a thread. Under the v1 authority contract, non-interactive reopen remains unavailable.
+A remembered preference is revocable, and a change in provider identity invalidates it. Remembering privacy consent suppresses that prompt only. It does not bypass the separate authority required to reopen a thread. The reopen still needs its own one-shot approval, from a person or from a policy rule that allows `reopen` (see [Commands](09-commands.md#kk-reopen)).
 
 Kiki should offer a preview before consent. Kiki does not claim to scrub secrets or reliably redact the catch-up. Consent covers model-provider egress for reopen context only. It does not permit transcript use in publication, metadata generation, telemetry, or unrelated agent prompts.
+
+### Consent with no person present
+
+Kiki is [headless](appendix-a-glossary.md#headless): a reopen can run with no terminal and no person. The consent question has no flag that answers it. With no person, consent for a catch-up comes from two places only:
+
+- a grant the person remembered earlier, for that thread, provider, and purpose; or
+- a rule in the activated automation policy that names the operation `consent:catch_up` and lists the provider in `providers`.
+
+The two approvals stay separate. A rule that allows `reopen` does not give consent, and a consent rule does not allow the reopen. A `*` in a rule's `operations` never matches a consent operation.
+
+`kkd` checks for consent during the reopen preflight. Without a foreground terminal, and with neither a remembered grant nor a matching rule, `kk reopen --catch-up` fails closed with [exit code](09-commands.md#exit-codes) 3 before anything changes. `kk reopen` without `--catch-up` then reopens the thread cold.
 
 ### How the catch-up is recorded
 
@@ -165,13 +178,14 @@ An MCP transcript result travels over local IPC ([inter-process communication](h
 
 - Before enabling transcript MCP for a managed harness, kiki requires remembered [provider-egress consent](appendix-a-glossary.md#provider-egress-consent) for purpose `transcript_mcp` and for that harness's current provider identity.
 - MCP itself cannot open the foreground prompt or grant consent. Without a matching record it returns `ConsentRequired` and no transcript content.
-- The human grants or revokes that purpose through the foreground privacy-consent CLI/TUI surface.
+- A person grants that purpose through the foreground privacy-consent CLI/TUI surface. Revoking it needs no approval: `kk privacy consent revoke` works with or without a terminal.
+- With no person present, `kk privacy consent grant transcript-mcp` records the grant only when an activated policy rule names `consent:transcript_mcp` and lists that provider (see [Provider-egress consent](#provider-egress-consent)).
 
 ## Provider-egress consent
 
-[Provider-egress consent](appendix-a-glossary.md#provider-egress-consent) is the human's recorded permission to send one thread's transcript text to one model provider for one purpose. This section says what each record contains and how narrowly it applies.
+[Provider-egress consent](appendix-a-glossary.md#provider-egress-consent) is the recorded permission to send one thread's transcript text to one model provider for one purpose. A person gives it, or a policy rule the user activated for exactly that purpose and provider gives it. This section says what each record contains and how narrowly it applies.
 
-Provider-egress consent is a privacy policy record. It is not a `HumanApproval` (see [human approval](appendix-a-glossary.md#human-approval)) and not configuration. Each durable record binds:
+Provider-egress consent is a privacy policy record. It is not a `HumanApproval` (see [human approval](appendix-a-glossary.md#human-approval)), not an ordinary `PolicyApproval`, and not configuration. Each durable record binds:
 
 - `repo_id`;
 - `thread_id`;
@@ -185,9 +199,19 @@ Provider-egress consent is a privacy policy record. It is not a `HumanApproval` 
 - A change in thread, provider, endpoint, account/tenant, purpose, or disclosure version [fails closed](appendix-a-glossary.md#fail-closed) and asks again. "Fails closed" means kiki refuses until it has a new answer.
 - A one-time catch-up approval attaches only to that invocation. kiki does not insert it as a remembered grant.
 
-**Storage and revocation.** Consent records live in the registered repo's SQLite database. They are inspectable and revocable. Revocation takes effect before the next provider-bound read. It does not recall content already sent.
+**Granting by policy.** A machine with no person can still use a provider-backed feature, through one narrow path: a rule in the activated automation policy (see [Authority](04-authority.md#automation-policy) and [Configuration](11-configuration.md#automation-keys)).
 
-**What cannot create a grant.** Committed config, [environment variables](https://en.wikipedia.org/wiki/Environment_variable), CLI flags, MCP calls, and an operational `HumanApproval` cannot create a remembered grant.
+- The rule must name the operation `consent:<purpose>`: `consent:catch_up` or `consent:transcript_mcp`.
+- The rule must list the normalized provider identity in `providers`. A consent rule without `providers` is invalid, and there is no `*` for providers.
+- A `*` in the rule's `operations` never matches a consent operation. A rule that approves everything else still gives no consent.
+- The rule counts only after `kk automation apply` activates it. Writing it in the config file grants nothing.
+- The rule stands in for the person's confirmation only. `kkd` still records the consent with the same tuple, and it writes an audit row with the rule name and the policy digest.
+- A change in provider, endpoint, account/tenant, or disclosure version still fails closed, unless the rule also lists the new provider identity.
+- Consent rules ship with the transcript features they gate, which are v1.x.
+
+**Storage and revocation.** Consent records live in the registered repo's SQLite database. They are inspectable and revocable. Revocation takes effect before the next provider-bound read. It does not recall content already sent. Revoking a record does not change the policy: while a consent rule stays active, it can give the consent again. To stop that, remove the rule and run `kk automation apply`, or run `kk automation revoke`.
+
+**What cannot create a grant.** A plain config key in any layer, [environment variables](https://en.wikipedia.org/wiki/Environment_variable), CLI flags, MCP calls, and an operational one-shot approval (a `HumanApproval` or a `PolicyApproval` for some other operation) cannot create a grant. Only two things can: a person at the foreground presenter, and an activated policy rule that names the purpose and the provider.
 
 ## Privacy and retention
 

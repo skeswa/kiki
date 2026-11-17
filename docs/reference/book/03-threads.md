@@ -96,14 +96,14 @@ One rule says where each kind of move may put the bookmark. The rest of the book
 - **`adopt-bookmark` and `choose-bookmark-target` may place it anywhere on the chain.** These approved repair plans may place the bookmark on the live head or on any commit on the validated owned chain. That includes a commit behind the expected target. These plans may pass `--allow-backwards`.
 - **`restore-bookmark` puts it back on the expected target.** jj may see that as a backward move, so this plan may pass `--allow-backwards`. It still needs no approval in the thread's own context; applied to a different thread, it needs a one-shot approval. It is offered only while the expected target is visible.
 - **`unhide-checkpoint` may also pass the flag.** It makes a hidden expected target visible again and places the bookmark on it.
-- **Kiki never places the bookmark off the owned chain.** v1 has no plan for that. The human first fixes the shape with jj, for example with a rebase that puts the commit on the chain. The human then adopts or chooses.
+- **Kiki never places the bookmark off the owned chain.** v1 has no plan for that. The shape is first fixed with jj, for example with a rebase that puts the commit on the chain. Then an adopt or choose plan is applied.
 
 A checkpoint therefore refuses when its target is neither the expected target nor a descendant of it. That happens in two common cases:
 
 - the human has moved `@` to an earlier commit with `jj edit`;
 - the human has moved `@` onto another line with `jj new <elsewhere>`, or has moved the bookmarked commit somewhere else with `jj rebase -r`.
 
-Placing the bookmark there would move it backward or sideways and strand the later revisions. Kiki reports the relationship as `ahead` or `diverged` and stops. Publish, close, and detach stay blocked until the human applies [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target). A backward move is never a side effect of close, publish, or detach.
+Placing the bookmark there would move it backward or sideways and strand the later revisions. Kiki reports the relationship as `ahead` or `diverged` and stops. Publish, close, and detach stay blocked until [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target) is applied. A backward move is never a side effect of close, publish, or detach.
 
 The plans themselves are listed in [Bookmark plans](#bookmark-plans) below.
 
@@ -247,13 +247,13 @@ Automatic compensation may close the provisioned group and remove the new worksp
 
 Things change once a harness may have run, or the human has opened a pane in the visible `Creating` group. The saga then stops in `CreateFailed` with every projection intact. Cleanup is the approved [`cleanup-failed-create`](appendix-a-glossary.md#cleanup-failed-create) repair plan, which uses the close machinery. A failed reopen's counterpart is [`cleanup-failed-reopen`](appendix-a-glossary.md#cleanup-failed-reopen).
 
-`kk repair` applies that plan. `CreateFailed` has no retry plan: nothing resumes a failed creation into `Active`. `cleanup-failed-create` is the only repair plan, and it ends the thread as `Destroyed`. Once `kk thread destroy` ships, destroy is also possible. The human then runs `kk new` again. `kk repair` may also resume a cleanup that stopped part way, from the recorded step. It never infers completion from the mere presence or absence of one projection.
+`kk repair` applies that plan. `CreateFailed` has no retry plan: nothing resumes a failed creation into `Active`. `cleanup-failed-create` is the only repair plan, and it ends the thread as `Destroyed`. Once `kk thread destroy` ships, destroy is also possible. After that, `kk new` is run again. `kk repair` may also resume a cleanup that stopped part way, from the recorded step. It never infers completion from the mere presence or absence of one projection.
 
 ### Options and results
 
 When run inside an existing thread, `kk new` follows the current thread by default. `--no-follow` suppresses that default. `--follows <parent>` selects an explicit parent. A request to follow is refused, with that reason, when the new thread's harness failed its `RestartStartup` proof (see [Cascade](05-cascade.md#creating-a-follows-edge)).
 
-Successful creation leaves all required v1 projections and an `Active` row. Unsuccessful creation leaves a `CreateFailed` row that `cleanup-failed-create` can clean up, even when compensation removed every external projection. It is not retried; the human runs `kk new` again. This is a saga guarantee, not cross-system atomicity.
+Successful creation leaves all required v1 projections and an `Active` row. Unsuccessful creation leaves a `CreateFailed` row that `cleanup-failed-create` can clean up, even when compensation removed every external projection. It is not retried; `kk new` is run again. This is a saga guarantee, not cross-system atomicity.
 
 `kk new [<name>]` takes an optional name. In the acceptance slice, a thread created without a name is called `unnamed-<short-hex>`, even when it has an initial prompt. Deriving a placeholder name from the prompt is v1.x work. The placeholder is kiki-owned metadata and follows the metadata ownership rules.
 
@@ -362,7 +362,7 @@ Close runs in two journaled phases.
 - It synchronously advances the [op-watcher](appendix-a-glossary.md#op-log-watcher) frontier to the repo's current operation heads.
 - It reclassifies every follows child from that pinned view.
 - It waits for selected reconciliations to complete, or records explicit discard choices in the proposed plan.
-- It requires [agent quiescence](appendix-a-glossary.md#agent-quiescence) where the harness adapter can prove it. If the agent is working, preflight says so and stops. The human then waits, or interrupts the agent in its pane.
+- It requires [agent quiescence](appendix-a-glossary.md#agent-quiescence) where the harness adapter can prove it. If the agent is working, preflight says so and stops. The caller then waits and runs the close again. A person can also interrupt the agent in its pane, and a script can wait with [`kk wait --for quiescent`](09-commands.md#kk-wait).
 - For a harness version that cannot prove quiescence, preflight proceeds. It warns that a working agent will make the [approval drift](appendix-a-glossary.md#approval-drift).
 - It takes the [boundary snapshot](appendix-a-glossary.md#boundary-snapshot).
 - It inventories loss-sensitive files, every process in the terminal group, and every other [holder](appendix-a-glossary.md#holder) of the workspace.
@@ -397,7 +397,7 @@ The [fingerprint](https://en.wikipedia.org/wiki/Cryptographic_hash_function) cov
 - the workspace state: its inventory and byte fingerprint;
 - the set of terminal containers the plan lists;
 - the identity of each role's [pane launcher](appendix-a-glossary.md#pane-launcher);
-- the set of [holders](appendix-a-glossary.md#holder) outside those containers, with any holders the human accepts by name (see [accepted holder](appendix-a-glossary.md#accepted-holder));
+- the set of [holders](appendix-a-glossary.md#holder) outside those containers, with any holders the caller accepts by name with `--accept-holder <pid>` (see [accepted holder](appendix-a-glossary.md#accepted-holder));
 - the expected projections;
 - the children: every child-edge decision;
 - the checkpoint target;
@@ -590,7 +590,7 @@ flowchart TD
     A[kk close requested] --> B[Preflight: no destructive mutation]
     B --> R[Refresh op frontier\nreclassify child edges]
     R --> C{Loss policy satisfied\nand child choices resolved?}
-    C -- no --> D[Abort or ask human\nthread remains Active]
+    C -- no --> D[Abort and report\nthread remains Active]
     C -- yes --> AP[Approve exact close-plan fingerprint]
     AP --> E[Claim approval and persist\nCloseCommit journal]
     E --> F[Freeze every process in the terminal group\nto a fixed point; fence terminal mutation]
@@ -701,7 +701,7 @@ Suppose a harness exits while its `agent` launcher is alive. That retires the [i
 A replacement incarnation starts on the same launcher through a fresh gate. That happens for one of two reasons:
 
 - the cascade's delivery protocol requires one;
-- the human applies the [`restart-agent`](appendix-a-glossary.md#restart-agent) repair plan.
+- a caller applies the [`restart-agent`](appendix-a-glossary.md#restart-agent) repair plan.
 
 A replacement's gate opens only when an inventory rooted at the launcher shows no process left over from the retired harness. `TerminalMissing` is raised only when the launcher, its binding, or its server instance is gone.
 
@@ -709,7 +709,7 @@ A replacement's gate opens only when an inventory rooted at the launcher shows n
 
 Automatic repair is limited to identity-preserving normalization with exactly one possible result. For example, kiki may replace a stale lexical path with the canonical path of the same uniquely identified workspace.
 
-Kiki does not recreate, move, or adopt revisions merely because one outcome looks likely. Every human resolution is written to the projection-issue row and the lifecycle journal before the thread returns to `Active`.
+Kiki does not recreate, move, or adopt revisions merely because one outcome looks likely. Every resolution, with the approval that allowed it, is written to the projection-issue row and the lifecycle journal before the thread returns to `Active`.
 
 ### What still works while a projection is broken
 
@@ -729,19 +729,19 @@ The issue preserves whether the coherent prior lifecycle was `Active` or `Closed
 
 There are four per-thread bookmark plans and one repo-level plan. [Commands](09-commands.md#bookmark-plans) owns the table. This is the same table:
 
-| Plan                                                                       | Offered for                                                                                                                                                                       | Target                                                             | Approval                                                                      |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| [`restore-bookmark`](appendix-a-glossary.md#restore-bookmark)              | `BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, only while the expected target is visible                                                                               | the expected target                                                | none in the thread's own context; one-shot when applied to a different thread |
-| [`adopt-bookmark`](appendix-a-glossary.md#adopt-bookmark)                  | `BookmarkMoved`, when the single observed target is the live head or on the owned chain                                                                                           | the observed target                                                | one-shot                                                                      |
-| [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target)  | any bookmark issue: `BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, `CheckpointAbandoned`. Also a thread with no open issue whose relationship is `ahead` or `diverged` | the live head, or a commit on the owned chain that the human picks | one-shot                                                                      |
-| [`unhide-checkpoint`](appendix-a-glossary.md#unhide-checkpoint)            | `CheckpointAbandoned`, only when unhiding would not create a divergent change                                                                                                     | the expected target, made visible again                            | one-shot                                                                      |
-| [`reanchor-history`](appendix-a-glossary.md#reanchor-history) (repo level) | `OperationHistoryRewritten`                                                                                                                                                       | each listed thread's observed bookmark commit                      | one-shot, repo scope                                                          |
+| Plan                                                                       | Offered for                                                                                                                                                                       | Target                                                              | Approval                                                                      |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [`restore-bookmark`](appendix-a-glossary.md#restore-bookmark)              | `BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, only while the expected target is visible                                                                               | the expected target                                                 | none in the thread's own context; one-shot when applied to a different thread |
+| [`adopt-bookmark`](appendix-a-glossary.md#adopt-bookmark)                  | `BookmarkMoved`, when the single observed target is the live head or on the owned chain                                                                                           | the observed target                                                 | one-shot                                                                      |
+| [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target)  | any bookmark issue: `BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, `CheckpointAbandoned`. Also a thread with no open issue whose relationship is `ahead` or `diverged` | the live head, or a commit on the owned chain that the caller names | one-shot                                                                      |
+| [`unhide-checkpoint`](appendix-a-glossary.md#unhide-checkpoint)            | `CheckpointAbandoned`, only when unhiding would not create a divergent change                                                                                                     | the expected target, made visible again                             | one-shot                                                                      |
+| [`reanchor-history`](appendix-a-glossary.md#reanchor-history) (repo level) | `OperationHistoryRewritten`                                                                                                                                                       | each listed thread's observed bookmark commit                       | one-shot, repo scope                                                          |
 
 These rules apply to every bookmark plan:
 
 - Each applied plan is an explicit placement. It appends a placement row and resets the expected target.
 - The target must be the live head or a commit on the validated owned chain. A commit behind the expected target is allowed for `adopt-bookmark` and `choose-bookmark-target`. See [Who may move the bookmark where](#who-may-move-the-bookmark-where).
-- A target off the owned chain is never placed. v1 has no plan for it. The human first fixes the shape with jj, then adopts or chooses.
+- A target off the owned chain is never placed. v1 has no plan for it. The shape is first fixed with jj, and then an adopt or choose plan is applied.
 - `choose-bookmark-target` is the exit whenever the expected target is hidden. It is also the exit for `ahead` and `diverged`.
 
 **On a closed thread**, three more rules apply:
@@ -762,7 +762,7 @@ These rules apply to every bookmark plan:
 
 - [`recreate-workspace`](appendix-a-glossary.md#recreate-workspace) resolves `WorkspaceDirectoryMissing`. It recreates the workspace directory from the checkpoint.
 - [`reattach-workspace`](appendix-a-glossary.md#reattach-workspace) resolves `WorkspaceRecordMissing`. It recreates the jj workspace record.
-- [`repoint-workspace`](appendix-a-glossary.md#repoint-workspace) resolves a `WorkspacePathMismatch` that kiki could not correct by itself. It points the thread at the path the human confirms.
+- [`repoint-workspace`](appendix-a-glossary.md#repoint-workspace) resolves a `WorkspacePathMismatch` that kiki could not correct by itself. It points the thread at the path the caller gives with `--path <path>`.
 
 #### Closing without a terminal
 

@@ -15,21 +15,33 @@ Terminals live in a separate, [dedicated Herdr server](../appendix-a-glossary.md
 ## Lifecycle
 
 - **One `kkd` per user.**
-- **First-run bootstrap.** The first `kk` invocation installs and starts `kkd` as a per-user service. A service is a background program that the operating system (OS) starts and restarts.
+- **First-run bootstrap.** `kkd` is installed and started as a per-user service. A service is a background program that the operating system (OS) starts and restarts. There are two ways in:
+  - In a terminal, the first `kk` invocation asks whether to install `kkd`, and installs and starts it on a yes.
+  - [`kk daemon install`](../09-commands.md#kk-daemon-install) does the same without asking. This is the path for a script and for a machine with no human. Without a terminal, `kk` never prompts. If `kkd` is not installed, `kk` fails with exit code 5 and names `kk daemon install`. See [exit codes](../09-commands.md#exit-codes).
+  - Install creates the [Admin bootstrap credential](../appendix-a-glossary.md#bootstrap-admin-credential) and prints its path. `kk` never loads that credential by itself afterward.
   - On macOS the service is a [launchd](https://en.wikipedia.org/wiki/Launchd) user agent. On Linux it is a [systemd](https://en.wikipedia.org/wiki/Systemd) user unit.
   - `kk` never forks `kkd` from the invoking terminal. That is, `kk` never starts `kkd` as a child of that terminal.
   - So `kkd`, and the dedicated Herdr server it starts, run outside the terminal application's own job and process tree. Quitting the terminal application ends neither them nor any agent.
   - The server is not a child inside `kkd`'s own service unit either. `kkd` asks the service manager to start it as a separate unit: a separate launchd job on macOS, and a separate transient systemd user unit on Linux. ("Transient" means created at run time, with no unit file on disk.)
   - So a `kkd` crash, restart, or upgrade does not stop the server or any agent. This is a proof gate: the test kills `kkd` under each real service manager and checks that the server and the agents keep running. See [Terminal runtime](terminal-runtime.md#starting-and-addressing-the-server).
+  - No step here needs a desktop session or an attached Herdr client. kiki is [headless](../appendix-a-glossary.md#headless): `kkd` and the server run the same way on a machine that nobody is logged in to at a screen.
+  - On macOS reached over Secure Shell (SSH) with no graphical login, the per-user graphical launchd domain does not exist. `kk daemon install` then installs `kkd`, and `kkd` starts the server job, in launchd's per-user domain that is not tied to a graphical login. This is an unproven gate: the survival test above must pass in that domain before the mode is supported.
   - State files in `~/.config/kiki/` are created with mode `0700`. The [gRPC](https://grpc.io/) socket and credential files are mode `0600`. (These are [Unix file permissions](https://en.wikipedia.org/wiki/File-system_permissions). Both modes give access to the owning user only.)
-- **Reboot survival.** The service manager restarts `kkd` after a crash, logout, or reboot.
+- **No service manager.** Many containers and continuous-integration (CI) runners have no per-user service manager. There the operator runs `kkd --foreground` under whatever supervisor they already use.
+  - `kkd --foreground` stays attached to the process that started it and logs to standard error. It installs nothing.
+  - On first start it creates the state directory and the Admin bootstrap credential if they are absent, and logs the credential's path.
+  - `kk` never starts `kkd` in this mode. If `kkd` is not running, `kk` fails with exit code 5.
+  - With no service manager to ask, `kkd` starts the Herdr server as a detached process in its own OS session. The server is then not a member of `kkd`'s session or [process group](https://en.wikipedia.org/wiki/Process_group).
+  - The same survival proof is a gate for this mode: the test kills `kkd` under the supervisor and checks that the server and the agents keep running. A supervisor that stops every process it started, as some container runtimes do, fails the gate. A platform mode that fails the gate is unsupported. This gate is unproven.
+  - The operator's supervisor is what restarts `kkd`. If nothing restarts it, the server and the agents keep running, and every `kk` command fails with exit code 5 until `kkd` is back.
+- **Reboot survival.** The service manager restarts `kkd` after a crash, logout, or reboot. In the `kkd --foreground` mode, the operator's supervisor does this instead.
   - Recovery on restart reads sqlite ([SQLite](https://www.sqlite.org/), kiki's database). Threads survive crashes and reboots.
   - Agent processes do not survive a reboot. Their threads read [`TerminalMissing`](../appendix-a-glossary.md#terminalmissing) afterwards.
   - After a reboot or a login, the service manager does not start the Herdr server unit by itself. `kkd` starts it on demand, the next time a command needs the server. See [Terminal runtime](terminal-runtime.md#starting-and-addressing-the-server).
 - **Components.** Each thread has its own `ThreadController` actor. (An actor is a small independent worker inside the daemon.)
   - A `ThreadController` supervises the thread's durable lifecycle [sagas](../appendix-a-glossary.md#saga). A saga is a multi-step operation that records each step so it can recover after a crash.
   - A `ThreadController` dies only after its thread is closed or destroyed coherently.
-  - Cross-cutting components (those that serve the whole daemon) include the [op-log watcher](../appendix-a-glossary.md#op-log-watcher), cascade orchestrator, projection reconciler, terminal runtime adapter, process supervisor, and approval broker.
+  - Cross-cutting components (those that serve the whole daemon) include the [op-log watcher](../appendix-a-glossary.md#op-log-watcher), cascade orchestrator, projection reconciler, terminal runtime adapter, process supervisor, and approval broker. The approval broker holds the automation policy evaluator; see [The automation policy](#the-automation-policy).
   - AI and GitHub workers join later with their v1.x features.
 
 ## What the daemon owns
@@ -37,6 +49,7 @@ Terminals live in a separate, [dedicated Herdr server](../appendix-a-glossary.md
 - **All gRPC behavior.** [gRPC](https://grpc.io/) is the [remote procedure call](https://en.wikipedia.org/wiki/Remote_procedure_call) system that clients use to ask `kkd` to do things.
   - Every call goes through `AuthEnforcer`, the component that checks credentials.
   - A consequential operation claims its `HumanApproval` atomically (in one indivisible step) while it creates the durable operation journal. That [approval](../appendix-a-glossary.md#human-approval) is bound to the method, the target, the argument, and the rendered plan.
+  - A [`PolicyApproval`](../appendix-a-glossary.md#policy-approval) for the same plan satisfies the same requirement and is claimed the same way. It is the one-shot approval `kkd` issues when the active automation policy allows the plan. [Authority](../04-authority.md#policyapproval) owns that rule and its exceptions.
   - The operation then consumes the approval when that exact plan completes.
   - Every parseable transport attempt produces exactly one SQLite audit row. The row goes in the target repo database when the repo resolves. Otherwise it goes in the user database.
 - **Durable sagas** for creation, checkpoint, close, reopen, and repair. A terminal restart ([`restart-terminal`](../appendix-a-glossary.md#restart-terminal)) is one of these: a journaled lifecycle operation with its own step list.
@@ -80,6 +93,7 @@ Terminals live in a separate, [dedicated Herdr server](../appendix-a-glossary.md
 - **Active-thread focus.** Which terminal a human is looking at belongs to each [Herdr client](../appendix-a-glossary.md#herdr-client).
   - `kk switch` has two parts: a summary lookup in `kkd`, and a [caller-local focus](../appendix-a-glossary.md#caller-local-focus) request that `kk` makes through `TerminalClient`.
   - `kk switch` mutates (changes) no terminal and needs no `HumanApproval`. There is no mutating `Switch` RPC.
+  - Nothing in `kkd` waits for a viewer. The server may have zero attached clients, and every lifecycle step and safety proof runs the same way.
   - `kkd` never calls a focus method on a viewer's behalf.
   - There is no ambient operational Admin authority.
   - Caller-local focus requires the Herdr extension [`client_targeted_focus`](../appendix-a-glossary.md#client-targeted-focus). This is the only upstream extension (a change made in Herdr itself) that kiki requires.
@@ -106,6 +120,8 @@ When a command runs, kiki has to answer "Which thread am I in?". `ContextDiscove
    - Pane identity from any other Herdr server is ignored.
    - Pane ids in an environment can go stale after a native pane move. The verification is what catches that.
 4. **The current [working directory](https://en.wikipedia.org/wiki/Working_directory).**
+
+**Callers outside Herdr.** A script, a CI job, or a human in a plain SSH session has no Herdr variables at all. Steps 1 and 4 resolve the thread for such a caller. Discovery never needs an attached Herdr client.
 
 **Popups and keybindings.** A command started from a Herdr popup or keybinding has no `HERDR_PANE_ID`. Herdr supplies `HERDR_ACTIVE_WORKSPACE_ID`, `HERDR_ACTIVE_TAB_ID`, and `HERDR_ACTIVE_PANE_ID` instead.
 
@@ -139,6 +155,8 @@ When a command runs, kiki has to answer "Which thread am I in?". `ContextDiscove
 
 - **Start.** Only `kkd` starts the server. It runs `terminal.herdr_bin` with `--session <name>` and `HERDR_CONFIG_PATH=<herdr_dir>/config.toml`.
   - `kkd` starts the server as its own service-manager unit, not as a child inside `kkd`'s unit. That is a separate launchd job on macOS and a separate transient systemd user unit on Linux. The server must outlive `kkd`.
+  - Under `kkd --foreground`, with no service manager, `kkd` starts the server as a detached process in its own OS session. See [Lifecycle](#lifecycle).
+  - The server starts with no client attached and needs none. A client attaches only when a person runs `kk attach`.
   - Before it spawns the server, `kkd` writes a `terminal_servers` row in state `Starting`. It moves the row to `Open` once it has read the server's peer identity. So a crash between the two is recoverable: on restart `kkd` finds the `Starting` row and either completes it from the peer it finds on the socket or marks the start as failed.
   - Kiki does not redirect `XDG_CONFIG_HOME` or `XDG_STATE_HOME`. (These [XDG base-directory](https://specifications.freedesktop.org/basedir-spec/latest/) variables tell programs where to keep configuration and state.) Panes inherit the server's whole environment. So a redirected value would make jj, git, gh, and every shell in every thread read configuration from the wrong place.
   - For the same reason, `kkd` starts the server with an environment it builds on purpose. That environment is the user's login baseline of `HOME`, `USER`, `SHELL`, `PATH`, and locale. It is never the environment of whichever terminal happened to invoke `kk`.
@@ -154,7 +172,7 @@ When a command runs, kiki has to answer "Which thread am I in?". `ContextDiscove
   - `kk attach` asks `kkd` to ensure the server through `EnsureTerminalServer`. Then it uses Herdr's connect-only client mode for the named session. It never uses a client entry point that would start a server itself.
 - **Replace.** [`replace-terminal-server`](../appendix-a-glossary.md#replace-terminal-server) is the one plan that stops a running dedicated server. It is user-scoped, not thread-scoped. It is applied with `kk repair --server`.
   - The plan lists every thread and every process that the replacement stops.
-  - It needs a one-shot approval.
+  - It needs a one-shot approval. Its plan always carries the [risk label](../appendix-a-glossary.md#risk-label) `server-wide`, so a policy rule allows it only if the rule accepts that label.
   - It stops the old server with [verified exit](../appendix-a-glossary.md#verified-exit) and ends its row, whether that row was `Open` or `Unverified`. Then it starts a new one through the start path above.
   - Afterwards the old instance's bindings have ended, and each affected thread reads `TerminalMissing`. The server replacement starts no agent. Each thread is brought back with `restart-terminal`.
 - **Changed settings.** `[terminal] session`, `[terminal] herdr_bin`, and `[paths] herdr_dir` decide which server `kkd` runs. If one of them changes while an instance is open, `kkd` does not start a second server.
@@ -178,7 +196,7 @@ When a command runs, kiki has to answer "Which thread am I in?". `ContextDiscove
   - A snapshot is not atomic (not taken at one single instant). Every pid in it is re-read from the OS before it is trusted.
 - **Publish.** `kkd` publishes a label, and in v1.x tokens, only to a terminal group with a current binding.
   - A [remnant container](../appendix-a-glossary.md#remnant-container) left by a restore keeps whatever label Herdr restored. It receives no kiki tokens.
-  - The user can hide or collapse the sidebar that shows the label. Nothing depends on it being visible.
+  - The user can hide or collapse the sidebar that shows the label. Nothing depends on it being visible, or on any client being attached to see it.
 
 ### Runtime reconciliation
 
@@ -226,7 +244,8 @@ A process that is a pane member of a container on the current instance is a term
 **Unrecorded holders.** An **unrecorded** same-UID process that holds the workspace is not a standing issue. ("Same-UID" means running as the same user.) It never blocks an `Active` thread's boundaries.
 
 - It matters only to an operation that deletes the workspace: close, destroy, [`close-without-terminal`](../appendix-a-glossary.md#close-without-terminal), and the cleanup of a failed create or reopen.
-- There it makes the result `Unknown`, unless the approved plan names that exact holder identity as accepted. Naming it is the human's informed choice. One example is an editor left open. (See [accepted holder](../appendix-a-glossary.md#accepted-holder).)
+- There it makes the result `Unknown`, unless the approved plan names that exact holder identity as accepted. The caller names it with `--accept-holder <pid>`. One example is an editor left open. (See [accepted holder](../appendix-a-glossary.md#accepted-holder).)
+- A plan that accepts such a holder carries the risk label `outside-holders`. With no human, only a policy rule that accepts that label can approve it.
 - A holder the plan does not name is drift.
 - The holder scan excludes `kkd`, its own child processes, and the invoking `kk` process.
 - Every `Unknown` result reports each offending pid, its command line, and the step that clears it.
@@ -236,6 +255,27 @@ A process that is a pane member of a container on the current instance is a term
 **Termination.** `kkd` terminates only identities it recorded. It does so only after it has stopped them and re-read their identity. On a mismatch, it continues that process and treats it as unknown.
 
 Where the OS offers a process handle, such as a [pidfd](https://man7.org/linux/man-pages/man2/pidfd_open.2.html), `kkd` [signals](<https://en.wikipedia.org/wiki/Signal_(IPC)>) through the handle rather than a bare pid. A handle keeps pointing at the same process even if its pid is reused.
+
+## The automation policy
+
+The [automation policy](../appendix-a-glossary.md#automation-policy) is the set of rules that lets a plan run with no human confirming it. [Authority](../04-authority.md#automation-policy) owns its meaning. This section says where it lives in the daemon.
+
+- **The evaluator.** The policy evaluator is pure logic in `kiki-core`. It takes a canonical policy and one request, and it returns a `PolicyDecision`: `Allowed{rule}`, `RequireHuman{rule}`, or `NoMatch`. It opens no file and reads no database. See [Crate layout](crates.md#where-each-named-module-lives).
+- **Who calls it.** Only the approval broker calls it, and only inside `BeginApproval`. The broker supplies the four inputs:
+  - the principal, which it works out from the caller's credential and, for a thread caller, from the [follows](../appendix-a-glossary.md#follows) graph;
+  - the repo;
+  - the operation name; and
+  - the plan's risk labels, which the preflight computed.
+- **What it replaces.** The policy replaces only the human's confirm step. It runs after the preflight and before nothing else changes. Freeze, holder scans, the final proof, and verified exit run the same way under either kind of approval. A plan that a safety proof refuses is refused, whatever the policy says.
+- **When the policy is loaded.** `kkd` loads the active policy at three moments:
+  - at daemon start, from the active row of `automation_policies` in the user database, before it serves any call;
+  - when `ApplyAutomationPolicy` commits, in the same step that makes the new row active; and
+  - when `RevokeAutomationPolicy` commits, which leaves no policy loaded.
+- **What is never loaded.** `kkd` never evaluates the `[automation]` tables in the configuration file. Editing the file does nothing until `kk automation apply` activates it. `ConfigLoader` does not feed the evaluator.
+- **A stored policy that cannot be read.** If the active row's text does not match its digest, or does not parse, `kkd` loads no policy. Every decision is then `NoMatch`, and `kk automation status` reports the fault. This is [failing closed](../appendix-a-glossary.md#fail-closed).
+- **No policy.** With no active row, every decision is `NoMatch`. kiki then behaves as it did before automation existed: a human confirms at a foreground terminal, and a caller with no terminal fails with exit code 3.
+- **Automation credentials.** `kkd` stores each credential's hash in `automation_credentials` and writes the secret to `~/.config/kiki/automation/<name>.cred`, mode `0600`. That directory is outside every managed workspace. `kkd` never puts the secret in a harness, a hook, or a pane environment.
+- **Activation is hygiene, not a boundary.** Activation needs the enrolled presenter or the Admin credential. That keeps an agent from granting itself authority by editing a file. Like presenter enrollment, it works only under the cooperative same-UID model. It does not stop a malicious process that runs as the same user.
 
 ## Op attribution
 
@@ -259,7 +299,8 @@ This section lists what can go wrong and what kiki does about each case.
   - It comes from durable intent and barrier state, plus the ordering of `MarkDelivered(intent_id, incarnation_id, model_turn_id, tool_batch_id)` after stdout is written.
 - **The daemon restarts.** Op-log catch-up walks every unprocessed operation reachable from the observed frontier through normalized parent edges, in [topological order](https://en.wikipedia.org/wiki/Topological_sorting) (parents before children).
   - It runs _before_ JSONL backfill, so anchor lookups see current operation and workspace history.
-- **The service manager restarts `kkd`.** `kkd` runs under launchd or systemd-user and is restarted by it. Restart recovery reads sqlite state. Thread identity and persisted lifecycle state survive reboots.
+- **The service manager restarts `kkd`.** `kkd` runs under launchd or systemd-user and is restarted by it. Under `kkd --foreground`, the operator's supervisor restarts it. Restart recovery reads sqlite state. Thread identity and persisted lifecycle state survive reboots.
+  - The active automation policy is reloaded from its stored row. An approval that was issued but not yet claimed is a durable row. It stays valid until its expiry.
 - **`kkd` crashes during a freeze.**
   - Each discovered process identity was committed to `process_records` before it was signalled. The row includes its prior stop state and the freeze's lifecycle operation id.
   - On restart, `kkd` rebuilds the [frozen set](../appendix-a-glossary.md#frozen-set) from those rows.
@@ -274,7 +315,7 @@ This section lists what can go wrong and what kiki does about each case.
 - **`kkd` crashes while starting the server.** The `terminal_servers` row is still `Starting`.
   - On restart, `kkd` connects to the session's socket. If a server answers, `kkd` reads its peer identity and moves the row to `Open`.
   - If no server answers, `kkd` marks that start as failed and ends the row. It does not start again at once. It starts a server on demand, the next time a command needs one, with a new row.
-- **`kkd` restarts while the Herdr server survives.** Agents keep running. This is the normal case, because the server runs in its own service-manager unit.
+- **`kkd` restarts while the Herdr server survives.** Agents keep running. This is the normal case, because the server runs in its own service-manager unit, or as a detached process under `kkd --foreground`.
   - `kkd` reconnects and verifies the peer's `(pid, start_time)` against its open `terminal_servers` row. Then it snapshots, runs the [orphan scan](../appendix-a-glossary.md#orphan-scan), and reconciles.
   - `agent` launchers reopen their supervision streams. `kkd` authenticates each one by its accepted peer process identity.
   - The in-memory `PassThrough` cache is gone. So the first pre-tool call from an incarnation that was already running before this `kkd` start is an unknown in-flight batch. The one exception is a hook payload that proves the call is the first call of a new [model turn](../appendix-a-glossary.md#model-turn). For an unknown batch, `kkd` leaves files untouched, hard-pauses the incarnation, and replaces it to establish a clean boundary.
@@ -287,14 +328,14 @@ This section lists what can go wrong and what kiki does about each case.
   - A replacement incarnation is a new `agent_sessions` row and a new one-use gate, awaited by the same accepted launcher. It needs no terminal provisioning.
   - Its gate is activated only after the harness-remnant check above passes.
   - Two paths start a replacement incarnation:
-    - Kiki's own protocol restarts: a cascade hard restart or a `RestartStartup` replacement. These are daemon-initiated steps of the delivery protocol and need no `HumanApproval`.
+    - Kiki's own protocol restarts: a cascade hard restart or a `RestartStartup` replacement. These are daemon-initiated steps of the delivery protocol and need no one-shot approval of either kind.
     - The `kk repair` plan [`restart-agent`](../appendix-a-glossary.md#restart-agent), the explicit restart path. It is same-thread and needs no approval in thread context. `restart-agent` uses `RestartStartup` when an intent is pending.
   - Only the launcher's own exit, or the loss of its binding or server instance, ends the `agent` role and raises `TerminalMissing`. The restart plan for `TerminalMissing` needs approval.
   - In a group whose only pane is the `agent` pane, the launcher's exit also removes the whole Herdr workspace. This is because Herdr drops a workspace when its last pane's command exits, and reports only a pane-exit event.
 - **The Herdr server crashes or is killed.** Its PTYs close.
   - Processes that ignored hangup or left their session can survive. They are absent from every terminal view. (Hangup is the signal a process gets when its terminal closes.)
   - `kkd` observes the connection error. It treats every binding of that instance as ended and retires every incarnation without acknowledgement. It runs the orphan scan before anything else.
-  - `kkd` starts a fresh server only on demand, the next time a command such as `kk attach` or a repair plan needs it. `kkd` itself started that server, so it gets an `Open` row, and each affected thread needs only `restart-terminal`. `kkd` starts no agent on its own: each affected thread raises `TerminalMissing`.
+  - `kkd` starts a fresh server only on demand, the next time a command such as `kk new`, `kk attach`, or a repair plan needs it. `kkd` itself started that server, so it gets an `Open` row, and each affected thread needs only `restart-terminal`. `kkd` starts no agent on its own: each affected thread raises `TerminalMissing`.
   - A terminal restart is the approved `kk repair` plan [`restart-terminal`](../appendix-a-glossary.md#restart-terminal), with a fresh credential, launch settings, gate, and handshake. It never reuses a remnant or [unbound container](../appendix-a-glossary.md#unbound-container).
   - `restart-terminal` is a journaled lifecycle operation with its own step list:
     1. It lists every remnant or unbound container tied to the thread, with the processes in each, for approval.

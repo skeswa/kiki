@@ -147,6 +147,12 @@ confirm from a viewing device in a future release, its presenter must enroll
 separately. Remote confirmation stays disabled until that platform can prove
 a person confirmed this request outside the agent's control.
 
+A remote grant never implies an
+[automation policy](../04-authority.md#automation-policy) rule. A host's
+activated policy applies to remote callers only once a remote principal kind
+exists, and that arrives with remote access. Until then, policy principals
+are local.
+
 Suppose you ask kiki to create a thread and the connection drops before you
 get a reply. The client retries with the same request ID. For each request
 that changes state, the host records the ID for that caller and profile.

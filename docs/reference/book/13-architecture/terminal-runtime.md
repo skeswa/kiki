@@ -28,6 +28,8 @@ This table says which program is responsible for each concern.
 | PTYs, panes, tabs, layout, scrollback, copy mode, input, rendering, native sidebar, toasts (pop-up notices)                                                                                                    | Herdr                                                                                                              |
 | Which terminal a human is looking at                                                                                                                                                                           | each Herdr client; requested through `TerminalClient`                                                              |
 
+The last row is the only one that involves a [Herdr client](../appendix-a-glossary.md#herdr-client), the program a person runs to look at the server's terminals. Every other row works with no client attached. See [Topology](#topology).
+
 Kiki uses Herdr only from the outside, as a separate program. It uses four parts of Herdr:
 
 - the `herdr` executable;
@@ -68,6 +70,12 @@ flowchart TB
   - A Herdr _session_ is a server namespace with its own socket and its own saved state.
   - A Herdr session is not the per-thread unit. Kiki never creates one per thread or per repo.
   - The session name defaults to `kiki`.
+- **Zero clients is normal.** The dedicated server runs with zero attached clients. kiki is [headless](../appendix-a-glossary.md#headless): it works with no user interface attached and with no human present.
+  - No lifecycle step needs a client. Creation, provisioning, the ready handshake, cascade delivery, close, reopen, restart, and every repair plan run the same way with nobody attached.
+  - No safety proof needs a client. Freeze, the holder scan, the final proof, verified exit, and the orphan scan read the runtime's snapshot and the OS. None of them reads a screen.
+  - A pane's PTY and its processes exist whether or not anyone is viewing the pane.
+  - A client is a view. `kk attach` opens one, and `kk switch` moves one. Those are the only two commands that need a client.
+  - Everything a view shows is also printed by a `kk` command with `--json`.
 - **One terminal group per thread.** A **[terminal group](../appendix-a-glossary.md#terminal-group)** is kiki's name for the per-thread terminal home. With Herdr it is one Herdr workspace.
   - In this book, the word "[workspace](../appendix-a-glossary.md#workspace)" with nothing in front of it always means a jj workspace.
   - The terminal object is written "Herdr workspace" or "terminal group".
@@ -119,9 +127,13 @@ For the same reason, `kkd` starts the server with an environment that it builds 
   - A `kkd` crash, restart, or upgrade **must not** stop the server. This is a proof gate. The test kills `kkd` under each real service manager and checks that the server and the agents keep running.
   - After a reboot or a login, the service manager does not start the server unit by itself. Only `kkd` comes back automatically. `kkd` starts the server on demand, the next time a command needs it, such as `kk new`, `kk attach`, or a `restart-terminal` plan.
   - Herdr has its own fix for the terminal-application problem. That fix applies only to servers Herdr auto-spawns, and kiki never uses those.
+  - **No graphical login.** On macOS reached over Secure Shell (SSH) with no graphical login, the per-user graphical launchd domain does not exist. `kkd` and the server job then run in launchd's per-user domain that is not tied to a graphical login. This is an unproven gate: the kill-`kkd` test must pass in that domain.
+  - **No service manager.** Many containers and continuous-integration (CI) runners have no per-user service manager. There the operator runs `kkd --foreground` under their own supervisor, and `kkd` starts the server as a detached process in its own OS session. The same proof is a gate for this mode: kill `kkd`, and the server and the agents must keep running. This gate is unproven. A platform mode that fails it is unsupported. See [Daemon](daemon.md#lifecycle).
 - **Start record.** A `terminal_servers` row is in one of four states: `Starting | Open | Unverified | Ended`. Before it spawns a server, `kkd` writes a row in state `Starting`. It moves the row to `Open` once it has read the server's peer identity.
   - So a `kkd` crash between the spawn and the first connection is recoverable. On restart, `kkd` finds the `Starting` row, connects to the session's socket, and either completes the row from the peer identity it reads or marks the start as failed. After a failed start it does not start again at once. It starts a server on demand, the next time a command needs one.
 - **Attaching.** `kk attach` asks `kkd` to ensure the server is running. Then it connects with Herdr's connect-only client for the named session. It never uses a client entry point that would start a server itself.
+  - Attaching is optional. The server starts with no client, and no command waits for one.
+  - `kk attach` needs a terminal of its own, because it draws one. It works over SSH. Without a terminal it fails and says so.
 - **Verification.** `kkd` checks the server before using it:
   - It checks the server's reported version and protocol against its supported range.
   - It records the [server instance](../appendix-a-glossary.md#server-instance).
@@ -136,7 +148,8 @@ For the same reason, `kkd` starts the server with an environment that it builds 
 
 - **Replacing the server.** `replace-terminal-server` is the one plan that stops a running dedicated server. It is user-scoped, not thread-scoped, because one server hosts every thread's terminals. It is applied with `kk repair --server`.
   - The plan lists every thread and every process that the replacement stops.
-  - It needs a one-shot approval.
+  - It needs a one-shot approval. That is a `HumanApproval` or, under an activated [automation policy](../appendix-a-glossary.md#automation-policy), a [`PolicyApproval`](../appendix-a-glossary.md#policy-approval). [Authority](../04-authority.md#policyapproval) owns the rule that either one satisfies every "one-shot approval" and every "approved plan" in this chapter.
+  - Its plan always carries the [risk label](../appendix-a-glossary.md#risk-label) `server-wide`. A risk label names one kind of harm a plan carries. A policy rule allows a plan only if it accepts every label on it. See [Authority](../04-authority.md#risk-labels).
   - It stops the old server with [verified exit](../appendix-a-glossary.md#verified-exit) and ends its row, whether that row was `Open` or `Unverified`. Then it starts a new one through the normal start path above.
   - The new server is a new [server instance](../appendix-a-glossary.md#server-instance) with an `Open` row. Every binding of the old instance has ended, and each affected thread raises `TerminalMissing`, exactly as after a [cold restore](../appendix-a-glossary.md#cold-restore). Each one is then brought back with `restart-terminal`.
 - **Changed server settings.** Three settings choose which server `kkd` runs and where its files are: `[terminal] session`, `[terminal] herdr_bin`, and `[paths] herdr_dir`. If one of them changes while an instance is open, `kkd` does not start a second server.
@@ -245,11 +258,13 @@ trait TerminalRuntime {
   - Herdr's session snapshot names panes but not their processes. So the adapter asks for each pane's process information separately.
   - `ProcessSupervisor` then re-reads every reported pid from the OS.
   - A process in a Herdr popup appears in no listing at all.
+  - A snapshot does not depend on any client being attached.
 - **`subscribe`** yields wake-up hints only.
 - **`fence`** exists only where the runtime advertises [`mutation_fence`](../appendix-a-glossary.md#mutation-fence). It returns a guard. Dropping the guard releases the fence.
 - **`close_group`** returns `CloseRequested`, and **`notify`** returns `NotifyRequested`. Neither reply is an outcome.
   - Herdr's close reply does not establish that any process exited.
-  - Herdr's toast reply does not establish that anyone saw the toast.
+  - Herdr's toast reply does not establish that anyone saw the toast. With zero clients attached, nobody did.
+  - So a toast is never the only route for a notice. The same event is written to `thread_events`, where [`kk events`](../09-commands.md#kk-events) reads it. It can also go to the `command` notification provider. See [Observability](../12-observability.md).
 
 `RuntimeCapabilities` includes at least `direct_argv_launch`, [`client_targeted_focus`](../appendix-a-glossary.md#client-targeted-focus), `mutation_fence`, `request_keys`, `termination_receipt`, and `live_handoff`. Callers branch on these values, never on a version string. The adapter reports `live_handoff` as false throughout v1, whatever Herdr's own flag says.
 
@@ -266,9 +281,10 @@ trait TerminalClient {
 }
 ```
 
-- `caller` resolves which attached Herdr client issued the command.
+- `caller` resolves which attached Herdr client issued the command. With no client attached, there is none to resolve.
 - `focus` moves that client and no other. `FocusOutcome` is `Focused | NoCallerClient | Unsupported`.
 - `focus_all_clients` is the explicitly global operation behind `kk switch --all-clients`. Nothing else calls it.
+- This trait is the only one of the three that needs a client. `kkd` never calls it, and no lifecycle step or proof depends on it.
 - `attach` connects a new client to the dedicated server.
   - It places that client on `initial` only where the runtime can place one client without moving others.
   - Otherwise it attaches at Herdr's default location and says so.
@@ -436,6 +452,8 @@ So a duplicate group can exist briefly, but a duplicate harness cannot: the gate
 
 None proves that the launcher ran, that the harness is configured, or that anything was delivered.
 
+The reverse also holds. Nothing in provisioning waits for a screen to be drawn or for a client to attach. The launcher reports, the gate, and the handshake below are all the evidence there is, and all of them arrive with zero clients.
+
 Readiness is the settings-bound ready handshake. [`kk-hook`](../appendix-a-glossary.md#kk-hook) sends it from the harness's session-start hook event. The transaction that commits it re-reads the launcher's OS identity and the server instance. Delivery is the [cascade protocol](../05-cascade.md#delivery-protocol).
 
 The handshake has a deadline. `kkd` waits up to `[timeouts] ready_handshake` (default `60s`) from launch until the ready handshake. If the time runs out, a creation becomes `CreateFailed`. A reopen or a restart takes its own failure state.
@@ -475,6 +493,7 @@ The rules:
   - For a bound group, `kkd` publishes the [Herdr workspace label](../appendix-a-glossary.md#sidebar-label). In v1.x it also publishes sidebar tokens for lifecycle, cascade state, [agent display state](../appendix-a-glossary.md#agent-display-states), and follows parent.
   - Kiki never reads a decision back out of a label or token.
   - Presentation is republished after every resync and on every state change. So a clobbered (overwritten) value heals without becoming an input.
+  - `kkd` publishes whether or not a client is attached. Nothing waits for a label or a token to be seen.
 - **The durable record is elsewhere.** Kiki's journals and jj's [operation history](https://docs.jj-vcs.dev/latest/operation-log/) remain the durable record. Nothing is reconstructed from Herdr's event history.
 
 Herdr has its own agent detection, with values `idle | working | blocked | done | unknown`. It is a heuristic (an educated guess) based on the screen and the process.
@@ -490,7 +509,7 @@ Several different events can sit behind "the terminal came back". Kiki tells the
 
 | Event                    | What Herdr preserves                                                                                                                               | What kiki does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Client reconnect**     | Everything. Processes never stopped.                                                                                                               | Nothing changes in kiki's state. Only the caller identity used by `TerminalClient` is new.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Client reconnect**     | Everything. Processes never stopped.                                                                                                               | Nothing changes in kiki's state. Only the caller identity used by `TerminalClient` is new. The same holds when the last client detaches: the server keeps running with zero clients.                                                                                                                                                                                                                                                                                                                                                |
 | **Pane exit**            | The server and other panes. The pane of the command that exited is removed. The Herdr workspace is removed with it if that was its last pane.      | The claiming process identity is gone, so its role ends. If the ended role is `agent` (the launcher itself exited), kiki retires any live incarnation without acknowledgement and raises `TerminalMissing`. A harness that exits under a live launcher is not this case: the incarnation is retired and the role continues.                                                                                                                                                                                                         |
 | **Cold restore**         | Layout, labels, working directories, and public ids. Every process is new. Launch argv is saved but not rerun. Launch env and tokens are not kept. | `kkd` itself started the new server, so there is a new `server_instance_id` with an `Open` row. Every binding from the old instance is ended, and every incarnation is retired. Restored panes have no role. `kkd` runs the [orphan scan](#orphans), then raises `TerminalMissing` for each affected thread. A restart is a `kk repair` plan with a fresh credential, launch settings, gate, and handshake.                                                                                                                         |
 | **Planned live handoff** | Processes and PTYs move to a new server process.                                                                                                   | Unsupported until its acceptance gate passes. Kiki never initiates it. v1 does not re-prove survivors. After an observed handoff, the socket's peer is a server `kkd` did not start. `kkd` ends the old row, which ends every binding of the old instance and raises `TerminalMissing`. It records the new peer as `Unverified` and provisions nothing on it. The fix is `replace-terminal-server`, and after it `restart-terminal` for each thread.                                                                                |
@@ -510,6 +529,8 @@ Repair plans dispose of remnant and unbound containers explicitly. Two plans do 
 - Both follow the order in [Process supervision](#process-supervision): freeze, prove, terminate with [verified exit](../appendix-a-glossary.md#verified-exit), and only then request the container's close.
 
 A human may have started anything in a restored pane, including a second copy of the agent. That is why the plan lists processes instead of assuming they are shells.
+
+A plan that terminates running processes in its listed containers carries the risk label `live-processes`. With no human present, only a policy rule that accepts that label can approve it. The plan and its process list are also printed by `kk repair --json`, so a script sees what a human would see on the card.
 
 Kiki does not let Herdr resume agents. A resumed process would run without kiki's credential, launch-scoped settings, gate, or exclusive-hook proof.
 
@@ -554,6 +575,8 @@ If the restart fails after provisioning:
 
 Kiki deletes a thread's files only after proving that every program it can see using them is stopped, or was accepted by name in the approved plan. This section says how `ProcessSupervisor` builds that proof.
 
+The proof is the same whoever approved the plan. An automation policy replaces only the human's confirm step. It never replaces a step in this section, and it never turns an `Unknown` result into a pass.
+
 Herdr alone cannot prove it:
 
 - Herdr reports a pane's direct child and its [foreground process group](<https://en.wikipedia.org/wiki/Job_control_(Unix)>) (the group of processes currently using the terminal).
@@ -588,7 +611,8 @@ For those, the filesystem recheck after exit is the only check that can still no
    - The result is `Unknown` in two cases: a member is stopped by a tracer (a debugger-like program controlling it), or the set has not stabilized within `[timeouts] freeze_stabilize` (default `5s`).
 4. **Holders.** Enumerate same-UID processes that refer to the workspace through their working directory, root, mapped file, or open [file descriptor](https://en.wikipedia.org/wiki/File_descriptor) (the OS's handle for an open file).
    - Exclude `kkd`, `kkd`'s own child processes, and the invoking `kk`.
-   - A holder outside the [frozen set](../appendix-a-glossary.md#frozen-set) makes the result `Unknown`, unless the approved plan names that exact process identity as an [accepted holder](../appendix-a-glossary.md#accepted-holder). One example is an editor the human chose to leave open.
+   - A holder outside the [frozen set](../appendix-a-glossary.md#frozen-set) makes the result `Unknown`, unless the approved plan names that exact process identity as an [accepted holder](../appendix-a-glossary.md#accepted-holder). One example is an editor that someone chose to leave open.
+   - A plan that names an accepted holder carries the risk label `outside-holders`. A policy rule approves it only if the rule accepts that label. The holder must still be named by exact identity in the plan. A rule never accepts holders in general.
 5. **Repository locks.** Confirm that no frozen member has an open file descriptor under the repository's `.jj` directory.
    - A jj command frozen mid-flight would hold repository-wide locks that the checkpoint and every other thread need.
    - Finding one takes verified resume.
@@ -639,7 +663,7 @@ One case is outside the guarantee. A process may detach from every tracked relat
 - the workspace state: its inventory and byte fingerprint;
 - the set of terminal containers the plan lists;
 - the identity of each role's pane launcher;
-- the set of holders outside those containers, with any holders the human accepts by name;
+- the set of holders outside those containers, with any holders the caller accepts by name;
 - the expected projections;
 - the children: every child-edge decision;
 - the checkpoint target; and
@@ -647,7 +671,7 @@ One case is outside the guarantee. A process may detach from every tracked relat
 
 It does not cover the list of processes inside each container. Those processes are covered by container scope: the approval covers every process in a listed container at freeze time, and kiki records them at the freeze.
 
-- The plan card shows the preflight process inventory and states the container scope in those words.
+- The plan card shows the preflight process inventory and states the container scope in those words. A plan approved by policy is printed by `kk` with the same inventory and the same words, and `--json` carries them too.
 - A process that joins a listed container between preflight and freeze is covered. It is terminated under the plan's container-scope statement. It is not drift.
 - "Membership change" drift means one of three things: a change in the container set, a changed role launcher identity, or a change in the holders outside the listed containers.
 
@@ -780,6 +804,8 @@ With the extension, `TerminalClient::caller` resolves the caller in this order:
 
 A command with no such viewer resolves `NoCallerClient` and moves no one. Examples are an agent's tool call, a script, or a pane nobody is looking at.
 
+This is the normal result on a server with zero attached clients. `kk switch` then exits with code 4. Nothing else in kiki depends on a caller client.
+
 Until `client_targeted_focus` is advertised, `kk switch <thread>` fails with a message that names the missing capability.
 
 `kk switch --all-clients <thread>` is the explicit, differently named operation. It moves every attached client through the public focus method. A single-viewer setup can use it, with the explicit understanding that it moves all attached clients.
@@ -792,23 +818,28 @@ Kiki's own terminal operations **must not** move anyone either. Provisioning, du
 - applying a layout over a tab someone is viewing moves that view to the new tab; and
 - a client viewing a tab that is replaced, or a container that closes, falls back to Herdr's default location.
 
+With zero clients attached, these calls still change Herdr's shared focus state, but they move no one.
+
 This is an open gate, not an established fact. That is, it still has to be proven by a test.
 
 ## Native and custom UI
 
 Kiki reuses Herdr's UI where it already answers the product need. Kiki builds UI only where the need is specific to kiki.
 
-| Need                                                                       | Surface                                                                                                                                                  |
-| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Panes, splits, tabs, scrollback, copy mode, mouse, resize                  | Herdr, unmodified                                                                                                                                        |
-| A cross-repo list of threads with attention state                          | Herdr's sidebar, fed by kiki's label and tokens                                                                                                          |
-| Ambient "something needs you" while heads-down                             | Herdr's sidebar and toasts, plus OS notifications                                                                                                        |
-| Moving between threads                                                     | Herdr's own navigation, and `kk switch` through `TerminalClient`                                                                                         |
-| The follows tree, stack-aware log, transcript and diff preview, spawn form | custom: the `kk` [overlay TUI](../appendix-a-glossary.md#overlay-tui), opened as a Herdr popup or pane                                                   |
-| Approval cards                                                             | custom, always: the plan is rendered by an enrolled [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter) that owns its foreground terminal |
-| A permanently visible Stack tree                                           | custom and optional: a [`ui` role pane](../appendix-a-glossary.md#ui-role-pane)                                                                          |
+| Need                                                                       | Surface                                                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Panes, splits, tabs, scrollback, copy mode, mouse, resize                  | Herdr, unmodified                                                                                                                                                                                                                                                                         |
+| A cross-repo list of threads with attention state                          | Herdr's sidebar, fed by kiki's label and tokens                                                                                                                                                                                                                                           |
+| Ambient "something needs you" while heads-down                             | Herdr's sidebar and toasts, plus OS notifications                                                                                                                                                                                                                                         |
+| "Something needs you" with nobody attached                                 | no terminal surface: [`kk events`](../09-commands.md#kk-events) and the `command` notification provider                                                                                                                                                                                   |
+| Moving between threads                                                     | Herdr's own navigation, and `kk switch` through `TerminalClient`                                                                                                                                                                                                                          |
+| The follows tree, stack-aware log, transcript and diff preview, spawn form | custom: the `kk` [overlay TUI](../appendix-a-glossary.md#overlay-tui), opened as a Herdr popup or pane                                                                                                                                                                                    |
+| Approval cards                                                             | custom, always: the plan is rendered by an enrolled [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter) that owns its foreground terminal. Any terminal will do, including an SSH session with no Herdr client. No card is shown when the activated policy allows the plan |
+| A permanently visible Stack tree                                           | custom and optional: a [`ui` role pane](../appendix-a-glossary.md#ui-role-pane)                                                                                                                                                                                                           |
 
 (A TUI is a [text-based user interface](https://en.wikipedia.org/wiki/Text-based_user_interface): an interactive screen drawn in a terminal.)
+
+**Every surface in this table is a view.** The sidebar, the overlay, and the `ui` pane show state that `kkd` already holds. Each thing they show is also printed by a `kk` command with `--json`, and each action they offer is a `kk` command. No command, lifecycle step, or safety proof needs one of them to be open, or needs a Herdr client, a popup, or a desktop session.
 
 **The sidebar.** Herdr's sidebar is the user's to hide, collapse, or resize. Kiki never relies on it being visible.
 
@@ -821,7 +852,13 @@ Kiki reuses Herdr's UI where it already answers the product need. Kiki builds UI
 
 So the overlay changes directory out of the jj workspace when it starts. That way it is not an unlisted holder of the files it helps close.
 
+A popup exists only while a client shows it. Nothing in kiki opens a popup by itself or waits for one. With no client attached there is no popup, and nothing is missing.
+
 **Approval in a pane.** A pane's PTY is a [controlling terminal](<https://en.wikipedia.org/wiki/Job_control_(Unix)>) for its child. So an `ApprovalPresenter` running in a pane can own its foreground terminal.
+
+A pane is one place a presenter can run. It is not the only one. A presenter in a plain terminal or an SSH session works the same way, with no Herdr client involved.
+
+**Approval with no human.** When the activated automation policy allows a plan, `kkd` issues a `PolicyApproval` and no presenter runs at all. When it does not, and the caller has no terminal, the command fails closed with exit code 3. kiki never waits for a card that nobody can see. See [exit codes](../09-commands.md#exit-codes).
 
 **Herdr actions carry no authority.** A Herdr plugin action, keybinding, or sidebar click **may** open a kiki surface or request navigation. It is never an approval. It never carries more authority than the `kk` process it starts.
 
@@ -841,23 +878,26 @@ The candidate revision is Herdr source commit `ee5bfb5041bb` (package 0.9.5). It
 
 "Available" below means present at the candidate revision. An "[acceptance gate](../appendix-a-glossary.md#acceptance-gate)" is a test that has to pass before kiki relies on the behavior.
 
-| Capability                                        | Available in Herdr                                                                     | Kiki adapter work                                                                   | Upstream extension                                | Acceptance gate still unproven                                                             |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Dedicated server and configuration                | named sessions; an explicit configuration file; no way to relocate other state         | generate and validate config; construct the server environment; start, find, verify | optional state-root option not exported to panes  | the user's default server and configuration are undisturbed; panes see a clean environment |
-| Direct argv launch with cwd/env                   | layout application with per-pane command, cwd, env                                     | pane launcher; replace the default first tab                                        | none                                              | real Claude Code and Codex behind the launcher: input, resize, signals, copy               |
-| Exactly-once provisioning                         | no request key; duplicate labels accepted                                              | journal, verified launcher reports, single gate claim, unbound-container cleanup    | optional request key on create and layout         | lost-reply and crash injection never yields two harnesses                                  |
-| Server instance identity                          | none in the public API; the API socket is served by the server process itself          | socket peer `(pid, start_time)`                                                     | optional boot id in the ping and snapshot replies | restart with recurring ids is always detected, on each platform                            |
-| Durable bindings                                  | labels persist; launch argv is saved but not rerun; launch env and tokens are not kept | bindings live in kiki SQLite; labels are hints                                      | none required                                     | cold restore never binds or reports the wrong thread                                       |
-| Events and resync                                 | event stream with bounded history and a loss signal; snapshot without process ids      | subscribe-then-snapshot with per-pane process queries; resync on loss or reconnect  | optional wire sequence and cursor                 | loss injection                                                                             |
-| Presentation                                      | labels, sidebar tokens, agent states, toasts (off by default)                          | one-way publisher with republish; tokens are v1.x                                   | none                                              | the label heals after loss or overwrite; kiki's operations move no attached client         |
-| Popups, keybinding commands, plugin panes, toasts | present in source at the candidate revision; not run with a client                     | generated keybindings and the overlay entry point (v1.x)                            | none known                                        | each behaves as the [Interface](../10-interface/spec.md) chapter assumes                   |
-| Caller-local focus                                | per-client navigation exists only on the private client protocol                       | `TerminalClient` caller resolution                                                  | **required:** client-targeted focus               | two clients; only the invoker moves                                                        |
-| Restore policy                                    | layout restore; agent auto-resume can be disabled; layout restore cannot               | reconciliation, orphan scan, remnant disposal, repair restart                       | none required                                     | no restored pane is ever reported `Active`                                                 |
-| Process quiescence and verified exit              | signal escalation on close; bare success reply                                         | all of `ProcessSupervisor`                                                          | optional termination receipt                      | multiple panes, background jobs, escaped and daemonized writers, crash mid-freeze          |
-| Terminal mutation fence                           | none                                                                                   | pane-set comparison as drift detection                                              | optional group mutation fence                     | a split during freeze aborts or is prevented                                               |
-| Surviving the terminal application quitting       | only for servers Herdr auto-spawns                                                     | run `kkd` and the server under the user's service manager                           | none                                              | quit the terminal application; agents keep running                                         |
-| Surviving `kkd` stopping                          | none; a server started as a child shares its parent's service unit                     | start the server as its own launchd job or transient systemd user unit              | none                                              | kill `kkd` under each real service manager; the server and agents keep running             |
-| Live handoff                                      | Unix-only, experimental                                                                | none in v1                                                                          | a stability commitment                            | handoff with a managed agent and re-proven incarnation                                     |
+| Capability                                        | Available in Herdr                                                                     | Kiki adapter work                                                                   | Upstream extension                                | Acceptance gate still unproven                                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Dedicated server and configuration                | named sessions; an explicit configuration file; no way to relocate other state         | generate and validate config; construct the server environment; start, find, verify | optional state-root option not exported to panes  | the user's default server and configuration are undisturbed; panes see a clean environment         |
+| Direct argv launch with cwd/env                   | layout application with per-pane command, cwd, env                                     | pane launcher; replace the default first tab                                        | none                                              | real Claude Code and Codex behind the launcher: input, resize, signals, copy                       |
+| Exactly-once provisioning                         | no request key; duplicate labels accepted                                              | journal, verified launcher reports, single gate claim, unbound-container cleanup    | optional request key on create and layout         | lost-reply and crash injection never yields two harnesses                                          |
+| Server instance identity                          | none in the public API; the API socket is served by the server process itself          | socket peer `(pid, start_time)`                                                     | optional boot id in the ping and snapshot replies | restart with recurring ids is always detected, on each platform                                    |
+| Durable bindings                                  | labels persist; launch argv is saved but not rerun; launch env and tokens are not kept | bindings live in kiki SQLite; labels are hints                                      | none required                                     | cold restore never binds or reports the wrong thread                                               |
+| Events and resync                                 | event stream with bounded history and a loss signal; snapshot without process ids      | subscribe-then-snapshot with per-pane process queries; resync on loss or reconnect  | optional wire sequence and cursor                 | loss injection                                                                                     |
+| Presentation                                      | labels, sidebar tokens, agent states, toasts (off by default)                          | one-way publisher with republish; tokens are v1.x                                   | none                                              | the label heals after loss or overwrite; kiki's operations move no attached client                 |
+| Popups, keybinding commands, plugin panes, toasts | present in source at the candidate revision; not run with a client                     | generated keybindings and the overlay entry point (v1.x)                            | none known                                        | each behaves as the [Interface](../10-interface/spec.md) chapter assumes                           |
+| Caller-local focus                                | per-client navigation exists only on the private client protocol                       | `TerminalClient` caller resolution                                                  | **required:** client-targeted focus               | two clients; only the invoker moves                                                                |
+| Restore policy                                    | layout restore; agent auto-resume can be disabled; layout restore cannot               | reconciliation, orphan scan, remnant disposal, repair restart                       | none required                                     | no restored pane is ever reported `Active`                                                         |
+| Process quiescence and verified exit              | signal escalation on close; bare success reply                                         | all of `ProcessSupervisor`                                                          | optional termination receipt                      | multiple panes, background jobs, escaped and daemonized writers, crash mid-freeze                  |
+| Terminal mutation fence                           | none                                                                                   | pane-set comparison as drift detection                                              | optional group mutation fence                     | a split during freeze aborts or is prevented                                                       |
+| Surviving the terminal application quitting       | only for servers Herdr auto-spawns                                                     | run `kkd` and the server under the user's service manager                           | none                                              | quit the terminal application; agents keep running                                                 |
+| Surviving `kkd` stopping                          | none; a server started as a child shares its parent's service unit                     | start the server as its own launchd job or transient systemd user unit              | none                                              | kill `kkd` under each real service manager; the server and agents keep running                     |
+| Surviving `kkd` stopping with no service manager  | none; a server started as a plain child stays in its parent's session                  | under `kkd --foreground`, start the server as a detached process in its own session | none                                              | kill `kkd` under a container supervisor and a CI runner; the server and agents keep running        |
+| macOS with no graphical login                     | none                                                                                   | install `kkd` and the server job in launchd's per-user, non-graphical domain        | none                                              | over SSH with no graphical login: install, kill `kkd`, log out; the server and agents keep running |
+| Zero attached clients                             | the server runs with no client; the released binary was run that way                   | no step or proof reads a client                                                     | none                                              | a full lifecycle (create, cascade, close, reopen, repair) with zero attached clients               |
+| Live handoff                                      | Unix-only, experimental                                                                | none in v1                                                                          | a stability commitment                            | handoff with a managed agent and re-proven incarnation                                             |
 
 One row is required upstream before the Herdr-backed acceptance gate can pass: [client-targeted focus](../appendix-a-glossary.md#client-targeted-focus). Every other extension is an optimization of something the adapter already makes safe.
 
@@ -868,5 +908,7 @@ The v1 runtime is local. `kkd`, the dedicated Herdr server, and every thread's p
 `ProcessSupervisor` needs to inspect local OS processes and file holders. So a remote Herdr endpoint cannot supply kiki's deletion proof, and remote terminal hosting stays out of scope.
 
 macOS and Linux are the supported platforms once their gates pass.
+
+"Local" does not mean "with a screen". A supported host can be a server reached over SSH, a container, or a CI runner, with no desktop session and no attached client. Two of those modes have their own unproven gates in the table above: a host with no user service manager, and macOS with no graphical login. Each is supported only once its gate passes.
 
 Herdr runs on Windows. But kiki's freeze, holder inventory, and verified-exit proofs have no Windows evidence. Windows support is a [roadmap](../16-roadmap.md) item gated on that evidence. It is not a consequence of Herdr's support.

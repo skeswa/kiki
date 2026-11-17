@@ -26,10 +26,13 @@ All of these clients use the same service contract:
 - the optional [`ui` pane](../appendix-a-glossary.md#ui-role-pane);
 - future UIs.
 
+kiki is [headless](../appendix-a-glossary.md#headless). The `kk` command-line program and this service contract are the complete surface. The overlay and the `ui` pane are views: anything they show, a `kk` command prints with `--json`. A script or a continuous-integration (CI) job is one more client. It runs `kk` with an [automation credential](../appendix-a-glossary.md#automation-credential), and an activated [automation policy](../appendix-a-glossary.md#automation-policy) decides which plans it may run with no human confirming them. See [Authority](../04-authority.md#automation-policy).
+
 Terminals work like this:
 
 - Terminals are hosted by a [dedicated Herdr server](../appendix-a-glossary.md#dedicated-herdr-server). [Herdr](../appendix-a-glossary.md#herdr) is the [terminal multiplexer](../appendix-a-glossary.md#ext-terminal-multiplexer) kiki uses.
-- `kkd` starts that server as its own service-manager unit, so the server and the agents keep running when `kkd` crashes, restarts, or is upgraded.
+- `kkd` starts that server as its own service-manager unit, so the server and the agents keep running when `kkd` crashes, restarts, or is upgraded. On a host with no service manager, `kkd --foreground` starts it as a detached process instead. See [Daemon](daemon.md#lifecycle).
+- The server runs with zero attached clients. No command, lifecycle step, or safety proof needs a client.
 - `kkd` drives that server through [`TerminalRuntime`](../appendix-a-glossary.md#terminalruntime).
 - Which terminal a human is looking at belongs to each [Herdr client](../appendix-a-glossary.md#herdr-client). `kk` requests it through [`TerminalClient`](../appendix-a-glossary.md#terminalclient).
 
@@ -57,15 +60,18 @@ flowchart LR
 
     GrpcSock["~/.config/kiki/kkd.sock\ngRPC over unix socket"]
     McpSock["~/.config/kiki/kkd-mcp.sock\nStreamable HTTP MCP over unix socket\n(v1.x polish)"]
-    AdminCred["~/.config/kiki/admin-cred\nbootstrap / broker enrollment only"]
+    AdminCred["~/.config/kiki/admin-cred\nbootstrap / broker enrollment / automation setup only"]
+    AutoCred["~/.config/kiki/automation/<name>.cred\nread by kk for scripts and CI\nnever given to a harness, hook, or pane"]
     Broker["enrolled foreground broker\nbegin + display + confirm"]
-    Approval["one-shot HumanApproval\nmethod + target + argument + plan digest"]
+    Approval["one-shot approval\nHumanApproval or PolicyApproval\nmethod + target + argument + plan digest"]
     HookCred["~/.config/kiki/repos/<repo_id>/credentials/<thread_id>\nread by kk-hook / pane launcher / ui pane / MCP client"]
 
     AdminCred -. bootstrap .-> Auth
     CLI -. foreground confirmation .-> Broker
     TUI -. foreground confirmation .-> Broker
     Broker -. issues after persisted challenge .-> Approval
+    Auth -. issues when the active policy allows the plan .-> Approval
+    AutoCred -. read .-> CLI
     HookCred -. read .-> Hook
     HookCred -. read .-> Launcher
     HookCred -. read .-> UiPane
@@ -79,7 +85,7 @@ flowchart LR
     AgentMcp --> McpSock
 
     subgraph Daemon["kkd: single user-scoped daemon"]
-        Auth["AuthEnforcer + approval broker\nThreadScoped / HumanApproval\nAdmin bootstrap only"]
+        Auth["AuthEnforcer + approval broker\nThreadScoped / AutomationScoped\nHumanApproval / PolicyApproval\nautomation policy evaluator\nAdmin bootstrap only"]
         Api["gRPC service\nstable proto contract"]
         McpApi["MCP server\nthread-scoped transcript reads\n(v1.x polish)"]
         Events["server-streaming events"]
@@ -110,7 +116,7 @@ flowchart LR
     Watcher --> Transcript
 
     subgraph State["Persistent state"]
-        UserDb["~/.config/kiki/state.db\nrepo registry, presenters, Admin credential record,\nterminal servers, unscoped audit"]
+        UserDb["~/.config/kiki/state.db\nrepo registry, presenters, Admin credential record,\nautomation policies and credentials,\nterminal servers, unscoped audit"]
         RepoDb["~/.config/kiki/repos/<repo_id>/state.db\nthreads, credentials, audit, transcripts\n(centralized; no state inside the source repo)"]
     end
 
@@ -126,7 +132,7 @@ flowchart LR
 
     subgraph Tools["External tools kk coordinates"]
         Jj["jj / git repo\nworkspaces, bookmarks, op log"]
-        Herdr["dedicated Herdr server (session: kiki)\nstarted only by kkd, as its own service-manager unit\noutlives the terminal application and kkd\none terminal group per thread\nrole panes, native sidebar, toasts"]
+        Herdr["dedicated Herdr server (session: kiki)\nstarted only by kkd, as its own service-manager unit\noutlives the terminal application and kkd\nruns with zero attached clients\none terminal group per thread\nrole panes, native sidebar, toasts"]
         OsProc["local OS\nprocesses and workspace holders"]
         Harnesses["Claude Code / Codex\nagent sessions + JSONL"]
         Gh["gh / GitHub\nPRs, CI, review comments"]

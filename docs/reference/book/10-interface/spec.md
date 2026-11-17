@@ -4,6 +4,13 @@ The interface surfaces in this chapter are [v1.x polish](../appendix-a-glossary.
 
 Kiki's [threads](../appendix-a-glossary.md#thread) live in a [dedicated Herdr server](../appendix-a-glossary.md#dedicated-herdr-server) (see [Terminal runtime](../13-architecture/terminal-runtime.md)). [Herdr](https://github.com/herdrdev/herdr) is a [terminal multiplexer](https://en.wikipedia.org/wiki/Terminal_multiplexer): a program that runs many terminals inside one window. A human looks at the threads through a [Herdr client](../appendix-a-glossary.md#herdr-client).
 
+Every surface in this chapter is a view. Nothing in kiki needs one.
+
+- kiki runs [headless](../appendix-a-glossary.md#headless): with no Herdr client attached, no overlay, no popup, no UI pane, and no desktop session. The Herdr server runs with zero clients.
+- No command, lifecycle step, or safety proof waits for a surface in this chapter to exist or to be looked at.
+- The `kk` command line and the daemon's gRPC service are the complete surface. Anything the overlay, the UI pane, or the Herdr sidebar shows is also available from a command with `--json` (see [Commands · Output for scripts](../09-commands.md#output-for-scripts)).
+- Approval cards are the human path to an approval, not the only path. An activated [automation policy](../appendix-a-glossary.md#automation-policy) rule can approve a plan with no card and no terminal. See [Approval without a card](#approval-without-a-card).
+
 The drawing work is split:
 
 - Herdr draws the panes, the tabs, and its own native sidebar.
@@ -53,7 +60,7 @@ The custom UI is a `kk` process rendered with [ratatui](https://ratatui.rs/), a 
   - It auto-dismisses after `[ui] toast_ttl_ms` (default 4000).
   - It carries at most one optional named action. The action never performs or confirms anything consequential.
   - A **Herdr toast** is a different thing: Herdr's own notification, used as one attention transport (see [Toasts](#toasts)).
-- **Card**: a centered modal panel with title, body, and one or two action buttons. Used for spawn input and foreground approval.
+- **Card**: a centered modal panel with title, body, and one or two action buttons. Used for spawn input and for a human's foreground approval.
 
 ### What the overlay may read
 
@@ -78,10 +85,12 @@ Kiki reuses [Herdr](../appendix-a-glossary.md#herdr)'s UI where it already answe
 | Ambient "something needs you" while heads-down                             | Herdr sidebar tokens and Herdr toasts, plus OS notifications     | Herdr and the OS draw; kiki publishes |
 | Moving between threads                                                     | Herdr's own navigation, and `kk switch`                          | each Herdr client                     |
 | The follows tree, stack-aware log, transcript and diff preview, spawn form | the `kk` overlay                                                 | kiki                                  |
-| Approval cards                                                             | the enrolled `ApprovalPresenter`, in its own foreground terminal | kiki, always                          |
+| Approval cards, when a human approves                                      | the enrolled `ApprovalPresenter`, in its own foreground terminal | kiki, always                          |
 | A permanently visible Stack tree                                           | the optional UI pane                                             | kiki                                  |
 
-The [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter) is the `kk` process that is allowed to show and confirm an approval.
+The [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter) is the `kk` process that is allowed to show a plan to a person and confirm that person's approval.
+
+Every row of this table is a way to look at kiki or to steer it by hand. None is needed for kiki to work. A host with no client attached draws none of them.
 
 This chapter relies on several Herdr behaviors that are known only from reading Herdr's source at the candidate revision. They have not yet been exercised against a running candidate build:
 
@@ -97,6 +106,8 @@ Three rules follow:
 - Kiki does not rebuild what Herdr provides. There is no kiki pane manager, tab bar, scrollback viewer, or status line.
 - Nothing Herdr draws is an input to kiki. Labels, tokens, Herdr's agent states, and pane placement are presentation. Kiki never reads a decision out of them.
 - A Herdr keybinding, plugin action, or sidebar click may open a kiki surface or move a view. It is never an approval. It never carries more authority than the `kk` process it starts.
+
+A fourth rule runs the other way: kiki never depends on a surface being there. A thread is created, reconciled, repaired, and closed the same way whether or not anyone is attached.
 
 ## Glyph language
 
@@ -354,7 +365,7 @@ The ribbon adapts to selection:
 
 `i` (interrupt) shows the same shape; the body changes. `enter` confirms the daemon-issued challenge through the enrolled presenter. Then the exact operation retries with its one-use approval. There is no chord that fires destructive verbs in one keystroke.
 
-Approval cards are always custom and always foreground-bound:
+A card is how a person approves. Whenever a card is shown, it is custom and foreground-bound:
 
 - The card is drawn by the `kk` process that is the enrolled [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter).
 - That process draws it in the terminal it owns: the pane where `kk` was typed, or the popup the overlay keybinding opened.
@@ -367,7 +378,23 @@ A close, destroy, or terminal-restart card says exactly what it covers:
 - A process that joins a listed container after the card was drawn and before the freeze is covered by that statement.
 - The card also names any outside holder of the workspace that the human is asked to accept.
 
-An approval card needs a terminal its `kk` process owns in the foreground. A pane's PTY is the [controlling terminal](<https://en.wikipedia.org/wiki/Job_control_(Unix)>) of its child, so a `kk` typed in a pane qualifies. Whether a popup's terminal qualifies is part of the popup gate. Where it does not, the approval flow [fails closed](../appendix-a-glossary.md#fail-closed), and the same verb is available from `kk` in a pane. ("Fails closed" means the action is refused, not allowed by default.)
+An approval card needs a terminal its `kk` process owns in the foreground. A pane's PTY is the [controlling terminal](<https://en.wikipedia.org/wiki/Job_control_(Unix)>) of its child, so a `kk` typed in a pane qualifies. Whether a popup's terminal qualifies is part of the popup gate. Where it does not, the card cannot be shown. The overlay always asks for the card, so the approval flow then [fails closed](../appendix-a-glossary.md#fail-closed), and the same verb is available from `kk` in a pane. ("Fails closed" means the action is refused, not allowed by default.)
+
+#### Approval without a card
+
+The card is the human path. It is not the only one.
+
+An approval needs a card only when a person is the one approving. `kkd` first checks the active [automation policy](../04-authority.md#automation-policy). The policy is a set of rules, activated ahead of time, that say which plans may run with no person asked.
+
+- **A rule allows the plan.** `kkd` issues a [`PolicyApproval`](../appendix-a-glossary.md#policy-approval) and no card is drawn. `kk` prints the plan and the line "approved by rule `<name>`", then runs the operation. This works with no terminal, no popup, and no Herdr client. `kk <verb> --confirm` forces the card anyway.
+- **No rule allows it, or a rule requires a human.** The card is shown as described above, when its `kk` process owns a foreground terminal.
+- **A human is required and there is no terminal.** The flow fails closed. `kk` ends with [exit code](../09-commands.md#exit-codes) 3 and names the operation, the plan's [risk labels](../appendix-a-glossary.md#risk-label), and the reason.
+
+A rule replaces only the `enter` on the card. The plan, its digest, the freeze, and every safety proof are the same on both paths. The card's contents are not lost either: the process inventory, the scope statement, and any outside holder are part of the plan that `kk` prints, and `--json` prints them for a script.
+
+The overlay always takes the human path. A person is using it, so each of its verbs asks for the card, as `--confirm` does. That keeps the rule above: no single keystroke fires a destructive verb, even when a policy rule would allow the plan from the command line.
+
+No surface in this chapter can create, widen, or activate a policy rule. [Authority](../04-authority.md#activating-a-policy) owns activation.
 
 ### Wireframe: spawn card (`n` for new thread, `N` for new-as-child-of-cursored)
 
@@ -624,7 +651,7 @@ A background job started from the shell pane is therefore part of the close plan
 The shell pane runs the user's shell process at the user's UID (the user's own account). Kiki puts context identifiers in its environment and no credential.
 
 - When the user invokes `kk`, context resolution names the thread, and the CLI loads only that thread's credential.
-- Consequential operations enter the foreground one-shot approval flow. There, the `kk` process the user ran acts as the presenter in that pane.
+- Consequential operations enter the one-shot approval flow. When a person approves, the `kk` process the user ran acts as the presenter in that pane.
 - The CLI never auto-loads reusable Admin authority.
 - The pane's environment never supplies the presenter credential.
 
@@ -658,7 +685,7 @@ Toast triggers (v1):
 - cascade conflict on a non-current thread (`✗`): notification
 - cascade materialized for a child thread (`──`, only when ≥ 2 child reconciliations [coalesce](../appendix-a-glossary.md#coalescing)): notification
 - config-set warning that won't take effect until next `kk new` / `kk reopen`: notification
-- close proposed after a PR merge (`✓`), with a `review` action that opens the close plan's approval card (v1.x, with the GitHub integration, see [Publishing](../07-publishing.md)): actionable. Kiki never closes a thread by itself, and there is no undo grace: nothing happens until the human approves the card.
+- close proposed after a PR merge (`✓`), with a `review` action that opens the close plan's approval card (v1.x, with the GitHub integration, see [Publishing](../07-publishing.md)): actionable. Kiki never closes a thread by itself, and there is no undo grace: nothing happens until someone runs the close and it is approved. The toast's action is the human path to that.
 
 Overlay toasts are drawn only by the overlay. The UI pane hosts none, and kiki draws nothing over the live agent pane.
 
@@ -667,7 +694,7 @@ Overlay toasts are drawn only by the overlay. The UI pane hosts none, and kiki d
 When no overlay is open, [attention events](../appendix-a-glossary.md#attention-event) travel on two channels:
 
 - **The Herdr sidebar.** The thread's tokens change, so the entry shows the new glyph and word. This is passive: it needs a client to be attached, with the sidebar shown, and someone looking.
-- **The configured notification transport**, `[notifications] os_provider` (`auto | notify-rust | osascript | herdr | off` (see [Configuration](../11-configuration.md) and [Observability](../12-observability.md)).
+- **The configured notification transport**, `[notifications] os_provider` (`auto | notify-rust | osascript | herdr | command | off`; see [Configuration](../11-configuration.md#notification-keys) and [Observability](../12-observability.md)). The `command` value runs a program of the user's for each `loud` event. It is the transport for a host with no desktop and no attached client.
 
 Whether an event uses each channel depends on its level (`loud | soft | silent`). Configuration owns the table of event keys, default levels, and what each level does on each surface. [Orientation](../01-orientation.md) lists which attention events the acceptance slice raises.
 
@@ -682,7 +709,7 @@ A Herdr toast is global and best-effort:
 
 That is acceptable because kiki's attention events are not caller-scoped. A cascade conflict or a blocked agent concerns the thread, not whoever ran a command. Nothing that must reach one specific person travels by Herdr toast.
 
-A Herdr toast or an OS notification carries the same one-line summary as an overlay toast, with its glyph and words. It carries no action, intercepts no key, and never displays or confirms an approval. Actionable toasts exist only in the overlay. Outside it, the notification names the event and the user acts through `kk`.
+A Herdr toast or an OS notification carries the same one-line summary as an overlay toast, with its glyph and words. (The `command` provider passes the event as JSON instead.) None of them carries an action, intercepts a key, or displays or confirms an approval. Actionable toasts exist only in the overlay. Outside it, the notification names the event and the user acts through `kk`.
 
 ### Wireframe: conflicted-thread toast in overlay
 
@@ -721,6 +748,8 @@ A form does not perform the operation. It starts an approval, in these steps:
 2. The approval card must display the daemon-returned canonical plan and digest byte-for-byte.
 3. Only an enrolled foreground presenter may call `ConfirmApproval`.
 4. After that, the overlay retries the exact operation with the resulting approval id.
+
+The overlay asks for the human path every time, so a policy rule never skips steps 2 and 3 here. The same operation run as a `kk` command can be approved by a rule with no form at all (see [Approval without a card](#approval-without-a-card)).
 
 A changed plan dismisses the stale card and starts again. The card surface stays inside the overlay process, but authority remains in the daemon challenge and one-use capability. See [human approval](../appendix-a-glossary.md#human-approval).
 

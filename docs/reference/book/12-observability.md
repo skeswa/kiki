@@ -4,9 +4,9 @@ Observability means how you find out what kiki is doing and what it needs from y
 
 kiki should make important state visible without turning every event into an interruption. The system has four observability surfaces:
 
-- command output, for explicit inspection;
+- command output, for explicit inspection. Every read command can print JSON for a script, and `kk events` prints changes as they happen (see [Observing a headless host](#observing-a-headless-host));
 - durable lifecycle, cascade, and audit state, for diagnosis;
-- notifications, OS-native or Herdr [toasts](appendix-a-glossary.md#toast), for [acceptance-slice](appendix-a-glossary.md#acceptance-slice) events that need attention;
+- notifications for [acceptance-slice](appendix-a-glossary.md#acceptance-slice) events that need attention: OS-native, Herdr [toasts](appendix-a-glossary.md#toast), or a program you configure;
 - the Herdr sidebar, where each thread's [terminal group](appendix-a-glossary.md#terminal-group) appears under the label kiki publishes.
 
 Some terms used here:
@@ -20,6 +20,8 @@ Some terms used here:
 
 The Herdr sidebar, the deferred [overlay](appendix-a-glossary.md#overlay-tui), and the optional [`ui` pane](appendix-a-glossary.md#ui-role-pane) all project the same durable state. They never become new authorities, meaning new sources of truth.
 
+None of those three views is required. kiki runs [headless](appendix-a-glossary.md#headless): with no Herdr client attached, no overlay, and no desktop session. Anything a view shows is also available from a command. [Observing a headless host](#observing-a-headless-host) says how.
+
 Audit logs are separate. They answer what happened and who invoked it. Notifications answer what needs the human right now.
 
 ## Attention events
@@ -30,21 +32,21 @@ The scope ledger in [Orientation](01-orientation.md) decides which events are in
 
 The default notification vocabulary is:
 
-| Event                                            | Tier             | Default level | What kiki does                                                                                              |
-| ------------------------------------------------ | ---------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
-| Agent hit a permission prompt                    | acceptance slice | `loud`        | Notification; mark the agent `blocked` until acknowledged. Needs the adapter proof described below          |
-| Agent crashed                                    | acceptance slice | `loud`        | Notification; mark the agent `blocked`. `kk repair` offers `restart-agent`                                  |
-| Cascade reconciliation exposed textual conflicts | acceptance slice | `loud`        | Notification; mark the cascade `conflicted`                                                                 |
-| Lifecycle operation failed                       | acceptance slice | `loud`        | Notification; the thread shows its failed state (`CreateFailed`, `CloseFailed`, a failed reopen or restart) |
-| Projection issue opened                          | acceptance slice | `loud`        | Notification; the thread shows `ProjectionDiverged` with the reason, and points to `kk repair`              |
-| Delivery attempts exhausted                      | acceptance slice | `loud`        | Notification; the agent stays hard-paused until `retry-delivery` or `discard-delivery`                      |
-| Follows parent abandoned                         | acceptance slice | `loud`        | Notification and warning; the child shows topology divergence, and a human lifecycle decision is required   |
-| Agent reports goal complete                      | acceptance slice | `soft`        | Status mark (`finished`), plus an overlay toast once the overlay ships                                      |
-| Follows parent merged                            | v1.x             | `loud`        | Notification once remote merge observation ships; warning if reconciliation or detach fails                 |
-| PR check failed                                  | v1.x             | `loud`        | Notification and warning once GitHub polling ships                                                          |
-| External branch force-push detected              | v1.x             | `loud`        | Warning; explicit reconciliation required once remote observation ships                                     |
-| Agent silent beyond the silence threshold        | v1.x             | `silent`      | Dim status only; never `blocked`. The threshold is a deferred `[notifications]` key                         |
-| Auto-rename or auto-describe write completed     | v1.x             | `silent`      | No notification; visible in audit once metadata execution ships                                             |
+| Event                                            | Tier             | Default level | What kiki does                                                                                                |
+| ------------------------------------------------ | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------- |
+| Agent hit a permission prompt                    | acceptance slice | `loud`        | Notification; mark the agent `blocked` until acknowledged. Needs the adapter proof described below            |
+| Agent crashed                                    | acceptance slice | `loud`        | Notification; mark the agent `blocked`. `kk repair` offers `restart-agent`                                    |
+| Cascade reconciliation exposed textual conflicts | acceptance slice | `loud`        | Notification; mark the cascade `conflicted`                                                                   |
+| Lifecycle operation failed                       | acceptance slice | `loud`        | Notification; the thread shows its failed state (`CreateFailed`, `CloseFailed`, a failed reopen or restart)   |
+| Projection issue opened                          | acceptance slice | `loud`        | Notification; the thread shows `ProjectionDiverged` with the reason, and points to `kk repair`                |
+| Delivery attempts exhausted                      | acceptance slice | `loud`        | Notification; the agent stays hard-paused until `retry-delivery` or `discard-delivery`                        |
+| Follows parent abandoned                         | acceptance slice | `loud`        | Notification and warning; the child shows topology divergence, and an explicit lifecycle decision is required |
+| Agent reports goal complete                      | acceptance slice | `soft`        | Status mark (`finished`), plus an overlay toast once the overlay ships                                        |
+| Follows parent merged                            | v1.x             | `loud`        | Notification once remote merge observation ships; warning if reconciliation or detach fails                   |
+| PR check failed                                  | v1.x             | `loud`        | Notification and warning once GitHub polling ships                                                            |
+| External branch force-push detected              | v1.x             | `loud`        | Warning; explicit reconciliation required once remote observation ships                                       |
+| Agent silent beyond the silence threshold        | v1.x             | `silent`      | Dim status only; never `blocked`. The threshold is a deferred `[notifications]` key                           |
+| Auto-rename or auto-describe write completed     | v1.x             | `silent`      | No notification; visible in audit once metadata execution ships                                               |
 
 In the table, a "follows parent" is the thread that another thread [follows](appendix-a-glossary.md#follows) (tracks). A PR is a GitHub [pull request](https://docs.github.com/en/pull-requests).
 
@@ -69,11 +71,20 @@ Kiki cannot see a permission prompt by looking at the terminal. It learns of one
 
 See [Harness adapter](13-architecture/harness-adapter.md#capabilities).
 
+### Permission prompts when no human is present
+
+A permission prompt is the harness's own question, such as "may I run this command?". It is not a kiki approval, and the two never mix.
+
+- Kiki never answers a harness's permission prompt. No kiki setting, approval, or [automation policy](appendix-a-glossary.md#automation-policy) rule answers one. The policy approves kiki's own operations only.
+- On a host with no human, the operator decides ahead of time what the agent may do. They do that in the harness's own permission settings, so that the agent does not stop to ask.
+- If a prompt appears anyway, the agent waits. The "permission prompt" event still fires, the agent shows `blocked`, and the event appears in `kk events`. With the [`command` provider](#choosing-a-provider) set, the operator's program is told too.
+- A person can answer later. They connect to the host over SSH, run `kk attach`, and answer the prompt in the agent's pane.
+
 ## Notification transport
 
 The transport is the channel kiki uses to put a notification in front of you.
 
-In the [acceptance slice](appendix-a-glossary.md#acceptance-slice), the attention channel is an OS-native notification or a Herdr toast. (Herdr is the terminal multiplexer that hosts kiki's terminal groups; see [Terminal runtime](13-architecture/terminal-runtime.md).)
+In the [acceptance slice](appendix-a-glossary.md#acceptance-slice), the attention channel is an OS-native notification or a Herdr toast. (Herdr is the terminal multiplexer that hosts kiki's terminal groups; see [Terminal runtime](13-architecture/terminal-runtime.md).) Stage 2 of the [build sequence](15-build-sequencing.md) adds a third channel for hosts with no desktop: a program that kiki runs for each event.
 
 Once UI surfaces ship, kiki's own transient [toasts](appendix-a-glossary.md#toast) render in the overlay only (see [Interface](10-interface/spec.md)). The Herdr sidebar and the optional `ui` pane stay passive state renderers:
 
@@ -88,11 +99,21 @@ The cross-platform default is the `notify-rust` crate, a [Rust](https://www.rust
 
 The transport is configurable under `[notifications]`:
 
-- `os_provider`: `auto | notify-rust | osascript | herdr | off` (default `auto`).
-- `auto` resolves to `notify-rust` on Linux and to `osascript` on macOS. It never resolves to `herdr`.
+- `os_provider`: `auto | notify-rust | osascript | herdr | command | off` (default `auto`).
+- `auto` depends on whether the host has a desktop session: a logged-in graphical session where the operating system can draw a notification.
+  - With a desktop session, it resolves to `notify-rust` on Linux and to `osascript` on macOS.
+  - With no desktop session, it resolves to `command` when `[notifications] command` is set, and to `off` otherwise.
+  - It never resolves to `herdr`.
 - `herdr` shows the notification as a toast in Herdr, through the [dedicated server](appendix-a-glossary.md#dedicated-herdr-server) (the one Herdr server kiki runs for itself).
   - It is useful when the user's attention lives inside the kiki Herdr server.
   - Herdr's toasts are off by default; kiki's generated Herdr configuration turns them on.
+- `command` runs a program you name in `[notifications] command`, once for each `loud` event.
+  - `kkd` writes the event to the program's standard input as JSON.
+  - `kkd` gives the program a short time to finish and never retries. A failed run loses that one notification and nothing else: the durable state and `kk events` still carry the event.
+  - It is the provider for a host with no desktop. The program can post to a chat channel, page someone, or write to a log collector.
+  - Only the user config file can set the program, because the key makes `kkd` run it.
+  - A run of the program is not a record and not an action, in the same way a Herdr toast is not.
+  - [Configuration](11-configuration.md#the-command-provider) owns the key and its exact rules.
 - `off` disables notifications through this transport entirely. A currently open overlay may still render its toast after that surface ships.
 
 ### Limits of the `herdr` provider
@@ -123,6 +144,39 @@ Per-event behavior (`loud | soft | silent`) is independent of transport. It is c
 - `silent` sets the status mark only.
 
 The status mark is durable state, so no level turns it off. See [Configuration](11-configuration.md#notification-keys) for the full table.
+
+## Observing a headless host
+
+A headless host is a machine where kiki runs with no UI attached, and often with no person present. A build server and a cloud machine reached only over SSH are examples. There is no sidebar to glance at and no desktop to show a notification. Everything kiki knows is still reachable from the command line.
+
+[Commands](09-commands.md) owns each command named here. This section says what each one is for.
+
+- **Read state with `--json`.** Every read command takes `--json`: `kk ls`, `kk status`, `kk log`, `kk thread audit`, `kk automation status`, and the rest. Every other command takes it for its final result, for example `kk new`, `kk close`, and `kk repair`. The flag changes only how the output is drawn. It never changes what the command does. See [Output for scripts](09-commands.md#output-for-scripts).
+- **Follow changes with [`kk events`](09-commands.md#kk-events).** It prints the daemon's event stream: state changes, [attention events](appendix-a-glossary.md#attention-event), and cascade progress.
+  - `--thread <t>` follows one thread. Without it, the command follows the whole repo.
+  - `--follow` keeps the stream open.
+  - `--since <seq>` starts after an event the script already saw, so a script that reconnects misses nothing.
+  - `--json` prints one JSON object per event.
+- **Block until something happens with [`kk wait`](09-commands.md#kk-wait).** `kk wait [<thread>] --for <state>` returns when the thread reaches the named state: `quiescent`, `goal-complete`, `blocked`, `conflicted`, `closed`, or `issue`. `--timeout <dur>` sets how long to wait. `kk wait` ships in Stage 2 of the [build sequence](15-build-sequencing.md); the other commands here are Stage 1.
+- **Branch on the exit code.** Every `kk` command ends with one of a small, fixed set of [exit codes](09-commands.md#exit-codes), so a script can tell what happened without reading text:
+
+  | Code | Meaning                                       |
+  | ---- | --------------------------------------------- |
+  | `0`  | success                                       |
+  | `1`  | the operation failed                          |
+  | `2`  | usage error                                   |
+  | `3`  | an approval was needed and none was available |
+  | `4`  | refused by a precondition or a safety proof   |
+  | `5`  | the daemon is unreachable or not installed    |
+  | `6`  | timeout                                       |
+
+  Code `3` is the one a headless operator meets first. It means no person was there to confirm and no activated [automation policy](appendix-a-glossary.md#automation-policy) rule allowed the plan. The message names the operation, the plan's [risk labels](appendix-a-glossary.md#risk-label), and the reason.
+
+- **Get told with the `command` provider.** A `loud` attention event can run a program of yours. See [Choosing a provider](#choosing-a-provider).
+
+`kk` never asks a question when it has no terminal. Where it would have prompted, it fails and names the flag that answers the question.
+
+A typical script puts these together: `kk new` with a prompt, then `kk wait --for goal-complete`, then `kk status --json` to read the result, then `kk close`. The approvals in that script come from the activated policy; see [Configuration · Automation keys](11-configuration.md#automation-keys).
 
 ## Herdr sidebar projection
 
@@ -181,13 +235,13 @@ In the acceptance slice, when a parent thread's head advances, kiki creates a [`
 
 Once GitHub polling ships, a merged parent creates the same shape of intent, targeting the exact merged default-branch commit. Local reconciliation may complete at the safe boundary.
 
-Remote force-push and PR-base mutation, however, remain a named pending plan. They wait until the human separately confirms them through the two-phase [foreground approval flow](09-commands.md#foreground-approval-flow). The child detaches only after the approved remote updates succeed.
+Remote force-push and PR-base mutation, however, remain a named pending plan. They wait for a separate one-shot approval of that exact plan. A human gives it through the two-phase [foreground approval flow](09-commands.md#foreground-approval-flow). An activated [automation policy](04-authority.md#automation-policy) rule that covers the plan can give it in the human's place. The child detaches only after the approved remote updates succeed.
 
 ### The parent's bookmark or revisions go away
 
 Deleting or moving only a parent's checkpoint [bookmark](appendix-a-glossary.md#bookmark) creates a projection-repair condition. It does not change the pinned [follows edge](appendix-a-glossary.md#follows-edge): the recorded parent-child link.
 
-If the parent's live head or owned revisions are abandoned, kiki surfaces topology divergence and waits for a human decision. It does not guess a new head or parent.
+If the parent's live head or owned revisions are abandoned, kiki surfaces topology divergence and waits for an explicit decision. A person makes it, or an operator's script does through the same commands. It does not guess a new head or parent.
 
 ## Audit
 
@@ -203,11 +257,23 @@ kiki inserts every parseable daemon transport attempt into exactly one authorita
 - compact argument summary;
 - outcome.
 
+An approval that came from the automation policy is marked as such. A [`PolicyApproval`](appendix-a-glossary.md#policy-approval) is the approval `kkd` issues when an activated policy rule allows a plan, in place of a human's confirmation. Each one writes an audit row that also records:
+
+- the name of the rule that allowed the plan;
+- the digest of the active policy;
+- the principal: who asked, as the policy saw them;
+- the operation;
+- the plan's [risk labels](appendix-a-glossary.md#risk-label).
+
+So an audit reader can always tell a human's approval from a rule's, and can tell which rule and which version of the policy it was. [Authority](04-authority.md#policyapproval) owns the capability.
+
 ### Which table a row goes to
 
 Once a valid target repo is resolved, the authoritative row belongs to that repo database's `audit_log`. Some requests belong to the per-user database's `user_audit_log` instead:
 
 - bootstrap and approval-presenter enrollment;
+- automation policy activation (`kk automation apply`) and revoke;
+- automation credential create, rotate, and revoke;
 - registry-wide calls;
 - registration before a repo exists;
 - unknown-repo targets;
@@ -220,7 +286,7 @@ kiki represents an unidentified caller with null credential/approval ids and a s
 The table is [append-only](https://en.wikipedia.org/wiki/Append-only) through the daemon API: rows can be added but not changed. Even so, kiki does not claim it is tamper-proof against a process running as the same user (same [UID](https://en.wikipedia.org/wiki/User_identifier)).
 
 - Reading a thread's own non-sensitive slice uses thread-scoped authority.
-- Repo-wide, cross-thread, or detailed-argument reads require method-bound one-shot [human approval](appendix-a-glossary.md#human-approval).
+- Repo-wide, cross-thread, or detailed-argument reads require a method-bound one-shot approval: a [human approval](appendix-a-glossary.md#human-approval), or a `PolicyApproval` from an activated rule that lists the `audit-log` or `sensitive-read` operation.
 
 Audit entries are operational records, not transcript entries. A future export command may produce [JSONL](https://jsonlines.org/), but an exported file is never a second authority.
 

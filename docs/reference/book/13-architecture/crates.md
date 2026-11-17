@@ -4,6 +4,8 @@ kiki is a [Cargo workspace](https://doc.rust-lang.org/cargo/reference/workspaces
 
 The [gRPC](https://grpc.io/) service separates privileged operations from clients. [`kkd`](../appendix-a-glossary.md#kkd) is the only privileged process, and every UI uses the same protocol.
 
+kiki is [headless](../appendix-a-glossary.md#headless): the `kk` CLI and the gRPC service are the complete surface. The TUI and the `ui` pane are views built on that surface. A script uses the same `kk` binary, with `--json` output and an [automation credential](../appendix-a-glossary.md#automation-credential).
+
 | Crate       | Kind    | Responsibility                                                                                                                                                                                                                                                         |
 | ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `kiki-core` | library | Shared types, traits, generated proto types, the sqlite migration SQL, and a migration runner that works on a connection passed in. It opens no file, socket, or process itself.                                                                                       |
@@ -39,7 +41,11 @@ Some terms from the table:
 - **The `kk status` passthrough.** When a human runs `kk status`, `kk` runs `jj` itself in the caller's terminal and passes its output through. An agent or `kkd` never takes this path.
 - **The pane launcher.** It spawns the harness, or replaces itself with the user's shell or the kiki UI process. It also reads the thread's credential file. It runs only what `kkd` computed.
 
+**Credential files that `kk` is told to read.** `kk` reads an automation credential only from the file named by `KIKI_AUTOMATION_CREDENTIAL_FILE` or `--automation-credential-file`. It reads the Admin bootstrap credential only from the file named by `--admin-credential-file`, on the few commands that take that flag. It presents what it read to `kkd` and keeps nothing. See [Commands](../09-commands.md#kk-automation).
+
 **`kk` and `kk-hook`** are both clients of the same gRPC contract. There is no privileged internal API.
+
+`kk` never prompts when it has no terminal. Every question it can ask has a flag or argument that answers it. Without that flag it fails and names the flag. The `--json` form of a command prints the same reply message as [JSON](https://en.wikipedia.org/wiki/JSON), so it changes rendering only.
 
 `kk` also talks to the dedicated [Herdr](https://github.com/herdrdev/herdr) server as a viewer:
 
@@ -133,7 +139,10 @@ The components:
 - **`AuthEnforcer` + approval broker** check who may do what.
   - `ThreadScoped` checks cover ordinary work.
   - Consequential operations use persisted begin/display/confirm challenges and a one-shot plan-bound `HumanApproval`. (See [human approval](../appendix-a-glossary.md#human-approval).)
-  - Admin is used only for bootstrap, for foreground-presenter enrollment, and to begin the approvals for `kk init` and first run. It also diagnoses and begins the approval of the user-scoped `replace-terminal-server` plan.
+  - Inside `BeginApproval`, the broker asks `PolicyEvaluator` whether the active [automation policy](../appendix-a-glossary.md#automation-policy) allows the plan. If it does, the broker issues a [`PolicyApproval`](../appendix-a-glossary.md#policy-approval), which satisfies the same requirement as a `HumanApproval` for that plan. See [Authority](../04-authority.md#policyapproval).
+  - The broker works out the caller's principal and passes it in. The preflight computes the plan's [risk labels](../appendix-a-glossary.md#risk-label).
+  - `AutomationStore` keeps the activated policy and the automation credentials. `AuthEnforcer` checks an `AutomationScoped<name>` caller against it.
+  - Admin is used only for bootstrap, for foreground-presenter enrollment, and to begin the approvals for `kk init` and first run. It also diagnoses and begins the approval of the user-scoped `replace-terminal-server` plan. A caller that presents an automation credential begins `kk init` and that plan with the automation credential instead. And Admin can activate a policy and create or rotate an automation credential, which is how a machine with no human is set up.
 - **`ThreadTranscriptStore`** (v1.x) covers the JSONL tail, projection, FTS5 read API, and [provider-egress consent](../appendix-a-glossary.md#provider-egress-consent) state. ([JSONL](https://jsonlines.org/) is one JSON record per line. [FTS5](https://www.sqlite.org/fts5.html) is SQLite's full-text search.)
 - **`JjBackend`** is how `kkd` talks to jj. It is the one module that runs `jj` for `kkd`.
   - The v1 `JjCli` implementation shells out to `jj` and parses structured template output.
@@ -144,19 +153,22 @@ The components:
 
 Tests and build stages name these modules. Each has one home crate.
 
-| Module                                                       | Home crate                                     | What it is                                                                                                                                                                                                                              |
-| ------------------------------------------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AncestryQuery`                                              | `kkd`                                          | Answers ancestry questions about commits at one exact operation, such as owned-chain membership.                                                                                                                                        |
-| `OpAttribution`                                              | `kkd`                                          | Records and looks up the jj operations that kiki itself wrote.                                                                                                                                                                          |
-| `OpFrontierSampler`                                          | trait in `kiki-core`; real adapter in `kkd`    | Reads the current operation heads from jj's operation store.                                                                                                                                                                            |
-| `ThreadLifecycleSaga`                                        | `kkd`                                          | Runs one journaled lifecycle operation for a thread.                                                                                                                                                                                    |
-| `JjBackend`                                                  | trait in `kiki-core`; `JjCli` adapter in `kkd` | The only path by which `kkd` runs `jj`.                                                                                                                                                                                                 |
-| `PaneLifecycle`                                              | `kkd`                                          | Tracks the `shell` and `ui` [role panes](../appendix-a-glossary.md#role-pane): claim, absence, and the end of the claiming process (v1.x).                                                                                              |
-| `UiPaneController`                                           | `kk`                                           | Drives the Stack tree shown in the optional [`ui` role pane](../appendix-a-glossary.md#ui-role-pane) (v1.x).                                                                                                                            |
-| [`LogRenderer`](../appendix-a-glossary.md#logrenderer)       | `kiki-core`                                    | Turns thread summaries into the stack-aware `kk log` view. Pure: data in, text out.                                                                                                                                                     |
-| [`StatusRenderer`](../appendix-a-glossary.md#statusrenderer) | `kiki-core`                                    | Turns thread state into the `kk status` and status-line text. Pure: data in, text out.                                                                                                                                                  |
-| `RunningAgent`                                               | `kkd`                                          | The handle to one live harness incarnation. It is not a `kiki-core` type, because it needs the database and `ProcessSupervisor`.                                                                                                        |
-| `Harness`                                                    | trait in `kiki-core`; adapters in `kkd`        | Describes one harness. Besides the launch specification, it maps harness events to turn and batch identity, audits hook exclusivity, looks up delivery receipts, and supplies status inputs. See [Harness adapter](harness-adapter.md). |
+| Module                                                       | Home crate                                     | What it is                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AncestryQuery`                                              | `kkd`                                          | Answers ancestry questions about commits at one exact operation, such as owned-chain membership.                                                                                                                                                 |
+| `OpAttribution`                                              | `kkd`                                          | Records and looks up the jj operations that kiki itself wrote.                                                                                                                                                                                   |
+| `OpFrontierSampler`                                          | trait in `kiki-core`; real adapter in `kkd`    | Reads the current operation heads from jj's operation store.                                                                                                                                                                                     |
+| `ThreadLifecycleSaga`                                        | `kkd`                                          | Runs one journaled lifecycle operation for a thread.                                                                                                                                                                                             |
+| `JjBackend`                                                  | trait in `kiki-core`; `JjCli` adapter in `kkd` | The only path by which `kkd` runs `jj`.                                                                                                                                                                                                          |
+| `PaneLifecycle`                                              | `kkd`                                          | Tracks the `shell` and `ui` [role panes](../appendix-a-glossary.md#role-pane): claim, absence, and the end of the claiming process (v1.x).                                                                                                       |
+| `UiPaneController`                                           | `kk`                                           | Drives the Stack tree shown in the optional [`ui` role pane](../appendix-a-glossary.md#ui-role-pane) (v1.x).                                                                                                                                     |
+| [`LogRenderer`](../appendix-a-glossary.md#logrenderer)       | `kiki-core`                                    | Turns thread summaries into the stack-aware `kk log` view. Pure: data in, text out.                                                                                                                                                              |
+| [`StatusRenderer`](../appendix-a-glossary.md#statusrenderer) | `kiki-core`                                    | Turns thread state into the `kk status` and status-line text. Pure: data in, text out.                                                                                                                                                           |
+| `RunningAgent`                                               | `kkd`                                          | The handle to one live harness incarnation. It is not a `kiki-core` type, because it needs the database and `ProcessSupervisor`.                                                                                                                 |
+| `PolicyEvaluator`                                            | `kiki-core`                                    | Decides whether a canonical automation policy allows one request. It also canonicalizes the `[automation]` tables and computes the policy digest. Pure: a policy and a request in, a `PolicyDecision` out. It opens no file and no database.     |
+| `RiskLabel`                                                  | `kiki-core`                                    | The closed set of risk labels that [Authority](../04-authority.md#risk-labels) owns. A shared type, so the evaluator, the plan renderers, and the proto agree on it.                                                                             |
+| `AutomationStore`                                            | `kkd`                                          | Stores activated policies and automation credential hashes in the user database, writes each credential file, and loads the active policy for the evaluator. The Automation gRPC methods call it. See [Daemon](daemon.md#the-automation-policy). |
+| `Harness`                                                    | trait in `kiki-core`; adapters in `kkd`        | Describes one harness. Besides the launch specification, it maps harness events to turn and batch identity, audits hook exclusivity, looks up delivery receipts, and supplies status inputs. See [Harness adapter](harness-adapter.md).          |
 
 ### Fakes
 
@@ -168,6 +180,8 @@ Each trait below has an in-process fake as its second adapter. A [fake](../appen
 - `Harness`
 
 [Testing](../14-testing.md#fakes) lists what each fake must be able to do.
+
+`PolicyEvaluator` needs no fake. It is pure logic, so tests call it directly.
 
 This split has two benefits:
 
@@ -188,6 +202,7 @@ This split has two benefits:
 - `rusqlite` (or `sqlx` with the sqlite feature) for state.
 - `ratatui` for the custom UI only. ([ratatui](https://ratatui.rs/) is a Rust library for drawing terminal screens.)
   - The custom UI is approval cards, the v1.x [overlay TUI](../appendix-a-glossary.md#overlay-tui) (opened as a Herdr popup or pane), and the optional v1.x [`ui` role pane](../appendix-a-glossary.md#ui-role-pane).
+  - Each of these is a view. No command needs one of them to be open.
   - Panes, splits, tabs, scrollback, and the thread sidebar are Herdr's and are not reimplemented.
 - `clap` for CLI parsing (reading command-line arguments).
 

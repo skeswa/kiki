@@ -8,8 +8,11 @@ The `kk` CLI should make common kiki operations obvious. It does not try to repl
 
 - **Inside a thread**, it presents that thread's [`ThreadScoped`](appendix-a-glossary.md#threadscoped-credential) credential, which works only for that thread.
 - **Outside a thread**, summary-only commands use the repo's [`RegistrationScoped`](appendix-a-glossary.md#registrationscoped) credential, issued at `kk init`. That credential authorizes [repo-summary reads](appendix-a-glossary.md#repo-summary-read-scope) and `BeginApproval` for that repo and nothing else.
+- **With an automation credential**, `kk` presents that credential in place of the two above. An [automation credential](appendix-a-glossary.md#automation-credential) is a named secret for scripts and other unattended callers. `kk` uses one only when the caller names it, with `--automation-credential-file <path>` or the `KIKI_AUTOMATION_CREDENTIAL_FILE` environment variable (see [`kk automation`](#kk-automation)).
 
-Riskier operations enter the one-shot [foreground approval flow](#foreground-approval-flow) defined by [Authority](04-authority.md). "One-shot" means each approval is good for exactly one operation. The riskier operations are:
+Kiki is fully [headless](appendix-a-glossary.md#headless): every command in this chapter works with no terminal window attached to kiki's Herdr server, and no command needs the overlay, a popup, or a desktop session. The `kk` CLI and the gRPC service behind it are the complete surface. Whether a command also works with no person present depends on the approval rules below.
+
+Riskier operations enter the one-shot [approval flow](#foreground-approval-flow) defined by [Authority](04-authority.md). "One-shot" means each approval is good for exactly one operation. The approval comes from one of two places: a person who confirms at a foreground terminal, or a rule in the activated [automation policy](appendix-a-glossary.md#automation-policy). The riskier operations are:
 
 - mutating (changing) another thread;
 - destructive actions;
@@ -48,6 +51,7 @@ Each step is a lookup, not a grant. Whatever step resolves the thread, the CLI t
   - `kkd` verifies the active pane's [terminal group](appendix-a-glossary.md#terminal-group) against the current server instance in the same way. A terminal group is the set of terminals that belongs to one thread.
   - The result is a locator for read-only and navigation commands only.
   - A mutation invoked from a popup still needs the thread credential and, where required, approval.
+- **Automation credential.** A caller that presents an [automation credential](appendix-a-glossary.md#automation-credential) is not inside a thread as far as authority goes. Context resolution still locates the thread or repo the command is about, but `kk` loads no thread credential for it.
 - **Authority.** A Herdr id never authorizes anything and never substitutes for a credential. A verified ref only locates the caller's contextual thread. The thread's own credential is what authorizes.
 - **Working directory.** `kk` matches the canonical current [working directory](https://en.wikipedia.org/wiki/Working_directory) against registered [jj workspace](appendix-a-glossary.md#workspace) paths.
 
@@ -55,60 +59,344 @@ If no thread resolves but the command is repo-scoped, the command may fall back 
 
 ## Foreground approval flow
 
-For some risky operations, kiki asks a person at the keyboard to approve each one, right before it runs. That requirement is called [`HumanApproval`](appendix-a-glossary.md#human-approval). This section describes how `kk` collects it.
+For some risky operations, kiki requires a fresh approval of each one, right before it runs. That requirement is called [`HumanApproval`](appendix-a-glossary.md#human-approval). This section describes how `kk` gets it.
 
-Commands never accept a reusable [Admin](appendix-a-glossary.md#bootstrap-admin-credential) credential from a flag. They never accept a raw approval token from a flag either. When an operation requires `HumanApproval`, `kk`:
+There are two ways to satisfy it:
 
-1. runs a non-mutating preflight through `BeginApproval`, using its ordinary thread or registration credential (for `kk init`, first run, and the user-scoped `replace-terminal-server` plan, the user's Admin bootstrap credential, because no thread or registration credential applies);
-2. receives and displays the daemon's canonical view of the request: method, target, consequential arguments, [plan digest](appendix-a-glossary.md#plan-digest), and expiry;
-3. verifies that its stdin/stdout terminal is in the [foreground](<https://en.wikipedia.org/wiki/Job_control_(Unix)>), then confirms or cancels the challenge with its separately enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) credential;
+- **A person confirms.** A person at a foreground terminal reads the plan and says yes. This is the default, and it is the only way when no policy is active.
+- **A policy rule allows it.** [`kkd`](appendix-a-glossary.md#kkd) issues a [`PolicyApproval`](appendix-a-glossary.md#policy-approval) when a rule in the activated [automation policy](appendix-a-glossary.md#automation-policy) allows the exact plan. Wherever this book says an operation needs a `HumanApproval`, a `PolicyApproval` for the same plan satisfies it (see [Authority](04-authority.md#policyapproval)). The few exceptions are listed under [What a policy can never approve](#what-a-policy-can-never-approve).
+
+This chapter says "one-shot approval" when either kind will do. The policy is checked first. A person is asked only when the policy does not allow the plan.
+
+### The steps
+
+When an operation requires a one-shot approval, `kk`:
+
+1. runs a non-mutating preflight through `BeginApproval`, using the credential it already holds: a thread credential, a registration credential, or an automation credential. Two cases have no thread or registration credential to use: `kk init`, and the user-scoped `replace-terminal-server` plan. For those, `kk` uses the automation credential when the caller presents one, and otherwise the user's [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential);
+2. receives and displays the daemon's canonical view of the request: method, target, consequential arguments, [risk labels](appendix-a-glossary.md#risk-label), [plan digest](appendix-a-glossary.md#plan-digest), and expiry. The same reply carries the daemon's `PolicyDecision` for this plan;
+3. gets the approval by the [policy path](#the-policy-path) or the [human path](#the-human-path), as the decision says;
 4. retries the exact operation with the issued approval id. The daemon claims that id into one durable operation journal before any external effects happen.
 
-A preflight is a check that runs first and changes nothing. A plan digest is a [fingerprint](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the exact plan, so a changed plan no longer matches.
+A preflight is a check that runs first and changes nothing. A plan digest is a [fingerprint](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the exact plan, so a changed plan no longer matches. A risk label is a short fixed name for one dangerous thing a plan does, such as `live-processes` for a plan that ends running processes. `kkd` works out the labels in preflight. [Authority](04-authority.md#risk-labels) owns the full list.
+
+### The policy path
+
+`kkd` compares the plan with the activated policy. It looks at four things: who is calling (the principal), the repo, the operation, and the plan's risk labels. A rule that allows matches only when it accepts every label on the plan. A rule that requires a human ignores the labels. The `PolicyDecision` is one of three values:
+
+- **`Allowed{rule}`.** A rule allows this plan. `kkd` issues a `PolicyApproval` in the same reply. `kk` prints the plan and the line "approved by rule `<name>`", then goes to step 4. It asks nothing.
+- **`RequireHuman{rule}`.** A rule says a person must confirm this plan. Such a rule matches whatever risk labels the plan has, and it wins over any rule that allows the plan.
+- **`NoMatch`.** No rule covers this plan. An empty or missing policy always gives this answer.
+
+`--confirm` forces the human path even when a rule allows the plan. Every command that can need an approval accepts it.
+
+A `PolicyApproval` is bound to the same things as a `HumanApproval`: the caller's credential, the method, the target repo and thread, and the plan digest. It expires quickly and works once. Each one writes an audit row with the rule name, the policy digest, the principal, the operation, and the risk labels.
+
+### The human path
+
+On `RequireHuman` or `NoMatch`, `kk` needs a person:
+
+1. `kk` verifies that its stdin/stdout terminal is in the [foreground](<https://en.wikipedia.org/wiki/Job_control_(Unix)>).
+2. The person confirms or cancels the challenge. `kk` sends the answer with its separately enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) credential.
+
+`ConfirmApproval` is refused when the presenter process is a descendant or [session](https://en.wikipedia.org/wiki/Process_group) member of any recorded `agent`-role launcher. So a `kk` started by an agent cannot confirm. An agent gets approvals only from a policy rule whose principal is `thread:self`, `thread:descendant`, or `thread:any`. This is approval hygiene under the cooperative model, not a security boundary.
+
+### When no approval is available
+
+Without a foreground terminal, `kk` never prompts. On `RequireHuman` or `NoMatch` it stops with [exit code](#exit-codes) 3 and changes nothing. The message names:
+
+- the operation;
+- the plan's risk labels;
+- the reason: no rule matched, or rule `<name>` requires a human.
+
+An automation credential never confirms a human challenge. It is never accepted in place of Admin or the presenter.
+
+### What a policy replaces, and what it does not
+
+A policy replaces one thing: the person's confirmation in step 3. Everything else is the same on both paths:
+
+- the preflight, the canonical plan, and the plan digest;
+- the drift and expiry checks;
+- single use, and the claim into the operation journal;
+- [freeze](appendix-a-glossary.md#freeze), holder scans, the [final proof](appendix-a-glossary.md#final-proof), and [verified exit](appendix-a-glossary.md#verified-exit).
+
+A policy can never make a plan run that a safety proof refuses. A rule that accepts every risk label still gets the same refusal a person would get.
 
 The flow [fails closed](appendix-a-glossary.md#fail-closed): it stops rather than guessing. It stops on any of these:
 
-- plan drift (the plan changed after the human saw it);
+- plan drift (the plan changed after it was approved);
 - expiry;
-- terminal loss;
+- terminal loss on the human path;
 - cancellation;
 - replay (an approval used a second time);
-- a non-interactive process.
+- a process with no foreground terminal and no rule that allows the plan.
 
-`ConfirmApproval` is also refused when the presenter process is a descendant or [session](https://en.wikipedia.org/wiki/Process_group) member of any recorded `agent`-role launcher. So a `kk` started by an agent cannot confirm. This is approval hygiene under the cooperative model, not a security boundary.
+### What a policy can never approve
 
-`--yes`, piped confirmation, environment approval, and reusable approval files do not exist.
+Three kinds of operation never accept a `PolicyApproval`:
 
-Explicit Admin bootstrap is used for three things only: to enroll or recover an approval presenter, to begin the approvals for `kk init` and first run (see [First run](#first-run)), and to diagnose and begin the approval of the user-scoped `replace-terminal-server` plan. Operational methods reject Admin and presenter credentials.
+- activating a policy (`kk automation apply`);
+- creating or rotating an automation credential;
+- enrolling or recovering the approval presenter.
+
+Each of these needs a confirmation from the enrolled presenter or the Admin bootstrap credential. See [`kk automation`](#kk-automation) and [First run](#first-run).
+
+### What does not exist
+
+`--yes`, piped confirmation, environment approval, and reusable approval tokens or files do not exist. Commands never accept a raw approval token from a flag. Unattended approval comes only from the activated policy.
+
+### Admin
+
+Commands do not accept a reusable [Admin](appendix-a-glossary.md#bootstrap-admin-credential) credential from a flag, with three exceptions. These setup commands take `--admin-credential-file <path>`:
+
+- `kk automation apply`;
+- `kk automation credential create` and `kk automation credential rotate`;
+- [`kk daemon install`](#kk-daemon-install), when it changes an installation that already exists.
+
+This is the path for a machine with no human. Admin is still never loaded automatically and never given to agents.
+
+Explicit Admin bootstrap is used for these things only:
+
+- to enroll or recover an approval presenter;
+- to begin the approval for `kk init` when the caller presents no automation credential (see [First run](#first-run));
+- to diagnose and begin the approval of the user-scoped `replace-terminal-server` plan when the caller presents no automation credential;
+- to activate a policy, to create or rotate an automation credential, or to change an existing daemon installation, on a machine with no presenter.
+
+Operational methods reject Admin and presenter credentials.
+
+## Output for scripts
+
+Scripts and other programs drive kiki through the same `kk` commands a person types. Three rules make that work.
+
+### `--json`
+
+Every read command accepts `--json`. So does every other command, for its final result. Examples are `kk ls`, `kk status`, `kk log`, `kk new`, `kk close`, `kk repair` (both diagnose and apply), `kk automation status`, and `kk thread audit`.
+
+- `--json` changes rendering only. It changes no behavior, no authority, and no approval rule.
+- The result is written to [standard output](https://en.wikipedia.org/wiki/Standard_streams) as JSON. A stream, such as `kk events --follow --json`, writes one JSON object per line.
+- A failed command also prints its result as JSON, with the reason. For an approval that was needed and not available, the result names the operation, the risk labels, and the reason. The [exit code](#exit-codes) is the same with and without `--json`.
+
+### Views are not the only source
+
+The overlay, the `ui` pane, and Herdr's sidebar are views. Anything they show is also available from a command with `--json`. No command, lifecycle step, or safety proof needs one of them, an attached Herdr client, or a desktop session.
+
+### No prompt without a flag
+
+Every question `kk` can ask for a choice or a value has a flag or an argument that answers it. Examples:
+
+| Question                                          | Answer                                                  |
+| ------------------------------------------------- | ------------------------------------------------------- |
+| install and start the daemon?                     | run [`kk daemon install`](#kk-daemon-install)           |
+| enroll the approval presenter?                    | `kk init --enroll-presenter` or `--no-enroll-presenter` |
+| which commit should `choose-bookmark-target` use? | `--target <commit>`                                     |
+| which path should `repoint-workspace` record?     | `--path <path>`                                         |
+| which outside holder does a deleting plan accept? | `--accept-holder <pid>`                                 |
+| which plan should `kk repair` apply?              | `--apply <repair-id>`                                   |
+| accept the generated PR text without an editor?   | `kk publish --no-edit` (v1.x)                           |
+
+Without a terminal, `kk` never prompts. When a command cannot go on without an answer, it fails with exit code 2 and names the missing flag. Two rows above have their own outcome: a missing daemon is exit code 5, and `kk init` with no enrollment answer goes on without enrolling a presenter.
+
+Two questions are different, because they are not choices of a value. They are a person's confirmation:
+
+- the confirmation of a one-shot approval;
+- [provider-egress consent](appendix-a-glossary.md#provider-egress-consent).
+
+No flag answers either one. Without a person, only a matching rule in the activated policy does.
+
+## Exit codes
+
+Every `kk` command ends with one of these [exit codes](https://en.wikipedia.org/wiki/Exit_status). This chapter owns the list.
+
+| Code | Meaning                                       |
+| ---- | --------------------------------------------- |
+| `0`  | success                                       |
+| `1`  | the operation failed                          |
+| `2`  | usage error                                   |
+| `3`  | an approval was needed and none was available |
+| `4`  | refused by a precondition or a safety proof   |
+| `5`  | the daemon is unreachable or not installed    |
+| `6`  | timeout                                       |
+
+Notes:
+
+- Code 3 means the plan was valid, and neither a rule nor a person approved it. Nothing was changed. The fix is a policy rule or a person at a terminal.
+- Code 4 means kiki refused before or during the work because a check did not pass. Examples are a working agent at close preflight, a stale repair id, plan drift, and `kk switch` with `NoCallerClient`. No policy rule changes a code 4 into a success.
+- Code 1 is a failure after the work began. The thread's lifecycle state and `kk repair` say what to do next.
+- Code 6 is used by [`kk wait`](#kk-wait) when its `--timeout` runs out.
 
 ## First run
 
-A new machine has no running daemon and no enrolled approval presenter. This section says how each one comes to exist. Nothing here happens silently.
+A new machine has no running daemon, no enrolled approval presenter, and no active automation policy. This section says how each one comes to exist. Nothing here happens silently.
+
+There are two paths. A machine with a person at a terminal follows the first three subsections. A machine with no person follows [A machine with no human](#a-machine-with-no-human).
 
 ### Installing and starting the daemon
 
 The first `kk` command that needs [`kkd`](appendix-a-glossary.md#kkd) finds no daemon to talk to.
 
-- On an interactive terminal, `kk` asks once whether to install and start `kkd`. On a yes, it installs `kkd` under the user's service manager ([launchd](https://en.wikipedia.org/wiki/Launchd) on macOS, a [systemd](https://en.wikipedia.org/wiki/Systemd) user unit on Linux), starts it, and then runs the command that was typed.
-- On a no, or when `kk` is not running on a terminal, the command exits with an error that says the daemon is not installed and how to install it. Nothing is installed.
+- On an interactive terminal, `kk` asks once whether to install and start `kkd`. On a yes, it does what [`kk daemon install`](#kk-daemon-install) does, and then runs the command that was typed.
+- On a no, the command exits with code 5 and says how to install the daemon. Nothing is installed.
+- When `kk` is not running on a terminal, it does not ask. The command exits with code 5 and names `kk daemon install`. Nothing is installed.
+- `kk daemon install` installs and starts `kkd` without asking. It works with or without a terminal.
 - The question is asked once. Later commands find the daemon running, or the service manager starts it.
 
 ### Enrolling the approval presenter
 
-Approvals need an enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter): the local program that shows a plan to a person at the keyboard and collects the answer.
+A person's approval needs an enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter): the local program that shows a plan to a person at the keyboard and collects the answer.
 
-- `kk init` on a terminal enrolls the presenter when none is enrolled. It first shows what is being enrolled, and it enrolls only after the person confirms.
+- `kk init` on a terminal offers to enroll the presenter when none is enrolled. It first shows what is being enrolled, and it enrolls only after the person confirms.
+- `kk init --enroll-presenter` answers that question with yes, and `--no-enroll-presenter` answers it with no. The person still confirms the enrollment itself at the terminal.
 - The enrollment uses the [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential).
-- `kk init --recover-presenter` replaces a lost presenter. It also uses the Admin bootstrap credential, shows what it will replace, and needs a terminal.
-- Without a terminal, no presenter is enrolled, and every command that needs approval fails closed.
+- `kk init --recover-presenter` replaces a lost presenter. It also uses the Admin bootstrap credential, shows what it will replace, and needs a foreground terminal.
+- A presenter is a program a person uses at a terminal. So without a terminal, no presenter is enrolled, and `--enroll-presenter` or `--recover-presenter` is a usage error.
+- A policy rule can never enroll or recover a presenter.
+- A machine can run with no presenter at all. Then every approval comes from the activated policy, and an operation with no matching rule fails closed with exit code 3.
 
 ### Which credential begins the first approvals
 
-An approval is normally begun with a thread credential or a repo's registration credential. During `kk init` and first run, neither exists yet: the registration credential is issued only when the registration completes.
+An approval is normally begun with a thread credential or a repo's registration credential. During `kk init`, neither exists yet: the registration credential is issued only when the registration completes.
 
-- So the approvals for `kk init` and first run are begun under the user's [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential).
-- Admin only begins the challenge. The enrolled presenter still confirms it on a foreground terminal, and the registration still consumes the one-shot approval.
-- Enrolling the presenter and beginning these approvals are the only things `kk init` uses Admin for. Once a repo is registered, its commands use the registration or thread credential.
+- When the caller presents an [automation credential](appendix-a-glossary.md#automation-credential), `kk init` begins its approval with that credential, not with Admin. The policy then needs a rule that allows the `init` operation for that credential.
+- Otherwise the approval for `kk init` is begun under the user's [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential).
+- Admin only begins the challenge. It is not a policy principal, so the enrolled presenter still confirms the challenge on a foreground terminal. The registration still consumes the one-shot approval.
+- Enrolling the presenter and beginning this approval are the only things `kk init` uses Admin for. Once a repo is registered, its commands use the registration, thread, or automation credential.
+
+### A machine with no human
+
+A build server, a container, or a remote host may never have a person at a terminal. Such a machine is set up with four commands and no prompt:
+
+1. `kk daemon install` installs and starts `kkd`. It creates the Admin bootstrap credential and prints the path of the credential file.
+2. `kk automation apply --admin-credential-file <path>` activates the `[automation]` policy written in the user config file.
+3. `kk automation credential create <name> --admin-credential-file <path>` creates an automation credential and prints the path of its file.
+4. `kk init`, run with that automation credential, registers a repo. Every later command uses the automation credential too.
+
+For example:
+
+```sh
+kk daemon install
+kk automation apply --admin-credential-file ~/.config/kiki/admin-cred
+kk automation credential create ci --admin-credential-file ~/.config/kiki/admin-cred
+export KIKI_AUTOMATION_CREDENTIAL_FILE=~/.config/kiki/automation/ci.cred
+kk init
+kk new fix-login -m "Fix the login redirect"
+```
+
+The Admin path in the example stands for whatever path `kk daemon install` printed.
+
+- No presenter needs to be enrolled on such a machine.
+- Every consequential thing the automation credential does goes through the policy. An operation with no matching rule fails closed with exit code 3.
+- The Admin credential file is used for steps 2 and 3 and for later policy or credential changes. The operator keeps it away from agents and scripts that do not need it. Kiki never loads it automatically.
+
+## `kk daemon install`
+
+`kk daemon install` installs [`kkd`](appendix-a-glossary.md#kkd) and starts it. It asks nothing, so it works from a script and without a terminal. It ships in the [acceptance slice](appendix-a-glossary.md#acceptance-slice).
+
+- It installs `kkd` under the user's service manager: [launchd](https://en.wikipedia.org/wiki/Launchd) on macOS, a [systemd](https://en.wikipedia.org/wiki/Systemd) user unit on Linux. Then it starts the daemon.
+- A first install creates the [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential) and prints the path of its file. The file is outside every managed workspace.
+- A first install needs no approval and no credential. No daemon exists yet to give an approval, and the command registers no repo and starts no agent.
+- Running it again is safe. It reports that the daemon is installed and running, prints the same credential path, and creates no second credential.
+- A later run that would change an existing installation, such as replacing the service definition after an upgrade, needs a confirmation at a foreground terminal or `--admin-credential-file <path>`.
+- With `--json`, the result includes the service state and the credential path.
+- It exits with code 0 once the daemon answers. It exits with code 4 when the host has no supported user service manager, and the message names `kkd --foreground`.
+
+### Hosts with no user service manager
+
+Many containers and CI ([continuous integration](https://en.wikipedia.org/wiki/Continuous_integration)) runners have no launchd and no systemd user session. On such a host the operator runs `kkd --foreground` under whatever supervisor the host already uses.
+
+- `kkd --foreground` stays attached to the process that started it and does not register a service.
+- On its first start it creates the Admin bootstrap credential and logs the path of its file. This does what a first `kk daemon install` does on other hosts.
+- It starts the dedicated Herdr server as a detached process in its own [session](https://en.wikipedia.org/wiki/Process_group), so the server does not die with `kkd`.
+
+Two things here are [acceptance gates](appendix-a-glossary.md#acceptance-gate), not established facts:
+
+- **Survival under `kkd --foreground`.** The Herdr server and the agents must outlive a `kkd` crash in this mode, as they must under a service manager. A platform mode that fails this proof is unsupported.
+- **macOS over SSH with no GUI login.** There `kk daemon install` uses launchd's per-user domain, not the GUI domain. That this domain keeps `kkd` and the server running is not yet proven.
+
+## `kk automation`
+
+`kk automation` manages the two things that let kiki work with no person present: the activated [automation policy](appendix-a-glossary.md#automation-policy) and the [automation credentials](appendix-a-glossary.md#automation-credential). It ships in the [acceptance slice](appendix-a-glossary.md#acceptance-slice).
+
+| Command                                  | What it does                                         | What it needs                    |
+| ---------------------------------------- | ---------------------------------------------------- | -------------------------------- |
+| `kk automation apply`                    | activates the policy written in the user config file | presenter confirmation, or Admin |
+| `kk automation status`                   | shows the active policy and whether the file differs | nothing                          |
+| `kk automation revoke`                   | clears the active policy                             | no approval                      |
+| `kk automation credential create <name>` | creates a named automation credential                | presenter confirmation, or Admin |
+| `kk automation credential rotate <name>` | replaces that credential's secret                    | presenter confirmation, or Admin |
+| `kk automation credential revoke <name>` | makes that credential stop working                   | no approval                      |
+| `kk automation credential list`          | lists the credentials                                | nothing                          |
+
+The two revoke commands only remove authority. They need no approval, and any credential of this user may call them: a thread, registration, or automation credential, or Admin. The status and list commands accept the same credentials.
+
+The policy itself is the `[automation]` table in the user config file. [Configuration](11-configuration.md#automation-keys) owns its keys, and [Authority](04-authority.md#automation-policy) owns what a rule means.
+
+### `kk automation apply`
+
+Editing the config file does nothing by itself. A policy takes effect only when it is activated, and `kk automation apply` is the one way to activate it (see [Authority](04-authority.md#activating-a-policy)).
+
+1. `kk` reads the `[automation]` table from the user config file. No other config layer can set it.
+2. `kkd` puts the policy in one canonical form and computes a policy digest, a fingerprint of that exact policy.
+3. The activation is confirmed in one of two ways:
+   - **By a person.** On a foreground terminal, the enrolled `ApprovalPresenter` shows the full canonical policy and a diff against the active one. The person confirms or cancels.
+   - **By Admin.** `--admin-credential-file <path>` presents the Admin bootstrap credential. This is the path for a machine that never has a person.
+4. `kkd` stores the policy as the active one. From then on it evaluates only the stored copy, never the file.
+
+More rules:
+
+- A `PolicyApproval` can never activate a policy. A policy cannot widen itself.
+- Without a foreground terminal and without `--admin-credential-file`, the command exits with code 3 and names that flag.
+- A policy that does not parse, or that names an unknown operation or risk label, is refused with exit code 2. The active policy stays as it was.
+- This step is the reason an agent cannot grant itself authority by editing a config file. As with presenter enrollment, it is hygiene under the cooperative same-user model, not a security boundary.
+
+The policy can be as wide as the user wants, including `principals = ["*"]`, `operations = ["*"]`, and `accept = ["*"]`. That policy hands every approval to any local caller, and the confirmation screen says so.
+
+### `kk automation status`
+
+`kk automation status` shows:
+
+- the active policy, in its canonical form;
+- its digest;
+- who activated it (`Presenter` or `Admin`) and when;
+- whether the `[automation]` table in the file now differs from the active policy.
+
+A file that differs is not an error. It means the edit has not been applied, and the old policy is still the one in force. `kk doctor` reports the same difference when it ships.
+
+### `kk automation revoke`
+
+`kk automation revoke` clears the active policy. After it, no rule matches, and every approval needs a person again.
+
+It only removes authority, so it needs no approval. The file is not changed. A later `kk automation apply` activates the file's policy again, with a fresh confirmation.
+
+A revoke stops new approvals. A `PolicyApproval` that `kkd` already issued stays valid until its short expiry. Revoking the credential it is bound to is different: that approval can then no longer be claimed.
+
+### `kk automation credential`
+
+An automation credential is a named secret that a script, a CI job, or another unattended caller presents to `kkd`.
+
+- **`create <name>`** creates the credential and writes it to `~/.config/kiki/automation/<name>.cred` with mode 0600. It prints that path. It needs the same confirmation as `kk automation apply`: the presenter on a foreground terminal, or `--admin-credential-file <path>`. A `PolicyApproval` never satisfies it.
+- **`rotate <name>`** replaces the secret in the same file. The old secret stops working at once. It needs the same confirmation as `create`.
+- **`revoke <name>`** makes the credential stop working. It only removes authority, so it needs no approval. A `PolicyApproval` bound to the credential can no longer be claimed.
+- **`list`** shows each credential's name and the times it was created, rotated, and revoked. It never prints a secret.
+
+A caller presents the credential in one of two ways:
+
+- the environment variable `KIKI_AUTOMATION_CREDENTIAL_FILE=<path>`;
+- the flag `--automation-credential-file <path>`, which every `kk` command accepts.
+
+What the credential is:
+
+- It belongs to the user, not to one repo or thread. A policy rule names it as the principal `credential:<name>`.
+- By itself it may do three things:
+  - read the repo summary of every registered repo;
+  - read each registered thread's status and non-sensitive state. That is what `kk status`, `kk ls`, `kk events`, `kk wait`, and `kk repair` without `--apply` need. A sensitive read, such as a transcript or a diff, still needs a rule that allows `sensitive-read`;
+  - call `BeginApproval` for any registered repo or thread, for `kk init`, and for the user-scoped `replace-terminal-server` plan.
+- Everything consequential it does goes through the policy. With no matching rule, the operation fails closed.
+- It is no thread's own credential. So even an ordinary change that a thread makes to itself with no approval, such as a checkpoint, needs a one-shot approval when this credential makes it. In a policy rule that operation is `thread-op` (see [Authority](04-authority.md#the-thread-op-operation)).
+- It never confirms a human challenge. It is never accepted in place of Admin or the presenter.
+- The file lives outside every managed workspace. Kiki never puts it into a harness, a hook, or a pane's environment.
+
+### Audit
+
+Policy activation and revocation, and credential creation, rotation, and revocation, are each recorded in the per-user `user_audit_log`. Read them with [`kk audit log --user`](#kk-audit).
 
 ## `kk init`
 
@@ -135,7 +423,14 @@ It verifies prerequisites:
 
 ### Approval
 
-On a terminal, `kk init` enrolls the foreground approval presenter when none is enrolled. It shows what is being enrolled first, and it uses [Admin bootstrap](appendix-a-glossary.md#bootstrap-admin-credential) for that one step (see [First run](#first-run)). Registering a repo is then a one-shot approved operation (see [Foreground approval flow](#foreground-approval-flow)). That approval is begun under the user's Admin bootstrap credential, because the repo has no registration credential yet. The approval is bound to the repo's canonical path and derived repo id.
+On a terminal, `kk init` offers to enroll the foreground approval presenter when none is enrolled. It shows what is being enrolled first, and it uses [Admin bootstrap](appendix-a-glossary.md#bootstrap-admin-credential) for that one step (see [First run](#first-run)). `--enroll-presenter` and `--no-enroll-presenter` answer the question ahead of time. Without a terminal, `kk init` asks nothing and enrolls no presenter.
+
+Registering a repo is a one-shot approved operation (see [Foreground approval flow](#foreground-approval-flow)). The approval is bound to the repo's canonical path and derived repo id. In a policy rule the operation is `init`. The repo has no registration credential yet, so the approval is begun in one of two ways:
+
+- **With an automation credential.** When the caller presents an [automation credential](appendix-a-glossary.md#automation-credential), `kk init` begins the approval with it. The registration runs when a rule allows `init` for that credential. The repo has no id yet, so the rule's `repos` must match it by canonical path or by `*`.
+- **With Admin.** Otherwise the approval is begun under the user's Admin bootstrap credential. Admin is not a policy principal, so no rule matches, and the enrolled presenter confirms on a foreground terminal.
+
+Without a terminal and without a rule that allows the plan, `kk init` exits with code 3 and registers nothing.
 
 `kk init --recover-presenter` replaces a lost presenter using the Admin bootstrap credential. It registers nothing.
 
@@ -174,7 +469,7 @@ What `kk` does with no arguments depends on whether the TUI has shipped and on w
 
 ### Approval
 
-Thread creation requires one-shot [foreground approval](#foreground-approval-flow). The approval is bound to:
+Thread creation requires a one-shot [approval](#foreground-approval-flow). In a policy rule the operation is `new`. The approval is bound to:
 
 - the resolved base/head;
 - the follows choice;
@@ -182,7 +477,9 @@ Thread creation requires one-shot [foreground approval](#foreground-approval-flo
 - the harness;
 - a digest of the initial input.
 
-This keeps agent-driven spawning out of v1 without granting the CLI reusable Admin authority.
+With no policy rule, only a person at a foreground terminal can approve a new thread. So by default an agent cannot spawn one. An agent can create threads only when the activated policy has a rule with the `thread:any` principal that allows `new`. Neither path gives the CLI reusable Admin authority.
+
+Without a terminal and without a rule that allows the plan, `kk new` exits with code 3 and creates nothing.
 
 ### Flags
 
@@ -214,6 +511,8 @@ After the thread is `Active`, `kk` requests [caller-local focus](appendix-a-glos
 - creation still succeeds;
 - nobody's view moves;
 - `kk` prints how to reach the thread (`kk attach <thread>`).
+
+That is the normal case for a script, and it is not an error: `kk new` still exits with code 0. With `--json`, the result carries the new thread's id and name, so the script can pass them to later commands.
 
 Provisioning itself must move no attached client's view. That is the contract for `kk new`, `kk reopen`, a repair restart, and duplicate cleanup alike. The only view that may move is the caller's, through the explicit focus request above.
 
@@ -257,7 +556,7 @@ The command runs entirely in `kk`, through [`TerminalClient`](appendix-a-glossar
 Outcomes:
 
 - **Focused.** The caller's client now shows the target thread. Other attached clients are unchanged.
-- **`NoCallerClient`.** No attached client can be identified as the caller. This happens when the command ran from an agent's tool call, a script, a pane nobody is viewing, or a terminal that is not attached to the kiki server. `kk switch` moves no one, exits non-zero, and names `kk attach <thread>` as the way to open a view on that thread.
+- **`NoCallerClient`.** No attached client can be identified as the caller. This happens when the command ran from an agent's tool call, a script, a pane nobody is viewing, or a terminal that is not attached to the kiki server. `kk switch` moves no one, exits with [code](#exit-codes) 4, and names `kk attach <thread>` as the way to open a view on that thread.
 - **Missing capability.** [Caller-local focus](appendix-a-glossary.md#caller-local-focus) requires the Herdr extension [`client_targeted_focus`](appendix-a-glossary.md#client-targeted-focus), which the server advertises as a capability. It is a required extension, not an optional one. When the server does not advertise it, `kk switch <thread>` fails with a message that names `client_targeted_focus` and moves no one.
 
 ### Moving every client
@@ -293,7 +592,7 @@ It does not mutate daemon focus state either. [`kkd`](appendix-a-glossary.md#kkd
   - A thread with no [terminal target](appendix-a-glossary.md#terminal-target) is reported the same way as in `kk switch`, and the client still attaches.
 - Without `<thread>`, the client opens wherever Herdr places a new client. `kk attach` does not apply [context resolution](#context-resolution).
 - Run from a pane that is already inside the kiki server, `kk attach` refuses to nest a client and points to `kk switch`.
-- It requires an interactive terminal.
+- It requires an interactive terminal, because it opens a view for a person. Without one it exits with code 4. No other command needs a client to be attached.
 
 The dedicated server is a separate server process, socket, saved session, and configuration file. It is not a separate directory tree: Herdr keeps the named session's socket and saved state under its own directories, keyed by session name.
 
@@ -456,11 +755,50 @@ The header also names any open terminal issue ([`TerminalMissing`](appendix-a-gl
 
 The [cascade](appendix-a-glossary.md#cascade-reconciliation) state indicator is exactly one of `in sync`, `pending`, or `conflicted`; it does not include counts.
 
+## `kk events`
+
+`kk events [--thread <t>] [--follow] [--since <seq>] [--json]` prints kiki's events as they are recorded. An event is one thing that happened to a thread, such as a state change, a cascade step, or an [attention event](appendix-a-glossary.md#attention-event). It ships in the [acceptance slice](appendix-a-glossary.md#acceptance-slice).
+
+It is how a script, or a person with no overlay, watches kiki. It reads kiki's own event log, so it works with no Herdr client attached.
+
+- **Without `--thread`**, it prints the events of every thread in the caller's repo, through the `StreamRepoEvents` RPC. This is true even when the command runs inside a thread.
+- **With `--thread <t>`**, it prints one thread's events. Run in that thread's own context, it reads the thread's full stream through `StreamThreadEvents`. Run from anywhere else, it reads the repo stream narrowed to that thread.
+- `--since <seq>` starts after that sequence number. Every event carries a sequence number that only goes up, so a caller that reconnects can ask for exactly the events it missed.
+- `--follow` keeps the stream open and prints new events as they happen. Without it, the command prints the stored events and exits with code 0.
+- `--json` prints one JSON object per line.
+
+The repo stream carries summary-class fields only: the same kind of data as [`kk ls`](#kk-ls). It never carries transcript text or other content that needs a [sensitive read](04-authority.md#sensitive-reads). So it needs no approval, and a registration credential or an automation credential can read it.
+
+When a harness stops to ask its own permission question, the stream shows `agent_blocked`. Kiki never answers a harness's own prompt. On a machine with no person, the operator sets the harness's own permission settings ahead of time. A person can also answer later, through `kk attach` over SSH.
+
+## `kk wait`
+
+`kk wait [<thread>] --for <state> [--timeout <dur>]` blocks until a thread reaches a state, and then exits. It lets a script wait for an agent without polling. It ships in Stage 2 of the [build sequence](15-build-sequencing.md), after the rest of the acceptance slice's headless surface.
+
+The target defaults to the contextual thread (see [Context resolution](#context-resolution)). `--for` takes one of these states:
+
+| State           | Reached when                                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------------------------------- |
+| `quiescent`     | the harness adapter proves the agent is idle (see [agent quiescence](appendix-a-glossary.md#agent-quiescence)) |
+| `goal-complete` | the agent reports its goal complete                                                                            |
+| `blocked`       | the agent is blocked: it waits on a permission prompt, or it crashed                                           |
+| `conflicted`    | the thread's cascade state is `conflicted`                                                                     |
+| `closed`        | the thread's lifecycle state is `Closed`                                                                       |
+| `issue`         | the thread has any open issue that `kk repair` would report                                                    |
+
+- If the thread is already in the state, `kk wait` exits at once.
+- It exits with [code](#exit-codes) 0 when the state is reached, and with code 6 when `--timeout` runs out first. Without `--timeout` it waits until the state is reached.
+- `--for` is required. Without it the command exits with code 2.
+- It reads summary-class data only, so it needs no approval. It changes nothing and proves nothing: a later command still runs its own preflight.
+- With `--json`, the result carries the thread's summary at the moment the wait ended.
+
 ## `kk publish`
 
 `kk publish` sends a thread's work to GitHub as a [pull request](https://docs.github.com/en/pull-requests) (PR). It is a v1.x command that publishes the resolved thread to GitHub through `gh`; see [Publishing](07-publishing.md). It is not part of the coordination [acceptance slice](appendix-a-glossary.md#acceptance-slice).
 
-When invoked, it validates `gh` installation, authentication, repository identity, and remote state. It then requires one-shot [human approval](#foreground-approval-flow) for the exact publish plan.
+When invoked, it validates `gh` installation, authentication, repository identity, and remote state. It then requires a one-shot [approval](#foreground-approval-flow) for the exact publish plan. In a policy rule the operation is `publish`, and every publish plan carries the `externally-visible` risk label. `publish` rules arrive with this command.
+
+Without a terminal, `kk publish` opens no editor. It needs `--no-edit`, and without it the command exits with code 2 and names that flag.
 
 Important flags:
 
@@ -479,13 +817,21 @@ The first publishing release generates a deterministic template from explicit in
 
 ### Approval
 
-Closing terminates live processes, so it requires one-shot [human approval](#foreground-approval-flow). The approval is bound to the final preflight and becomes invalid if the close plan changes before commit. Non-interactive close is unavailable in v1.
+Closing terminates live processes, so it requires a one-shot [approval](#foreground-approval-flow). The approval is bound to the final preflight and becomes invalid if the close plan changes before commit.
+
+In a policy rule the operation is `close`. A close plan can carry these [risk labels](appendix-a-glossary.md#risk-label):
+
+- `live-processes`, when it ends running processes in the thread's containers;
+- `outside-holders`, when it accepts a holder outside the listed containers;
+- `work-loss`, when its [loss inventory](appendix-a-glossary.md#loss-inventory) is not empty.
+
+A rule allows the close only when it accepts every label on the plan. Without a terminal and without such a rule, `kk close` exits with code 3 and changes nothing.
 
 ### Preflight: a quiet agent
 
 Close wants a quiet agent. [Agent quiescence](appendix-a-glossary.md#agent-quiescence) means the agent is not in the middle of work.
 
-- Where the harness adapter can prove agent quiescence, preflight requires it. If the agent is working, preflight reports that and exits with no mutation. The human waits, or interrupts the agent in its pane, and runs `kk close` again.
+- Where the harness adapter can prove agent quiescence, preflight requires it. If the agent is working, preflight reports that and exits with code 4 and no mutation. The caller waits and runs `kk close` again. A person can also interrupt the agent in its pane first. A script can wait with [`kk wait --for quiescent`](#kk-wait).
 - For a harness version that cannot prove quiescence, preflight proceeds and warns that a working agent will make the [approval drift](appendix-a-glossary.md#approval-drift).
 
 Preflight then takes the [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) so the pinned head contains every tracked edit, then builds the plan.
@@ -533,7 +879,11 @@ Once termination has begun there is no resume. If exit cannot be verified within
 
 A same-UID process can hold the workspace from outside the listed containers: an editor opened elsewhere, for example. "Same-UID" means it runs as the same [user](https://en.wikipedia.org/wiki/User_identifier). Such a [holder](appendix-a-glossary.md#holder) is not a standing issue and never blocks an `Active` thread.
 
-At close it makes the result `Unknown`, and the files are kept, unless the approved plan names that exact holder as accepted (an [accepted holder](appendix-a-glossary.md#accepted-holder)). Every `Unknown` result reports each offending pid, its command line, and the step that clears it. Writers running as another user are invisible to this scan.
+At close it makes the result `Unknown`, and the files are kept, unless the approved plan names that exact holder as accepted (an [accepted holder](appendix-a-glossary.md#accepted-holder)).
+
+The caller names a holder to accept with `--accept-holder <pid>`, once for each holder. Preflight resolves each pid to the exact process identity it found, and the plan lists it. Such a plan carries the `outside-holders` risk label. A holder the caller did not name is never accepted, by a person or by a policy rule.
+
+Every `Unknown` result reports each offending pid, its command line, and the step that clears it. Writers running as another user are invisible to this scan.
 
 ### Closing from inside the thread
 
@@ -552,9 +902,11 @@ The request is best-effort navigation and is not part of the close journal. Ever
 
 Important flags:
 
+- `--accept-holder <pid>` names one process outside the listed containers that the plan accepts (see [Processes outside the listed containers](#processes-outside-the-listed-containers)). It can be given more than once.
+- `--confirm` asks a person to confirm even when a policy rule allows the plan.
 - `--discard-pr` becomes available with the v1.x publishing integration; it also closes the open PR. Plain acceptance-slice `kk close` is local. It never requires `gh` and never changes remote state.
 
-Nothing closes a thread without this approval. The v1.x auto-archive on PR merge only proposes a close plan; see [Publishing](07-publishing.md).
+Nothing closes a thread without a one-shot approval. The v1.x auto-archive on PR merge only proposes a close plan; see [Publishing](07-publishing.md).
 
 ## `kk reopen`
 
@@ -562,7 +914,9 @@ Nothing closes a thread without this approval. The v1.x auto-archive on PR merge
 
 ### Approval
 
-A closed thread has no live thread credential, and reopen starts a new process [incarnation](appendix-a-glossary.md#incarnation). So reopen requires one-shot [foreground approval](#foreground-approval-flow) bound to the target, the restored head, the workspace path, and the harness.
+A closed thread has no live thread credential, and reopen starts a new process [incarnation](appendix-a-glossary.md#incarnation). So reopen requires a one-shot [approval](#foreground-approval-flow) bound to the target, the restored head, the workspace path, and the harness. In a policy rule the operation is `reopen`.
+
+Without a terminal and without a rule that allows the plan, `kk reopen` exits with code 3 and changes nothing.
 
 ### What it does
 
@@ -589,12 +943,17 @@ The projections stay, and cleanup is the approved [`cleanup-failed-reopen`](appe
 - Declining catch-up continues cold unless the user cancels reopen entirely.
 - Without the flag, reopen never reads transcript rows for harness input.
 
+The consent question has no flag that answers it. With no person present, consent can come from two places only: a grant the person remembered earlier, or a rule in the activated policy that names `consent:catch_up` and lists that provider. A rule that gives the reopen approval does not give this consent, and `*` in a rule's `operations` never matches it.
+
+- When such a consent exists, the catch-up is sent and no preview is released to anyone.
+- When it does not, and there is no foreground terminal, `kk reopen --catch-up` exits with code 3 at preflight and changes nothing. The message names the missing consent. Running `kk reopen` without `--catch-up` reopens cold.
+
 ## `kk thread transcript`
 
 `kk thread transcript [<thread>] [<change>]` reads the locally stored [transcript](appendix-a-glossary.md#thread-transcript) for a thread: the record of what the human and the agent said. It is a v1.x command.
 
 - A contextual same-thread read uses [`ThreadScoped`](appendix-a-glossary.md#threadscoped-credential).
-- Reading another thread's transcript requires one-shot [approval](#foreground-approval-flow) for the exact query and an immutable result snapshot.
+- Reading another thread's transcript requires a one-shot [approval](#foreground-approval-flow) for the exact query and an immutable result snapshot. In a policy rule the operation is `sensitive-read`.
 - Changing search, range, or filter arguments requires a new approval. So does refreshing after repository state changes.
 
 Important flags:
@@ -614,11 +973,11 @@ The first comments surface is read-only. Feeding review comments into agent cont
 
 ## `kk thread interrupt`
 
-`kk thread interrupt [<thread>]` is the human's way to stop an agent that is stuck or off track. It is a v1.x management command. The target is optional and defaults to the contextual thread (see [Context resolution](#context-resolution)).
+`kk thread interrupt [<thread>]` stops an agent that is stuck or off track. It is a v1.x management command. The target is optional and defaults to the contextual thread (see [Context resolution](#context-resolution)).
 
-It hard-stops the thread's agent and reframes it through the harness resume path. It is the explicit human escape hatch for a stuck or off-track agent, and it uses the same [hard-escalation](appendix-a-glossary.md#hard-escalation) shape as cascade conflict handling.
+It hard-stops the thread's agent and reframes it through the harness resume path. It is the explicit escape hatch for a stuck or off-track agent, and it uses the same [hard-escalation](appendix-a-glossary.md#hard-escalation) shape as cascade conflict handling.
 
-Interrupt destroys a process at a human's request, so it requires one-shot [foreground approval](#foreground-approval-flow), even for the contextual thread. Kiki's own protocol restarts, such as a cascade hard restart, are daemon-initiated steps of the delivery protocol and need no approval.
+Interrupt destroys a process at a caller's request, so it requires a one-shot [approval](#foreground-approval-flow), even for the contextual thread. In a policy rule the operation is `interrupt`, and the plan carries the `live-processes` risk label. Without a terminal and without a rule that allows the plan, the command exits with code 3. Kiki's own protocol restarts, such as a cascade hard restart, are daemon-initiated steps of the delivery protocol and need no approval.
 
 ## `kk thread restart`
 
@@ -631,7 +990,7 @@ A thread cannot change its harness in place. This command is the only way to cha
 - If a cascade delivery is waiting, the new agent receives the saved payload first, through [`RestartStartup`](appendix-a-glossary.md#restartstartup-delivery-proof).
 - `--harness` accepts the same names as `kk new --harness`. An unsupported name is an error.
 
-Ending a live agent is process-destructive, so the command requires one-shot human approval (see [Authority](04-authority.md#operations-that-require-human-approval)).
+Ending a live agent is process-destructive, so the command requires a one-shot approval (see [Authority](04-authority.md#operations-that-require-human-approval)). In a policy rule the operation is `restart`, and the plan carries the `live-processes` risk label.
 
 This command is not the `restart-agent` repair plan. That plan restarts the same harness after it has already exited, ships in the acceptance slice, and needs no approval in the thread's own context (see [`kk repair`](#kk-repair)).
 
@@ -661,7 +1020,7 @@ Before detach decides that no reconciliation is pending, it does these things:
 2. It refreshes the parent and child [live heads](appendix-a-glossary.md#live-head) from that pinned view.
 3. It creates any transition a lagging watcher had not yet recorded.
 
-The user must reconcile that exact transition or explicitly discard it. Pending parent work is discarded only with `--discard-pending`; without that flag, detach refuses while a transition is pending and says so. Only then does detach checkpoint the child at its [checkpoint target](appendix-a-glossary.md#checkpoint-target) and delete the edge.
+The caller must reconcile that exact transition or explicitly discard it. Pending parent work is discarded only with `--discard-pending`; without that flag, detach refuses while a transition is pending and says so. Only then does detach checkpoint the child at its [checkpoint target](appendix-a-glossary.md#checkpoint-target) and delete the edge.
 
 Follows graph surgery, `kk thread attach` and `kk thread reparent`, is out of v1. When those commands ship, they refuse the same way as `kk new --follows` for a thread whose harness failed its `RestartStartup` proof.
 
@@ -669,8 +1028,10 @@ Follows graph surgery, `kk thread attach` and `kk thread reparent`, is out of v1
 
 A same-thread detach with no pending reconciliation uses thread-scoped authority. Two cases require one-shot [approval](#foreground-approval-flow) bound to that choice:
 
-- discarding a pending transition with `--discard-pending`;
-- detaching an explicitly targeted different thread.
+- discarding a pending transition with `--discard-pending`. The plan carries the `discard-pending` risk label;
+- detaching an explicitly targeted different thread. For a thread-scoped caller, the plan carries the `cross-thread` risk label.
+
+In a policy rule the operation is `detach`. Without a terminal and without a rule that allows the plan, these two cases exit with code 3. The pending transition and the edge stay as they were.
 
 ## `kk thread destroy`
 
@@ -710,17 +1071,18 @@ The approval covers every process in the listed terminal containers at freeze ti
 
 ### Approval
 
-Destroy requires one-shot [foreground approval](#foreground-approval-flow) even when revisions are preserved.
+Destroy requires a one-shot [approval](#foreground-approval-flow) even when revisions are preserved.
 
 - `--abandon-revisions` has a distinct method/argument digest and cannot reuse an approval issued for ordinary destroy.
 - A plain yes/no prompt detached from a method-and-target-bound capability is insufficient.
-- Non-interactive destroy is unavailable in v1.
+- In a policy rule the operation is `destroy`. The plan carries `abandon-revisions` when that flag is given, and the same labels as close for what it stops and deletes: `live-processes`, `outside-holders`, and `work-loss`. `--accept-holder <pid>` works as it does for close.
+- Without a terminal, destroy runs only when a rule allows `destroy` and accepts every label on the plan. Otherwise it exits with code 3 and changes nothing.
 
 ## `kk repair`
 
 `kk repair [<thread>]` diagnoses a thread whose state went wrong and offers named plans to fix it. With `--repo` or `--server` it does the same for the repo or for the terminal server.
 
-It is the human-directed recovery surface for a `ProjectionDiverged`, `CreateFailed`, `CloseFailed`, `DestroyFailed`, exhausted-delivery, or other repairable lifecycle condition. The lifecycle and projection chapters own those states; this command owns their shared interaction shape.
+It is the explicit recovery surface for a `ProjectionDiverged`, `CreateFailed`, `CloseFailed`, `DestroyFailed`, exhausted-delivery, or other repairable lifecycle condition. The lifecycle and projection chapters own those states; this command owns their shared interaction shape.
 
 ### Diagnose first, then apply
 
@@ -732,13 +1094,27 @@ Without an apply flag, `kk repair` is read-only. It reports:
 
 Each plan states which records, workspace paths, bookmarks, terminal groups, processes, or revisions it would change.
 
-Kiki may repair provably idempotent projection drift automatically in the background. But it must never silently choose among multiple plausible heads, paths, or topologies.
+With `--json`, the diagnosis lists each plan's id, its name, its [risk labels](appendix-a-glossary.md#risk-label), and any argument the plan needs. A script can read that list and pick a plan.
+
+Kiki may repair provably idempotent projection drift automatically in the background. But it must never silently choose among multiple plausible heads, paths, or topologies. A policy rule does not change that: a rule can approve a plan, and it never picks one.
 
 `--apply <repair-id>` applies exactly the plan emitted by the current diagnosis.
 
-- If repository state has changed, the id is stale, and kiki diagnoses again instead of adapting the old plan.
+- If repository state has changed, the id is stale, and kiki diagnoses again instead of adapting the old plan. The apply exits with code 4.
 - A same-thread, non-destructive projection repair may use [`ThreadScoped`](appendix-a-glossary.md#threadscoped-credential).
-- Any destructive, revision-rewriting, topology-changing, or cross-thread plan requires one-shot [approval](#foreground-approval-flow) bound to the repair id and target.
+- Any destructive, revision-rewriting, topology-changing, or cross-thread plan requires a one-shot [approval](#foreground-approval-flow) bound to the repair id and target. In a policy rule the operation is `repair:<plan-name>`, for example `repair:terminate-orphans`. `repair:*` covers every such plan.
+- A plan that needs no approval in the thread's own context, such as `restart-agent`, needs one when any other caller applies it. In a policy rule that operation is `thread-op`, not `repair:<plan-name>`.
+- Without a terminal and without a rule that allows the plan, the apply exits with code 3 and changes nothing.
+
+Some plans need the caller to choose something. Each such choice is an argument to `--apply`, and it is part of the plan digest:
+
+| Plan                                                                      | Argument                | What it names                                                 |
+| ------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------- |
+| [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target) | `--target <commit>`     | the commit the bookmark is placed on                          |
+| [`repoint-workspace`](appendix-a-glossary.md#repoint-workspace)           | `--path <path>`         | the workspace path kiki records                               |
+| any plan that deletes the workspace                                       | `--accept-holder <pid>` | one outside [holder](appendix-a-glossary.md#holder) to accept |
+
+On a terminal, `kk` may ask for a missing choice. Without a terminal it does not ask: the apply exits with code 2 and names the missing argument. No other plan in v1 needs a choice. Where an issue has more than one plan, the caller chooses by plan id.
 
 ### Scopes: thread, repo, and server
 
@@ -751,7 +1127,9 @@ Kiki may repair provably idempotent projection drift automatically in the backgr
 
 ### Every issue and its plan
 
-This table is the full list. It names the plan for each issue or failed state and says what approval the plan needs. "One-shot" means the [foreground approval flow](#foreground-approval-flow). Other chapters use these plan names.
+This table is the full list. It names the plan for each issue or failed state and says what approval the plan needs. Other chapters use these plan names.
+
+"One-shot" means a one-shot approval from the [approval flow](#foreground-approval-flow). Either kind satisfies it: a person's confirmation at a foreground terminal, or a [`PolicyApproval`](appendix-a-glossary.md#policy-approval) from a rule that allows `repair:<plan-name>` and accepts the plan's risk labels.
 
 | Issue or failed state                             | Plan                                                                                                                         | Approval                                                                                                           |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -809,8 +1187,8 @@ This table is the full list. It names the plan for each issue or failed state an
 
 Three notes on the approval column:
 
-- "None in the thread's own context" means the plan uses `ThreadScoped` when it is applied from inside that thread. Applied to a different thread, every plan needs one-shot approval, as any cross-thread change does.
-- `retry-close` and `retry-destroy` continue the journal of a plan the human already approved. They never widen it. If the plan can no longer be finished as approved, the diagnosis says so and offers a fresh plan that needs a new approval.
+- "None in the thread's own context" means the plan uses `ThreadScoped` when it is applied from inside that thread. Applied to a different thread, every plan needs one-shot approval, as any cross-thread change does. So does a plan applied with an automation credential, which is no thread's own. For a plan this column marks "none in the thread's own context", the operation in a policy rule is then `thread-op`. For a plan marked "one-shot", it is `repair:<plan-name>` for every caller.
+- `retry-close` and `retry-destroy` continue the journal of a plan that was already approved. They never widen it. If the plan can no longer be finished as approved, the diagnosis says so and offers a fresh plan that needs a new approval.
 - A closed thread, a `CreateFailed` thread, and a `DestroyFailed` thread may also be destroyed through the [destroy](03-threads.md#destroy) preflight once that command ships.
 
 ### Failed close and destroy
@@ -824,7 +1202,7 @@ Three issues are about the thread's jj [workspace](appendix-a-glossary.md#worksp
 
 - **[`recreate-workspace`](appendix-a-glossary.md#recreate-workspace)** is for [`WorkspaceDirectoryMissing`](appendix-a-glossary.md#workspacedirectorymissing): the directory is gone. The plan creates the directory again from the checkpoint. Edits that were never recorded in jj are not recovered, and the plan says so.
 - **[`reattach-workspace`](appendix-a-glossary.md#reattach-workspace)** is for [`WorkspaceRecordMissing`](appendix-a-glossary.md#workspacerecordmissing): jj has forgotten the workspace, but the directory is still there. The plan creates the jj workspace record again for that directory.
-- **[`repoint-workspace`](appendix-a-glossary.md#repoint-workspace)** is for [`WorkspacePathMismatch`](appendix-a-glossary.md#workspacepathmismatch): the workspace is at a different path from the one kiki recorded. The plan records the path the human confirms. Kiki does this by itself only when jj's stable workspace id proves the moved directory is the same one.
+- **[`repoint-workspace`](appendix-a-glossary.md#repoint-workspace)** is for [`WorkspacePathMismatch`](appendix-a-glossary.md#workspacepathmismatch): the workspace is at a different path from the one kiki recorded. The plan records the path the caller gives with `--path <path>`. Kiki does this by itself only when jj's stable workspace id proves the moved directory is the same one.
 
 While one of these issues is open, kiki makes no change that depends on the broken workspace record, path, or directory.
 
@@ -837,9 +1215,9 @@ An intent is kiki's durable record of one update it owes an agent (see [`sync_in
   - it increments the intent's [`delivery_epoch`](appendix-a-glossary.md#delivery-epoch);
   - it resets the soft-redelivery count.
 
-  It then permits one fresh [`RestartStartup`](appendix-a-glossary.md#restartstartup-delivery-proof) cycle of at most `[cascade] delivery_attempts` attempts (default 3). Those attempts are stamped with and counted under the new epoch. The human runs it after changing whatever made delivery fail, such as upgrading the harness.
+  It then permits one fresh [`RestartStartup`](appendix-a-glossary.md#restartstartup-delivery-proof) cycle of at most `[cascade] delivery_attempts` attempts (default 3). Those attempts are stamped with and counted under the new epoch. It is run after changing whatever made delivery fail, such as upgrading the harness.
 
-- **[`discard-delivery`](appendix-a-glossary.md#discard-delivery)** acknowledges the intent without delivery proof. It runs under a one-shot approval bound to the plan, and it records the human resolution on the intent. The payload is then never delivered to the agent, and the plan says so before it is approved.
+- **[`discard-delivery`](appendix-a-glossary.md#discard-delivery)** acknowledges the intent without delivery proof. It runs under a one-shot approval bound to the plan, and it records the resolution on the intent, with the approval that allowed it. The payload is then never delivered to the agent, and the plan says so before it is approved.
 
 ### Agent, terminal, and process plans
 
@@ -921,7 +1299,8 @@ Some problems belong to the dedicated server, not to one thread:
 The fix is [`replace-terminal-server`](appendix-a-glossary.md#replace-terminal-server). It is a user-scoped plan, not a thread-scoped one, and it is applied with `kk repair --server`.
 
 - The plan lists every thread and every process that the replacement stops, across all of the user's repos.
-- It needs a one-shot approval. The plan belongs to the user, not to a repo, so the approval is begun under the user's Admin bootstrap credential, the same as a first-run approval. It works from any directory.
+- It needs a one-shot approval. The plan belongs to the user, not to a repo, so no thread or registration credential can begin it. A caller with an automation credential begins it with that credential. Any other caller begins it under the user's Admin bootstrap credential, and the presenter then confirms on a foreground terminal. It works from any directory.
+- The plan carries the `server-wide` risk label. It belongs to no repo, so a rule matches it only when the rule's `repos` is `*`.
 - On approval, kiki stops the old server with [verified exit](appendix-a-glossary.md#verified-exit), then starts a new one.
 - Every thread that was bound to the old server then reads `TerminalMissing`, and each one is brought back with `restart-terminal`.
 
@@ -968,7 +1347,7 @@ While the issue is open, kiki blocks exactly replacement, materialization, and d
 
 An unrecorded same-UID [holder](appendix-a-glossary.md#holder) of the workspace is not `OrphanedProcess` and never blocks an `Active` thread's boundaries. It matters only to a plan that deletes the workspace: close, destroy, `close-without-terminal`, and the failed-create and failed-reopen cleanups.
 
-- There the result is `Unknown`, and the files are kept, unless the approved plan names that exact holder identity as accepted: the human's informed choice.
+- There the result is `Unknown`, and the files are kept, unless the approved plan names that exact holder identity as accepted. The caller names it with `--accept-holder <pid>`, and the plan then carries the `outside-holders` risk label.
 - A holder the plan did not name is drift.
 - The diagnosis reports each such holder's pid, its command line, and the step that clears it.
 - Kiki never [signals](<https://en.wikipedia.org/wiki/Signal_(IPC)>) a process whose identity it did not record. (A harness remnant is recorded by freeze discovery under the `terminate-orphans` approval before it is signalled.)
@@ -990,7 +1369,7 @@ Otherwise the [saga](appendix-a-glossary.md#saga) stops with its projections int
 - It uses the close machinery: freeze, loss inventory, final proof, terminate, verified exit.
 - It requires one-shot approval with the same container-scope statement as close.
 
-`CreateFailed` has no retry plan. Its exit is `cleanup-failed-create`; after that the human runs `kk new` again.
+`CreateFailed` has no retry plan. Its exit is `cleanup-failed-create`; after that, `kk new` is run again.
 
 #### A failed terminal restart
 
@@ -1013,13 +1392,13 @@ Kiki tracks the checkpoint [bookmark](appendix-a-glossary.md#bookmark) through j
 
 There are four per-thread bookmark plans and one repo-level plan. This table is the source for them; other chapters agree with it.
 
-| Plan                                                                       | Offered for                                                                                                                                                                        | Target                                                            | Approval                                                                      | Placement `reason` |
-| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------ |
-| [`restore-bookmark`](appendix-a-glossary.md#restore-bookmark)              | `BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, only while the expected target is visible                                                                                | the expected target                                               | none in the thread's own context; one-shot when applied to a different thread | `RepairRestore`    |
-| [`adopt-bookmark`](appendix-a-glossary.md#adopt-bookmark)                  | `BookmarkMoved` when the single observed target is the live head or on the owned chain                                                                                             | the observed target                                               | one-shot                                                                      | `RepairAdopt`      |
-| [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target)  | any bookmark issue (`BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, `CheckpointAbandoned`); also a thread with no open issue whose relationship is `ahead` or `diverged` | the live head or an on-chain commit the human picks               | one-shot                                                                      | `RepairChoose`     |
-| [`unhide-checkpoint`](appendix-a-glossary.md#unhide-checkpoint)            | `CheckpointAbandoned`, only when unhiding would not create a divergent change                                                                                                      | the expected target, made visible again                           | one-shot                                                                      | `RepairUnhide`     |
-| [`reanchor-history`](appendix-a-glossary.md#reanchor-history) (repo level) | `OperationHistoryRewritten`                                                                                                                                                        | see [Repository operation history](#repository-operation-history) | one-shot, repo scope                                                          | `Reanchor`         |
+| Plan                                                                       | Offered for                                                                                                                                                                        | Target                                                             | Approval                                                                      | Placement `reason` |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- | ------------------ |
+| [`restore-bookmark`](appendix-a-glossary.md#restore-bookmark)              | `BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, only while the expected target is visible                                                                                | the expected target                                                | none in the thread's own context; one-shot when applied to a different thread | `RepairRestore`    |
+| [`adopt-bookmark`](appendix-a-glossary.md#adopt-bookmark)                  | `BookmarkMoved` when the single observed target is the live head or on the owned chain                                                                                             | the observed target                                                | one-shot                                                                      | `RepairAdopt`      |
+| [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target)  | any bookmark issue (`BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, `CheckpointAbandoned`); also a thread with no open issue whose relationship is `ahead` or `diverged` | the live head or an on-chain commit named with `--target <commit>` | one-shot                                                                      | `RepairChoose`     |
+| [`unhide-checkpoint`](appendix-a-glossary.md#unhide-checkpoint)            | `CheckpointAbandoned`, only when unhiding would not create a divergent change                                                                                                      | the expected target, made visible again                            | one-shot                                                                      | `RepairUnhide`     |
+| [`reanchor-history`](appendix-a-glossary.md#reanchor-history) (repo level) | `OperationHistoryRewritten`                                                                                                                                                        | see [Repository operation history](#repository-operation-history)  | one-shot, repo scope                                                          | `Reanchor`         |
 
 The "placement `reason`" column is the value kiki records on the placement-history row when the plan is applied.
 
@@ -1036,7 +1415,7 @@ Notes on the plans:
 
 - **`restore-bookmark`** puts the bookmark back on the tracked expected target (`bookmark_expected_commit_id`), never on the older placed commit. It never targets a hidden commit, so it is offered only while the expected target is visible. It does not change where publish or reopen will point, so in the thread's own context it uses `ThreadScoped` and needs no approval.
 - **`adopt-bookmark`** accepts the single observed target as the checkpoint. It changes where publish and reopen will point, so it requires one-shot approval.
-- **`choose-bookmark-target`** sets the bookmark to exactly one commit the human picks: the live head, or a commit on the validated owned chain. Kiki never picks. It is the exit whenever the expected target is hidden. It is also the exit for a thread that reads `ahead` or `diverged`.
+- **`choose-bookmark-target`** sets the bookmark to exactly one commit the caller names with `--target <commit>`: the live head, or a commit on the validated owned chain. Kiki never picks, and neither does a policy rule. It is the exit whenever the expected target is hidden. It is also the exit for a thread that reads `ahead` or `diverged`.
 - **`unhide-checkpoint`** first makes the hidden expected target visible again and then places the bookmark on it. It is not offered when unhiding would create a divergent change (two visible commits for one change).
 
 #### Who may move the bookmark where
@@ -1047,7 +1426,8 @@ One rule covers every bookmark move kiki makes:
 - **Adopt and choose may place it anywhere on the chain.** The approved plans `adopt-bookmark` and `choose-bookmark-target` may place the bookmark on the live head or on any commit on the validated owned chain. That includes a commit behind the expected target. These plans may pass `--allow-backwards`.
 - **Restore goes back to the expected target.** `restore-bookmark` puts the bookmark back on the expected target. jj may see that as a backward move, so the plan may pass `--allow-backwards`. It still needs no approval in the thread's own context; applied to a different thread, it needs a one-shot approval.
 - **Unhide may pass the flag too.** `unhide-checkpoint` may also pass `--allow-backwards`.
-- **Never off the chain.** Kiki never places the bookmark on a commit that is off the owned chain. v1 has no plan for that. The human first fixes the shape with jj (for example, a rebase that puts the commit on the chain) and then adopts or chooses.
+- **A backward move is labeled.** Any plan that passes `--allow-backwards` carries the `backward-bookmark` risk label, so a policy rule must accept that label to approve it.
+- **Never off the chain.** Kiki never places the bookmark on a commit that is off the owned chain. v1 has no plan for that. The shape is first fixed with jj (for example, a rebase that puts the commit on the chain), and then an adopt or choose plan is applied.
 
 For a `Closed` thread, adopt and choose must also validate the retained owned chain and every follows child, and they advance the archived `thread_head_commit_id` with the checkpoint. The full adoption rule is in [Threads](03-threads.md#projection-divergence-and-repair).
 
@@ -1084,7 +1464,7 @@ When that happens:
 
 While `OperationHistoryRewritten` is open, checkpoint, publish, close, detach, and explicit rebase are blocked for the listed threads; head observation continues. Between detection and approval, no anchor row exists. Bookmark classification is paused in that repo, and it resumes from the anchor recorded on approval.
 
-`kk repair --repo` diagnoses the issue and offers the [`reanchor-history`](appendix-a-glossary.md#reanchor-history) plan. `kk repair --repo --apply <plan-id>` applies it under a one-shot approval with repo scope.
+`kk repair --repo` diagnoses the issue and offers the [`reanchor-history`](appendix-a-glossary.md#reanchor-history) plan. `kk repair --repo --apply <plan-id>` applies it under a one-shot approval with repo scope. The plan carries the `history-rewrite` risk label.
 
 The plan works thread by thread. It lists every affected thread with its observed bookmark state. On approval, for each listed thread:
 
@@ -1097,6 +1477,8 @@ The plan works thread by thread. It lists every affected thread with its observe
 
 `--github` checks `gh` installation, authentication, repository resolution, and the permissions the future publish path needs, without mutating GitHub. GitHub failure never changes registration health and never causes `kk init` to fail.
 
+`kk doctor` also reports when the `[automation]` table in the user config file differs from the active policy, as [`kk automation status`](#kk-automation-status) does.
+
 ## `kk privacy consent`
 
 `kk privacy consent` manages your permission to send transcript content to an AI provider. It is a v1.x command.
@@ -1105,16 +1487,23 @@ That permission is called [provider-egress consent](appendix-a-glossary.md#provi
 
 - `kk privacy consent list` shows purpose, normalized provider identity, thread scope, disclosure version, grant time, and revocation state for the contextual thread. It never exposes credentials.
 - `kk privacy consent grant transcript-mcp` resolves the contextual thread and its managed harness provider.
-  - It discloses that same-thread MCP tool results may be sent to that provider, and it requires the enrolled foreground presenter.
+  - It discloses that same-thread MCP tool results may be sent to that provider.
+  - The grant needs a confirmation. On a foreground terminal, the enrolled presenter collects it from a person. With no person, an activated policy rule can give it, and only a rule that names `consent:transcript_mcp` and lists that provider in `providers`. With neither, the command exits with code 3 and records nothing.
   - This pre-grant exists because an agent-facing MCP call cannot open a human prompt.
   - MCP is the [Model Context Protocol](https://modelcontextprotocol.io/), a standard way for an agent to call outside tools.
-- `kk privacy consent revoke <purpose> [--provider <identity>]` uses the foreground presenter.
-  - It immediately revokes matching remembered grants for the contextual thread.
-  - Omitting `--provider` revokes every provider for that thread and purpose, after showing the exact set.
+- `kk privacy consent revoke <purpose> [--provider <identity>]` immediately revokes matching remembered grants for the contextual thread.
+  - Omitting `--provider` revokes every provider for that thread and purpose.
+  - Revoking only takes permission away. So it needs no approval, and any credential of this user may call it.
+  - On a foreground terminal, it shows the exact set first and asks before it revokes. That question is a safeguard against a typing mistake, not an approval. Without a terminal it asks nothing: it revokes the set and prints it.
 
 `kk reopen --catch-up` offers approve-once or remember during its actual payload preview. There is no standalone remembered-grant command for `catch_up`.
 
-Config, environment, MCP, generic `HumanApproval`, and non-interactive flags cannot grant [provider egress](appendix-a-glossary.md#provider-egress).
+A plain config key, the environment, MCP, a generic one-shot approval, and command flags cannot grant [provider egress](appendix-a-glossary.md#provider-egress). Besides a person at the presenter, one thing can: a rule in the activated [automation policy](appendix-a-glossary.md#automation-policy) that names `consent:<purpose>` and lists the provider.
+
+- `*` in a rule's `operations` never matches a consent operation, and there is no `*` for providers.
+- The rule counts only after `kk automation apply` activates it.
+- A consent given by a rule is recorded like any other, and `kk privacy consent list` shows it.
+- Revoking that record does not change the policy. While the rule stays active, it can give the consent again. To stop that, remove the rule and apply the policy again.
 
 Revocation prevents future sends. It cannot recall content already delivered.
 
@@ -1126,18 +1515,24 @@ The audit commands show kiki's record of which operations were requested and wha
 
 `kk thread audit [<thread>]` reads an operational audit slice. For the contextual thread, its default output is non-sensitive and uses [`ThreadScoped`](appendix-a-glossary.md#threadscoped-credential): timestamp, method, declared scope, and outcome, with argument and approval details redacted.
 
-Three cases require one-shot [approval](#foreground-approval-flow) bound to the exact filters and an immutable result snapshot:
+Three cases require a one-shot [approval](#foreground-approval-flow) bound to the exact filters and an immutable result snapshot:
 
 - an explicitly targeted different thread;
 - `--details`;
 - any query that exposes arguments.
 
+In a policy rule the operation for these three is `sensitive-read`.
+
+A row for an operation that a policy rule approved shows the rule name, the policy digest, the principal, the operation, and the risk labels.
+
 ### A repo, the user, or everything
 
-`kk audit log` reads a broader audit authority, so it always requires foreground one-shot approval:
+`kk audit log` reads a broader audit authority, so it always requires a one-shot approval. In a policy rule the operation is `audit-log`. Without a terminal and without a rule that allows the exact query, it exits with code 3 and prints no rows.
+
+Its sources and filters:
 
 - inside a repo, the default source is that repo's [SQLite](https://www.sqlite.org/) `audit_log`;
-- `--user` selects the per-user `user_audit_log` sink, which records bootstrap, registry-wide, unknown-repo, and pre-resolution attempts;
+- `--user` selects the per-user `user_audit_log` sink, which records bootstrap, registry-wide, unknown-repo, and pre-resolution attempts. It also records policy activation and revocation, and the creation, rotation, and revocation of automation credentials;
 - `--all-repos` selects every registered repo plus the user sink;
 - `--since <time>`, `--method <name>`, and `--outcome <value>` constrain the approved query;
 - `--json` changes rendering only, and it is included in the approval digest.
@@ -1157,7 +1552,15 @@ The [acceptance slice](appendix-a-glossary.md#acceptance-slice) provides `kk con
 
 ## Deferred thread management commands
 
-Scope tiers are recorded in [Orientation](01-orientation.md). Two groups of commands are not in the [acceptance slice](appendix-a-glossary.md#acceptance-slice):
+Scope tiers are recorded in [Orientation](01-orientation.md).
+
+The headless surface is part of the [acceptance slice](appendix-a-glossary.md#acceptance-slice), because kiki's own end-to-end tests need approvals with no person present. [Build Sequencing](15-build-sequencing.md) stages it:
+
+- **Stage 1:** [`kk daemon install`](#kk-daemon-install), [`kk automation`](#kk-automation) with the policy engine and automation credentials, [`kk events`](#kk-events), [`--json`](#output-for-scripts), and the [exit codes](#exit-codes).
+- **Stage 2:** [`kk wait`](#kk-wait), and the `command` notification provider (see [Configuration](11-configuration.md#the-command-provider)).
+- **With the features they gate:** `publish` rules arrive with `kk publish`, and `consent:<purpose>` rules arrive with the transcript features.
+
+Two groups of commands are not in the acceptance slice:
 
 - **v1.x:** `kk publish`, `kk thread transcript`, `kk thread comments`, `kk thread destroy`, `kk thread interrupt`, `kk thread restart --harness`, `kk thread describe --refresh`, `kk doctor`, and `kk privacy consent`.
 - **Out of v1:** follows graph surgery, `kk thread attach` and `kk thread reparent`. `kk thread attach` would re-establish a follows link; it is unrelated to [`kk attach`](#kk-attach), which opens a terminal view.
@@ -1188,8 +1591,8 @@ By default, `kk repo unregister` removes two things:
 
 The action is irreversible: there is no kiki-managed undo, matching the shape of `kk thread destroy` (see [Threads · destroy](03-threads.md#destroy)).
 
-- It therefore requires a one-shot [foreground approval](#foreground-approval-flow) bound to the canonical repo path, the repo id, and whether state is retained.
-- Non-interactive unregister is unavailable in v1.
+- It therefore requires a one-shot [approval](#foreground-approval-flow) bound to the canonical repo path, the repo id, and whether state is retained.
+- In a policy rule the operation is `unregister`. Without a terminal and without a rule that allows the plan, the command exits with code 3 and removes nothing.
 - If recovery bundles exist, the command prints their paths in its preflight; `--keep-state` is required to retain them.
 
 ### Keeping the state directory

@@ -57,7 +57,7 @@ A thread-scoped credential may read its own transcript. A URL such as `/threads/
 When the same-thread transcript MCP surface ships, each call is checked in this order, and the status codes are part of the contract:
 
 1. Credentials that are missing, malformed, revoked, or carry an invalid signature get `Unauthenticated`.
-2. Well-formed credentials that are not [`ThreadScoped<T>`](appendix-a-glossary.md#threadscoped-credential) get `PermissionDenied`. Neither reusable Admin authority nor one-shot [human approvals](appendix-a-glossary.md#human-approval) are exposed through the narrow transcript MCP surface.
+2. Well-formed credentials that are not [`ThreadScoped<T>`](appendix-a-glossary.md#threadscoped-credential) get `PermissionDenied`. Neither reusable Admin authority nor one-shot approvals, [human](appendix-a-glossary.md#human-approval) or [policy](appendix-a-glossary.md#policy-approval), are exposed through the narrow transcript MCP surface.
 3. If the request names a thread both in the URL path and in an explicit argument, and the two differ, the request gets `InvalidArgument`.
 4. If the credential authorizes thread T and the request asks for thread U, where U is not T, the request gets `PermissionDenied`.
 
@@ -68,10 +68,10 @@ The [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>) must not silent
 The v2 substrate divides tools by how much authority they need:
 
 - Same-thread, low-risk tools may be self-acting, such as setting status or requesting human attention.
-- Publish and close may be requested only as intents. Those intents stop at the foreground one-shot [human-approval](appendix-a-glossary.md#human-approval) boundary.
-- Cross-thread summaries may be auto-allowed only within the minimal summary policy. Sensitive cross-thread reads require a foreground one-shot approval, so they are not autonomous MCP tools.
+- Publish and close may be requested only as intents. Those intents stop at the one-shot approval boundary. A human gives that approval at a foreground terminal, or an activated [automation policy](04-authority.md#automation-policy) rule gives it.
+- Cross-thread summaries may be auto-allowed only within the minimal summary policy. Sensitive cross-thread reads require a one-shot approval, so they are not autonomous MCP tools unless the owner's activated policy has a `sensitive-read` rule that accepts the `cross-thread` label.
 - Cross-thread posts and agent-driven spawns are rate-limited and causal-chain tracked.
-- Cross-thread close, destroy, publish, and revision rewriting remain unavailable to agents. An agent request cannot itself satisfy or retain the human approval.
+- Cross-thread close, destroy, publish, and revision rewriting remain unavailable to agents. An agent request cannot itself satisfy or retain the approval. An MCP tool call is not a policy principal, so no automation policy rule approves one. Whether the substrate ever gains a principal kind is a decision for v2.
 
 Destroy is not exposed to agents at all, including on the caller's own thread.
 

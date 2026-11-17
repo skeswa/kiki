@@ -93,6 +93,46 @@ Some terms used throughout this section:
 - `kk init` is [idempotent](https://en.wikipedia.org/wiki/Idempotence) in an already-registered repo: running it again changes nothing. It prints status and exits 0 without mutating anything.
 - `kk init` does not pre-validate harness binaries. A missing-harness error surfaces only at `kk new` time.
 - `kk init` succeeds when [`gh`](https://cli.github.com/) is missing or unauthenticated. The first GitHub-backed command performs the check. It reports an error that says what to do, without corrupting local state.
+- **Headless first run.** A machine with no human and no desktop session finishes setup from flags alone. ([Headless](appendix-a-glossary.md#headless) means no screen attached, no person present, or both.)
+  - [`kk daemon install`](09-commands.md#kk-daemon-install) installs and starts `kkd` without asking a question. A first install needs no credential. It creates the Admin bootstrap credential and prints its path. A second run creates no second credential. A later run that changes an existing installation is refused without a foreground confirmation or `--admin-credential-file`. Under `kkd --foreground`, the first start creates the credential and logs its path.
+  - `kk automation apply --admin-credential-file <path>` activates the [automation policy](appendix-a-glossary.md#automation-policy). `kk automation credential create <name> --admin-credential-file <path>` creates an [automation credential](appendix-a-glossary.md#automation-credential).
+  - `kk init` run with that automation credential begins its approval with that credential, not with Admin. It succeeds under a matching `init` rule. With no `init` rule it exits with code 3 and registers nothing.
+  - No presenter is enrolled at any point in the run.
+  - At a terminal, the first-run question about installing the daemon is still asked.
+- **No prompt without a terminal.** With no terminal, `kk` never prompts.
+  - Each command that would ask a question fails instead, changes nothing, and names the flag that answers the question. The cases include the target of [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target), the daemon install question, and presenter enrollment.
+  - The same command with that flag runs with no terminal.
+  - No `--yes` flag, piped confirmation, environment variable, or reusable token produces an approval. Unattended approval comes only from the activated policy.
+- **[Exit codes](09-commands.md#exit-codes).** One case observes each code:
+  - `0` for success;
+  - `1` for an operation that failed;
+  - `2` for a usage error;
+  - `3` for an approval that is needed when none is available;
+  - `4` for a refusal by a precondition or a safety proof, including `kk switch` with `NoCallerClient`;
+  - `5` for a daemon that is unreachable or not installed;
+  - `6` for a timeout.
+- **[`--json`](09-commands.md#output-for-scripts).** Every read command, and the final result of every other command, can be printed as JSON.
+  - The flag changes rendering only. The same command with and without it makes the same daemon calls and the same state changes.
+  - The output parses as JSON, and it carries every fact the plain rendering shows.
+  - A refused or failed command still prints a JSON result and keeps its exit code.
+- **[`kk events`](09-commands.md#kk-events).** The command is the CLI face of the event streams.
+  - `kk events --thread <t>` prints the events `StreamThreadEvents` serves for that thread, in sequence order.
+  - Without `--thread` it prints the repo-wide events that `StreamRepoEvents` serves.
+  - `--since <seq>` starts after that sequence number, with no gap and no repeated event.
+  - `--follow` keeps the stream open and prints new events as they happen. Without it the command prints what exists and exits 0.
+  - `--json` prints each event as JSON.
+  - A harness permission prompt produces `agent_blocked` in the stream. Kiki never answers the harness's own prompt.
+  - All of this works with zero attached Herdr clients.
+- **[`kk wait`](09-commands.md#kk-wait).** `kk wait [<thread>] --for <state>` blocks until the thread reaches the state.
+  - Each state is covered: `quiescent`, `goal-complete`, `blocked`, `conflicted`, `closed`, and `issue`.
+  - It exits 0 when the state is reached, and at once when the thread is already in it.
+  - It exits 6 when `--timeout` runs out first.
+- **The `command` notification provider.** `[notifications] command` names a program that `kkd` runs for each `loud` [attention event](appendix-a-glossary.md#attention-event).
+  - With `os_provider = "command"`, `kkd` runs the program once per `loud` event, with the event as JSON on its standard input.
+  - A `soft` or `silent` event does not run it.
+  - A program that runs past the short timeout is stopped. A timeout or a non-zero exit is not retried, and it does not hold back the event's status mark or its `kk events` row.
+  - Only the user config file can set `command`. A value from a repo, thread, environment, or `--config` layer does not take effect.
+  - `os_provider = "auto"` on a host with no desktop session resolves to `command` when `command` is set, and to `off` when it is not.
 - If a thread's workspace directory is deleted out of band, the thread records `ProjectionDiverged { reason: WorkspaceDirectoryMissing }` at daemon boot or `kk ls`.
   - It fires exactly one notification.
   - It is neither recreated nor reclassified automatically.
@@ -138,7 +178,7 @@ Some terms used throughout this section:
       - A restart after exhaustion re-surfaces the blocked thread without minting a new attempt.
     - The two repair exits:
       - A [`retry-delivery`](appendix-a-glossary.md#retry-delivery) plan re-arms exactly one fresh bounded cycle by incrementing the [delivery epoch](appendix-a-glossary.md#delivery-epoch). So bounds count only attempt rows stamped with the current epoch. A prior-epoch row can never consume the fresh cycle. No bound ever compares timestamps, even under clock skew or rollback.
-      - A [`discard-delivery`](appendix-a-glossary.md#discard-delivery) plan acknowledges without delivery proof only under a one-shot approval bound to that plan, and records the human resolution.
+      - A [`discard-delivery`](appendix-a-glossary.md#discard-delivery) plan acknowledges without delivery proof only under a one-shot approval bound to that plan, and records the resolution with the approval that allowed it.
       - No other write is accepted against an [exhausted intent](appendix-a-glossary.md#exhausted-intent).
     - Receipt unreadable at the completing arrival: acknowledgement defers when no delivery is pending, and takes `RestartStartup` when one is.
     - Matching receipt: acknowledge.
@@ -509,6 +549,18 @@ A [projection](appendix-a-glossary.md#projection) is a changeable outside thing 
   - With `kk` first invoked from inside a terminal application, quitting that application leaves `kkd`, the server, and every agent running.
   - This is an integration gate on each platform.
   - No Herdr release containing its own terminal-quit fix is required, because that fix applies only to a server Herdr starts for itself.
+- **No service manager.** Many containers and CI runners have no user service manager. There, `kkd --foreground` runs under whatever supervisor the operator uses.
+  - `kkd` starts the Herdr server as a detached process in its own [session](appendix-a-glossary.md#ext-session), not as a child that dies with `kkd`.
+  - The survival proof above is a gate for this mode too: `kkd` is crashed with `SIGKILL`, restarted, and upgraded, and each time the server and every agent keep running with unchanged process identities.
+  - The returning `kkd` verifies the same server instance and continues the same bindings.
+  - A platform mode that fails the proof is unsupported. It is not shipped with a weaker promise.
+- **macOS over SSH with no GUI login.** `kkd` and the server run in launchd's per-user domain, not the GUI domain.
+  - The same survival proof is the gate. It is an unproven gate until it passes on a real host with no GUI login.
+- **A full lifecycle with zero attached clients.** No Herdr client, overlay, popup, `ui` pane, or desktop session exists at any point in the test.
+  - Under an automation credential and an activated policy, the test runs `kk init`, `kk new`, `kk close`, `kk reopen`, and a `kk repair` restart.
+  - Each step reaches the same end state as it does with a client attached, and every safety proof runs.
+  - `kk ls --json` and `kk events` report what the overlay would show.
+  - `kk attach` over SSH later connects a client to the running thread. Attaching and detaching change nothing in kiki's state.
 - **Cold restore.** The [dedicated server](appendix-a-glossary.md#dedicated-herdr-server) stops and restarts with its saved layout.
   - What the runtime does:
     - The fake and the real runtime both return the same public workspace, tab, and pane ids with new processes. They may reuse a closed group's workspace id for a new group.
@@ -559,7 +611,7 @@ A [projection](appendix-a-glossary.md#projection) is a changeable outside thing 
   - The matching cases for [sidebar tokens](appendix-a-glossary.md#sidebar-token) (overwritten, expired, or lost at restart, then republished) are tested with the later sidebar-token surface, not here.
 - **Caller-local focus with two attached clients.** [Caller-local focus](appendix-a-glossary.md#caller-local-focus) moves only the viewer who ran the command.
   - With [`client_targeted_focus`](appendix-a-glossary.md#client-targeted-focus) advertised, `kk switch <thread>` moves only the invoking client. The other client's location is unchanged.
-  - A command with no viewer (an agent's tool call, a script, a pane nobody is showing) resolves `NoCallerClient` and moves no one.
+  - A command with no viewer (an agent's tool call, a script, a pane nobody is showing) resolves `NoCallerClient` and moves no one. `kk switch` then exits with code 4.
   - Without the capability, `kk switch <thread>` fails naming the missing capability and moves no client. It never falls back to the broadcast focus.
   - `kk switch --all-clients <thread>` is the only form that moves every attached client.
   - Capability detection reads the runtime's advertised capabilities. A fake that silently ignores the unknown client parameter must not be mistaken for support.
@@ -833,7 +885,7 @@ A thread's [bookmark](appendix-a-glossary.md#bookmark) is a named pointer that m
   - [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target):
     - It is offered for any bookmark issue: `BookmarkMissing`, `BookmarkMoved`, `BookmarkConflicted`, and `CheckpointAbandoned`.
     - It is also offered for a thread with no open issue whose relationship is `ahead` or `diverged`.
-    - Its target is the live head or an on-chain commit the human picks. It needs a one-shot approval and records `RepairChoose`.
+    - Its target is the live head or an on-chain commit the caller names with `--target <commit>`. It needs a one-shot approval and records `RepairChoose`.
     - It is the exit whenever the expected target is hidden.
   - [`unhide-checkpoint`](appendix-a-glossary.md#unhide-checkpoint):
     - It is offered for `CheckpointAbandoned`, and only when unhiding would not create a divergent change.
@@ -995,6 +1047,9 @@ Each module below has its own list of things its tests cover.
 `AuthEnforcer` and `ApprovalBroker` tests cover thread-scoped rejection across siblings and operational rejection of Admin. They also cover:
 
 - `BeginApproval` under Admin is accepted only for the approvals of `kk init`, first run, and the user-scoped `replace-terminal-server` plan; Admin cannot confirm the challenge and cannot begin any other approval
+- Admin passed with `--admin-credential-file` is accepted only by `kk automation apply`, `kk automation credential create` and `rotate`, and a `kk daemon install` that changes an existing installation; a first install needs no credential, and every operational method still rejects Admin
+- `kk init` begun by an automation credential uses that credential for `BeginApproval`, not Admin
+- the user-scoped `replace-terminal-server` plan begun by an automation credential uses that credential too; it runs only under a rule that allows `repair:replace-terminal-server`, accepts `server-wide`, and has `repos = ["*"]`
 - broker enrollment
 - persisted begin/display/confirm/cancel challenges
 - binding of the [nonce](https://en.wikipedia.org/wiki/Cryptographic_nonce), channel, method, target, arguments, and rendered plan
@@ -1004,7 +1059,30 @@ Each module below has its own list of things its tests cover.
 - final consumption
 - expiry and replay
 - plan-digest drift
-- non-interactive failure
+- a caller with no terminal: with no matching rule, or with a rule that requires a human, the call is refused with exit code 3 and changes nothing
+
+[Automation policy](04-authority.md#automation-policy) tests cover the rules that let a [`PolicyApproval`](04-authority.md#policyapproval) stand in for the human's confirmation:
+
+- **Match.** A rule that matches the principal, repo, operation, and labels gives `Allowed`. `BeginApproval` returns a `PolicyApproval` in the same reply, the retried method runs, and `kk` prints the plan and "approved by rule `<name>`" with no prompt.
+- **No match.** With no matching rule the [decision](appendix-a-glossary.md#policy-decision) is `NoMatch`. At a foreground terminal the presenter flow runs as before. With no terminal the call exits with code 3, and the message names the operation, the plan's risk labels, and the reason.
+- **`require-human` beats `allow`.** When both kinds of rule match, the decision is `RequireHuman`, whatever order the rules are in.
+- **`require-human` ignores `accept`.** A `require-human` rule with no `accept` key matches a plan that carries risk labels, and a plan that carries none. It matches on principals, repos, and operations alone. Adding an `accept` list to it changes nothing.
+- **A label that is not accepted means no match.** An `allow` rule matches only if every [risk label](appendix-a-glossary.md#risk-label) on the plan is in its `accept` list. An `allow` rule with no `accept` key matches only a plan with no labels.
+- **`thread-op`.** An ordinary thread change, such as a checkpoint or a `restart-agent` repair, needs no approval in the thread's own context. Run with an automation credential or from another thread, it needs a one-shot approval, and only a rule that lists `thread-op` allows it. A rule that lists `repair:*` does not. The plan carries `cross-thread` for a thread-scoped caller and no label for an automation credential.
+- **Risk labels.** For each label in the closed set, a plan that does the labelled thing carries the label, and the rendered plan shows it. A plan with no labels still needs an approval when its operation is on the approval list.
+- **An edited but unapplied file changes nothing.** `kkd` evaluates only the stored, activated copy. `kk automation status` reports that the file differs from it.
+- **[Activation](04-authority.md#activating-a-policy).** `kk automation apply` takes effect only after a foreground confirmation by the enrolled presenter, which shows the full canonical policy and a diff against the active one, or with the Admin credential. A thread credential, an automation credential, or a `PolicyApproval` cannot activate a policy.
+- **Layers.** An `[automation]` section in a repo, thread, environment, or `--config` layer is not read.
+- **Revoke.** `kk automation revoke` needs no approval, and any credential of this user may call it. After it, every evaluation is `NoMatch`. A `PolicyApproval` issued before the revoke can still be claimed until it expires. One whose credential was revoked cannot.
+- **Consent is never matched by `*`.** A rule with `operations = ["*"]` does not match `consent:*`. Only a rule that names `consent:<purpose>` and lists the provider in `providers` does.
+- **A safety-proof refusal still refuses.** Under a rule with `accept = ["*"]`, each of these stops the plan exactly as it does for a human approval: drift, an `Unknown` freeze result, an unaccepted holder, a failed final proof, and a failed verified exit.
+- **`PolicyApproval` single use and drift.** A second claim of the same approval is refused. An expired one is refused. A changed plan digest is refused and needs a fresh `BeginApproval`. The approval is claimed into the operation journal before any external effect, and a crash resumes only that plan.
+- **What a `PolicyApproval` can never satisfy.** Activating a policy, creating or rotating an automation credential, and enrolling or recovering the presenter are each refused when offered a `PolicyApproval`.
+- **Principals.** `credential:<name>`, `thread:self`, `thread:descendant`, `thread:any`, `registration`, and `*` each match exactly the callers they name. A thread acting on a sibling does not match `thread:self` or `thread:descendant`.
+- **`--confirm`.** With a matching `allow` rule, `--confirm` still runs the human prompt.
+- **Agents.** `ConfirmApproval` from a descendant of an `agent` launcher stays refused. An agent's call is allowed only through a rule with a `thread:*` principal.
+- **[Automation credentials](appendix-a-glossary.md#automation-credential).** A credential reads repo summaries for every registered repo. It also reads each registered thread's status and non-sensitive state: `kk status`, `kk ls`, `kk events`, `kk wait`, and `kk repair` diagnose all work with it. A sensitive read is refused without a `sensitive-read` rule. It calls `BeginApproval` for any registered repo or thread, for `kk init`, and for the `replace-terminal-server` plan. It cannot confirm a human challenge, and it is refused wherever Admin or the presenter is required. Creating or rotating one needs the presenter or Admin. Revoking one needs no approval, and a revoked or rotated-out credential is rejected. The file is mode `0600` and never appears in a harness, hook, or pane environment.
+- **Audit.** Each `PolicyApproval` writes exactly one audit row with the rule name, policy digest, principal, operation, and risk labels. Policy activation and revoke, and credential create, rotate, and revoke, each write exactly one row in `user_audit_log`.
 
 Audit tests cover accepted, rejected, unidentified, bootstrap, registration, invalid-repo, and `ListRepos` attempts. Each attempt writes exactly one row. The row is routed to the per-repo or per-user [SQLite](https://www.sqlite.org/) sink. Nullable credential and approval identities are represented explicitly.
 
@@ -1030,6 +1108,7 @@ Provider-egress cases are about transcript text sent to a model provider. They c
 - revocation
 - a configured-provider change
 - local preview without egress
+- consent from an activated policy rule that names `consent:<purpose>` and the provider, and no consent from a rule whose `operations` is `*`
 - denial of same-thread transcript [MCP](https://modelcontextprotocol.io/) until an active purpose-bound grant exists
 
 ### `LogRenderer`
@@ -1127,7 +1206,7 @@ Publishing tests prove that the first publishing tranche uses a human-authored o
   - If any commit has none, publish refuses and names those commits.
   - Nothing is placed, nothing is pushed, and the expected target is unchanged.
   - With every commit described, the same publish goes on to its checkpoint.
-- Force-push and PR-base mutation remain a pending named remote plan until a foreground one-shot approval claims it.
+- Force-push and PR-base mutation remain a pending named remote plan until a one-shot approval claims it. That is a foreground human approval, or a policy approval from a `publish` rule that accepts the `externally-visible` risk label.
 - A failure retains the [follows edge](appendix-a-glossary.md#follows-edge) and is safe to retry.
 
 ## Fakes
@@ -1214,6 +1293,15 @@ Each shipped [harness](appendix-a-glossary.md#harness)'s integration is still a 
   - the `attention_events` proof, where the adapter claims it
 
 The service-manager gate is also integration-only. Under real launchd and real systemd, the Herdr server and the agents must keep running through a `kkd` crash, restart, and upgrade.
+
+Two more placement modes carry the same gate, and both are unproven until they pass on a real host:
+
+- `kkd --foreground` on a host with no user service manager, with the Herdr server as a detached process in its own session;
+- macOS over SSH with no GUI login, in launchd's per-user domain.
+
+A mode that fails the gate is unsupported.
+
+Kiki's own end-to-end tests run unattended. They present an automation credential and rely on an activated policy, and they attach no Herdr client unless the test is about a client.
 
 An upstream version that fails its probes uses hard restart or is unsupported. It is never modeled optimistically.
 

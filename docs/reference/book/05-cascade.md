@@ -361,8 +361,8 @@ Recovery pauses the agent and preserves the files at risk:
    - The CLI PoC (proof of concept) must prove the concrete mechanism. If it cannot, automatic `NativeRewrite` is not accepted for v1.
 3. Run jj's stale-workspace recovery. Then, from the exact resulting operation, enumerate every visible successor and divergent commit for the affected working-copy change id. For each one, include the operation predecessor record that links it to the pre-recovery commit.
 4. Verify that the pre-materialization edits are represented either in the materialized commit or in explicitly named recovery/divergent commits.
-5. If exactly one recovery successor can be selected safely, make the conflict-bearing result visible in the workspace and resume with conflict framing. Otherwise, leave the thread in `RecoveryRequired`, preserve the recovery record, and require a human to choose.
-6. Transition `RecoveryRequired → Reconciling → Materialized` only after the selected workspace state visibly contains the edits, or after the human explicitly chooses a recovery outcome. Record that choice and the recovery-bundle location on the intent.
+5. If exactly one recovery successor can be selected safely, make the conflict-bearing result visible in the workspace and resume with conflict framing. Otherwise, leave the thread in `RecoveryRequired`, preserve the recovery record, and require an explicit choice. kiki never makes that choice itself.
+6. Transition `RecoveryRequired → Reconciling → Materialized` only after the selected workspace state visibly contains the edits, or after a caller explicitly chooses a recovery outcome. Record that choice and the recovery-bundle location on the intent.
 
 ### What the payload says, and who may delete a bundle
 
@@ -615,7 +615,7 @@ In one transaction, kiki creates a replacement incarnation and a one-use `startu
 
 **No leftover processes.** Before that gate is activated, an inventory rooted at the launcher must show no process other than the launcher itself. No tool child of the retired harness may survive in the launcher's descendant, session, or [process-group](https://en.wikipedia.org/wiki/Process_group) set. A survivor raises [`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess) with harness-remnant evidence (see [orphan](appendix-a-glossary.md#orphan)). It blocks replacement, materialization, and deletion until the approved [`terminate-orphans`](appendix-a-glossary.md#terminate-orphans) plan resolves it.
 
-**Approval.** These restarts, the cascade hard restart and the `RestartStartup` replacement, are daemon-initiated steps of the delivery protocol and need no human approval. A human-requested interruption or close does.
+**Approval.** These restarts, the cascade hard restart and the `RestartStartup` replacement, are daemon-initiated steps of the delivery protocol and need no one-shot approval. A requested interruption or close does need one, from a human or from an activated [automation policy](appendix-a-glossary.md#automation-policy) rule.
 
 **If the pane launcher is gone.** Then there is nothing to open a gate for:
 
@@ -659,7 +659,7 @@ After that, one fresh bounded `RestartStartup` cycle is permitted. Every attempt
 
 **`discard-delivery`** acknowledges the intent without delivery proof, under a one-shot [approval](appendix-a-glossary.md#human-approval) bound to the plan.
 
-- It records that human resolution on the intent and frees the queue behind it.
+- It records that resolution on the intent, with the approval that allowed it, and frees the queue behind it.
 - The payload is never delivered, and the plan states that consequence before approval.
 
 These two exits are the only writes permitted against an exhausted intent.
@@ -761,7 +761,7 @@ Under Codex's proven-serial dispatch this scenario cannot arise:
 
 ## Conflicts and escalation
 
-A jj command can succeed and still leave a problem behind, such as a file with conflict markers or two competing versions of a commit. This section says which of those results the agent may handle itself and which require kiki to stop the agent and involve a human.
+A jj command can succeed and still leave a problem behind, such as a file with conflict markers or two competing versions of a commit. This section says which of those results the agent may handle itself and which require kiki to stop the agent and wait for an explicit decision.
 
 In [jj](https://docs.jj-vcs.dev/latest/), [conflicts](https://docs.jj-vcs.dev/latest/conflicts/) and [divergent changes](https://docs.jj-vcs.dev/latest/glossary/) are first-class states, not necessarily failed commands. kiki inspects result revisions and every successor of the affected working-copy change id. It does not rely only on process exit status, or on whichever divergent commit jj happens to place on disk.
 
@@ -810,13 +810,13 @@ Once the v1.x GitHub polling integration ships ([v1.x](appendix-a-glossary.md#v1
 
 ## Parent abandoned
 
-A parent thread's bookmark or commits can be changed or thrown away from outside kiki. This section says which of those changes kiki reports, and that it then waits for a human instead of picking a new parent by itself.
+A parent thread's bookmark or commits can be changed or thrown away from outside kiki. This section says which of those changes kiki reports, and that it then waits for an explicit decision instead of picking a new parent by itself.
 
 A change to the parent's checkpoint [bookmark](appendix-a-glossary.md#bookmark) never changes the pinned follows relationship.
 
 - jj carrying the bookmark to a proven rewrite successor is ordinary and raises nothing.
 - Deleting the bookmark, moving it elsewhere, or leaving it conflicted creates [`BookmarkMissing`](appendix-a-glossary.md#bookmarkmissing), [`BookmarkMoved`](appendix-a-glossary.md#bookmarkmoved), or [`BookmarkConflicted`](appendix-a-glossary.md#bookmarkconflicted). Abandoning the bookmarked commit creates [`CheckpointAbandoned`](appendix-a-glossary.md#checkpointabandoned). In each case an active parent enters `ProjectionDiverged` (see [projection divergence](appendix-a-glossary.md#projection-divergence)).
-- If an external jj operation abandons the parent live head or owned revisions, or otherwise makes ancestry ambiguous, kiki records [`TopologyDiverged`](appendix-a-glossary.md#topologydiverged) and requires human attention.
+- If an external jj operation abandons the parent live head or owned revisions, or otherwise makes ancestry ambiguous, kiki records [`TopologyDiverged`](appendix-a-glossary.md#topologydiverged) and waits for an explicit decision. It raises an attention event, which also shows in `kk events`.
 
 `jj abandon` hides the commit and also deletes a bookmark on it by default. So one abandon can produce both a bookmark issue and `TopologyDiverged`. Each is classified on its own and neither replaces the other.
 

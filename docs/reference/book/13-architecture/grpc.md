@@ -4,6 +4,8 @@
 
 `kk`, the [pane launcher](../appendix-a-glossary.md#pane-launcher), [`kk-hook`](../appendix-a-glossary.md#kk-hook), the optional `ui` pane, and any future UI are all clients of this service. There is no privileged internal API.
 
+This service and the `kk` commands built on it are the complete surface of kiki. kiki is [headless](../appendix-a-glossary.md#headless): no method needs an attached Herdr client, a popup, a pane, or a desktop session. A script or a continuous-integration (CI) job is an ordinary client. It runs `kk` with an [automation credential](../appendix-a-glossary.md#automation-credential), a credential made for callers that have no human and no thread.
+
 ## Transport
 
 - **Socket:** `~/.config/kiki/kkd.sock`, mode `0600`. (Mode `0600` is a [Unix file permission](https://en.wikipedia.org/wiki/File-system_permissions) that lets only the owning user read and write.)
@@ -18,46 +20,92 @@ The proto (the Protocol Buffers file) is partitioned by capability class. A [cap
 
 - Every operational method declares its `ThreadScoped<T>` scope. (A [`ThreadScoped<T>` credential](../appendix-a-glossary.md#threadscoped-credential) is bound to one thread.)
 - Every operational method also declares whether it also consumes a `HumanApproval`. That [approval](../appendix-a-glossary.md#human-approval) is bound to the method, the target, and the argument digest (a [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the arguments).
-- Admin is accepted only by bootstrap and approval-presenter enrollment endpoints, and by `BeginApproval` for the approvals of `kk init` and first run, when no thread or registration credential exists yet. It is also accepted by the two user-scoped `replace-terminal-server` calls, `DiagnoseServerRepair` and the `BeginApproval` for that plan, so they work from any directory. It is never ambient operational authority. `kkd` checks the [Admin credential](../appendix-a-glossary.md#bootstrap-admin-credential) against its record in the user-level database, `~/.config/kiki/state.db`, because Admin belongs to no one repo.
+- Wherever this chapter says a method consumes a `HumanApproval`, a [`PolicyApproval`](../appendix-a-glossary.md#policy-approval) for the same plan satisfies it. A `PolicyApproval` is the one-shot approval that `kkd` issues when the active [automation policy](../appendix-a-glossary.md#automation-policy) allows the exact plan. [Authority](../04-authority.md#policyapproval) owns this rule and its exceptions. The exceptions are the methods on the Automation and Bootstrap surfaces below: they never accept a `PolicyApproval`.
+- A method that consumes a one-shot approval also accepts an `AutomationScoped<name>` caller, which is a caller that presents an automation credential. The approval must be bound to that same credential. By itself, an automation credential is accepted only by the repo-summary reads, `ListRepos`, `StreamRepoEvents`, the non-sensitive thread status reads, the diagnose methods, and `BeginApproval` for any registered repo or thread, for `kk init`, and for the user-scoped `replace-terminal-server` plan. It is also accepted by the revoke, status, and list methods of the Automation surface. `ConfirmApproval`, the Bootstrap surface, and the gated Automation methods never accept it.
+- Admin is accepted only by bootstrap and approval-presenter enrollment endpoints, and by `BeginApproval` for the approvals of `kk init` and first run, when no thread or registration credential exists yet. It is also accepted by the two user-scoped `replace-terminal-server` calls, `DiagnoseServerRepair` and the `BeginApproval` for that plan, so they work from any directory. A caller that presents an automation credential uses that credential for `kk init` and for these two calls, not Admin. Admin is also accepted by `ApplyAutomationPolicy`, `CreateAutomationCredential`, and `RotateAutomationCredential`, which is how a machine with no human sets up automation. It is never ambient operational authority, and operational methods still reject it. `kkd` checks the [Admin credential](../appendix-a-glossary.md#bootstrap-admin-credential) against its record in the user-level database, `~/.config/kiki/state.db`, because Admin belongs to no one repo.
 
-| Surface                 | Methods (illustrative)                                                                                                                      | Capability                                                                                                                                                                                                            |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bootstrap               | `EnrollApprovalPresenter`, `RecoverApprovalPresenter`                                                                                       | explicit Admin bootstrap                                                                                                                                                                                              |
-| Approval                | `BeginApproval`, `ConfirmApproval`, `CancelApproval`                                                                                        | caller credential begins; enrolled foreground presenter confirms/cancels                                                                                                                                              |
-| Repo registry           | `RegisterRepo`, `UnregisterRepo`, `ListRepos`                                                                                               | summary registration capability; mutations consume `HumanApproval`                                                                                                                                                    |
-| Thread lifecycle        | `NewThread`, `Close`, `Reopen`, `Destroy` (v1.x), `DiagnoseRepair`, `ApplyRepair`                                                           | `ThreadScoped<T>` where available; consequential plans consume `HumanApproval`                                                                                                                                        |
-| Repo repair             | `DiagnoseRepoRepair`, `ApplyRepoRepair`                                                                                                     | `RegistrationScoped<repo_id>` or `ThreadScoped<T>` to diagnose; apply consumes a one-shot `HumanApproval` with repo scope                                                                                             |
-| Thread reads (own)      | `GetThreadState`, `StreamThreadEvents`, `GetCascadeStatus`                                                                                  | `ThreadScoped<T>`                                                                                                                                                                                                     |
-| Repo summaries          | `RepoThreadSummaries` (server-streaming)                                                                                                    | least-privilege same-repo summary capability                                                                                                                                                                          |
-| Cascade hook            | `PreToolUseDecision`, `MarkDelivered`, `MarkToolBatchComplete`                                                                              | `ThreadScoped<T>` plus exact incarnation/turn/batch identities                                                                                                                                                        |
-| Terminal server         | `EnsureTerminalServer`                                                                                                                      | `RegistrationScoped<repo_id>` or `ThreadScoped<T>`; no approval; starts no agent                                                                                                                                      |
-| Terminal server repair  | `DiagnoseServerRepair`, `ApplyServerRepair`                                                                                                 | `RegistrationScoped<repo_id>`, `ThreadScoped<T>`, or the Admin bootstrap credential to diagnose and to begin the approval, so both work from any directory; apply consumes a one-shot `HumanApproval` with user scope |
-| Pane launcher           | `ReportLauncherStarted`, `SuperviseLauncher` (bidirectional stream carrying `AwaitLaunchGate`), `ReportHarnessStarted`, `ReportHarnessExit` | `ThreadScoped<T>` plus the provision nonce for the first claim, one claim per `(provision_id, role)`, bound to the caller's peer credentials; after the claim is accepted, the accepted peer process identity         |
-| Harness startup         | `ReportHarnessReady`                                                                                                                        | thread scope plus the incarnation id and, for a replacement, its one-use `startup_delivery_id`                                                                                                                        |
-| Transcript (v1.x)       | `ReadTranscript`, `SearchTranscript`                                                                                                        | same-thread `ThreadScoped<T>`; cross-thread read consumes `HumanApproval`                                                                                                                                             |
-| Provider consent (v1.x) | `ListEgressConsents`, `GrantEgressConsent`, `RevokeEgressConsent`                                                                           | reads use caller scope; grant/revoke require the foreground presenter                                                                                                                                                 |
-| Publish (v1.x)          | `Publish`                                                                                                                                   | `ThreadScoped<T>` plus a one-shot approval bound to the exact remote plan                                                                                                                                             |
-| Audit                   | `GetAuditLog`, `GetThreadAudit`                                                                                                             | non-sensitive same-thread slice; detailed or cross-thread read consumes `HumanApproval`                                                                                                                               |
-| Config                  | `GetConfig`, later `SetConfig`                                                                                                              | least privilege for reads; consequential scope changes consume approval                                                                                                                                               |
+| Surface                 | Methods (illustrative)                                                                                                                      | Capability                                                                                                                                                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bootstrap               | `EnrollApprovalPresenter`, `RecoverApprovalPresenter`                                                                                       | explicit Admin bootstrap                                                                                                                                                                                                                        |
+| Approval                | `BeginApproval`, `ConfirmApproval`, `CancelApproval`                                                                                        | caller credential begins, and the reply carries a `PolicyDecision` and, when the policy allows the plan, a `PolicyApproval`; enrolled foreground presenter confirms/cancels                                                                     |
+| Automation policy       | `ApplyAutomationPolicy`, `GetAutomationStatus`, `RevokeAutomationPolicy`                                                                    | apply: the Admin bootstrap credential, or a `HumanApproval` confirmed by the enrolled presenter, never a `PolicyApproval`; status and revoke: any valid credential of this user, no approval                                                    |
+| Automation credentials  | `CreateAutomationCredential`, `RotateAutomationCredential`, `RevokeAutomationCredential`, `ListAutomationCredentials`                       | create and rotate: the same gate as apply; revoke and list: any valid credential of this user, no approval                                                                                                                                      |
+| Repo registry           | `RegisterRepo`, `UnregisterRepo`, `ListRepos`                                                                                               | summary registration capability; mutations consume `HumanApproval`                                                                                                                                                                              |
+| Thread lifecycle        | `NewThread`, `Close`, `Reopen`, `Destroy` (v1.x), `DiagnoseRepair`, `ApplyRepair`                                                           | `ThreadScoped<T>` where available; consequential plans consume `HumanApproval`                                                                                                                                                                  |
+| Repo repair             | `DiagnoseRepoRepair`, `ApplyRepoRepair`                                                                                                     | `RegistrationScoped<repo_id>` or `ThreadScoped<T>` to diagnose; apply consumes a one-shot `HumanApproval` with repo scope                                                                                                                       |
+| Thread reads (own)      | `GetThreadState`, `StreamThreadEvents`, `GetCascadeStatus`                                                                                  | `ThreadScoped<T>`; `GetThreadState` and `GetCascadeStatus` also accept an automation credential for any registered thread and then return only non-sensitive state                                                                              |
+| Repo summaries          | `RepoThreadSummaries` (server-streaming)                                                                                                    | least-privilege same-repo summary capability, or an automation credential for any registered repo                                                                                                                                               |
+| Repo events             | `StreamRepoEvents` (server-streaming)                                                                                                       | the same capability as repo summaries; carries summary-class fields only                                                                                                                                                                        |
+| Cascade hook            | `PreToolUseDecision`, `MarkDelivered`, `MarkToolBatchComplete`                                                                              | `ThreadScoped<T>` plus exact incarnation/turn/batch identities                                                                                                                                                                                  |
+| Terminal server         | `EnsureTerminalServer`                                                                                                                      | `RegistrationScoped<repo_id>` or `ThreadScoped<T>`; no approval; starts no agent                                                                                                                                                                |
+| Terminal server repair  | `DiagnoseServerRepair`, `ApplyServerRepair`                                                                                                 | `RegistrationScoped<repo_id>`, `ThreadScoped<T>`, an automation credential, or the Admin bootstrap credential to diagnose and to begin the approval, so both work from any directory; apply consumes a one-shot `HumanApproval` with user scope |
+| Pane launcher           | `ReportLauncherStarted`, `SuperviseLauncher` (bidirectional stream carrying `AwaitLaunchGate`), `ReportHarnessStarted`, `ReportHarnessExit` | `ThreadScoped<T>` plus the provision nonce for the first claim, one claim per `(provision_id, role)`, bound to the caller's peer credentials; after the claim is accepted, the accepted peer process identity                                   |
+| Harness startup         | `ReportHarnessReady`                                                                                                                        | thread scope plus the incarnation id and, for a replacement, its one-use `startup_delivery_id`                                                                                                                                                  |
+| Transcript (v1.x)       | `ReadTranscript`, `SearchTranscript`                                                                                                        | same-thread `ThreadScoped<T>`; cross-thread read consumes `HumanApproval`                                                                                                                                                                       |
+| Provider consent (v1.x) | `ListEgressConsents`, `GrantEgressConsent`, `RevokeEgressConsent`                                                                           | reads use caller scope; revoke needs no approval and accepts any valid credential of this user; grant requires the foreground presenter or a `PolicyApproval` from a rule that names the purpose and the provider                               |
+| Publish (v1.x)          | `Publish`                                                                                                                                   | `ThreadScoped<T>` plus a one-shot approval bound to the exact remote plan                                                                                                                                                                       |
+| Audit                   | `GetAuditLog`, `GetThreadAudit`                                                                                                             | non-sensitive same-thread slice; detailed or cross-thread read consumes `HumanApproval`                                                                                                                                                         |
+| Config                  | `GetConfig`, later `SetConfig`                                                                                                              | least privilege for reads; consequential scope changes consume approval                                                                                                                                                                         |
 
 The rest of this section explains the surfaces that need more than one line.
 
 ### Approval
 
-An approval is how a human agrees to a consequential operation. It has separate steps so that the credential that requests an operation is never the one that confirms it.
+A one-shot approval is how a consequential operation gets permission to run. It comes from one of two places: a human who confirms the plan, or the active automation policy. It has separate steps so that the credential that requests an operation is never the one that confirms it.
 
-- **`BeginApproval`** does four things:
-  - It authenticates the operation requester.
-  - It performs a non-mutating preflight (a check that changes nothing).
+- **`BeginApproval`** does six things:
+  - It authenticates the operation requester. The requester is a thread credential, a registration credential, an automation credential, or, for the cases listed above, Admin.
+  - It performs a non-mutating preflight (a check that changes nothing). The preflight computes the plan's [risk labels](../appendix-a-glossary.md#risk-label). A risk label names one kind of harm the plan carries, such as `work-loss`. [Authority](../04-authority.md#risk-labels) owns the closed set.
   - It stores a pending challenge.
-  - It returns the daemon-canonical display plan and digest.
+  - It evaluates the active automation policy against four inputs: the caller's principal, the repo, the operation, and the plan's risk labels. `kkd` evaluates only its stored copy of the policy. It never reads the configuration file here. See [Authority](../04-authority.md#automation-policy).
+  - It returns the daemon-canonical display plan, its digest, and its risk labels.
+  - It returns a `PolicyDecision`: `Allowed{rule}`, `RequireHuman{rule}`, or `NoMatch`. `rule` is the name of the rule that decided.
+- **`Allowed`.** `kkd` issues a `PolicyApproval` in the same reply and in the same [transaction](https://en.wikipedia.org/wiki/Database_transaction) that stores the challenge. No one calls `ConfirmApproval`. The challenge is closed, so no second approval can come from it.
+  - A `PolicyApproval` is bound to the same things as a `HumanApproval`: the caller's credential identity, the method, the target repo and thread, the plan digest, and a short expiry. It is single-use.
+  - The request field `require_human` tells `kkd` not to issue one. `kk --confirm` sets it. The reply still carries the decision, and the challenge stays open for the presenter.
+- **`RequireHuman` or `NoMatch`.** `kkd` issues nothing. The only way forward is `ConfirmApproval`.
+  - With a foreground terminal, `kk` runs the presenter flow.
+  - Without one, `kk` fails closed with exit code 3. Its message names the operation, the plan's risk labels, and the reason: no rule matched, or rule `<name>` requires a human. See [exit codes](../09-commands.md#exit-codes).
 - **`ConfirmApproval`** is accepted only with an enrolled [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter) credential and foreground-terminal proof.
   - It cannot change the stored plan.
-  - It is refused when the presenter process is a descendant or session member of any recorded `agent`-role launcher. So a card cannot be confirmed from inside an agent's process tree.
+  - It is refused when the presenter process is a descendant or session member of any recorded `agent`-role launcher. So a card cannot be confirmed from inside an agent's process tree. An agent gets authority only through a policy rule whose principal is one of the `thread:` kinds.
   - That check is cooperative hygiene, not a security boundary.
+  - It never accepts an automation credential.
   - `ConfirmApproval` never performs the operation itself.
-- The consequential method later claims the issued approval and its operation journal atomically (in one indivisible step).
+- The consequential method later claims the issued approval and its operation journal atomically (in one indivisible step). This step is the same for both kinds of approval.
+- The policy replaces only the confirm step. Preflight, the plan digest, the drift and expiry checks, single use, the journal, and every safety proof run the same way. A policy can never make a plan run that a safety proof refuses.
 - Operational methods reject presenter and Admin credentials.
+- There is no other source of approval. No request field, environment variable, or reusable token approves a plan.
+
+**Methods the policy never approves.** `kkd` does not evaluate the policy for `ApplyAutomationPolicy`, `CreateAutomationCredential`, or `RotateAutomationCredential`. A `BeginApproval` for one of them always returns `NoMatch`. Those three methods, `EnrollApprovalPresenter`, and `RecoverApprovalPresenter` each refuse a `PolicyApproval`.
+
+### Automation
+
+The Automation surface manages the automation policy and the automation credentials. [Commands](../09-commands.md#kk-automation) owns the `kk automation` commands that call it. [Configuration](../11-configuration.md#automation-keys) owns the `[automation]` keys.
+
+**The gate.** `ApplyAutomationPolicy`, `CreateAutomationCredential`, and `RotateAutomationCredential` add authority. Each needs one of two things:
+
+- **A presenter confirmation.** `kk` calls `BeginApproval` for the method with a thread, registration, or Admin credential. The stored plan is the full canonical policy and its difference from the active one, or the credential's name. The enrolled presenter confirms it at a foreground terminal, and the method consumes the resulting `HumanApproval`. The challenge and the approval live in the user database, because these methods have no repository target.
+- **The Admin bootstrap credential.** `kk` reads it from the file named by `--admin-credential-file` and presents it on the call. There is no challenge. This is the path for a machine that never has a human. `kk` never loads Admin by itself.
+
+The methods:
+
+- **`ApplyAutomationPolicy`** carries the `[automation]` tables that `kk` read from the user configuration file.
+  - `kkd` canonicalizes them into one fixed form and computes the policy digest.
+  - In one transaction, `kkd` marks the active `automation_policies` row superseded, inserts the new row, and swaps the policy it evaluates.
+  - Editing the file changes nothing until this method succeeds. See [Authority](../04-authority.md#activating-a-policy).
+- **`GetAutomationStatus`** returns the active policy's canonical text, its digest, who activated it (`Presenter` or `Admin`), and when.
+  - `kk` may send the file's current `[automation]` tables with the request. `kkd` canonicalizes them and reports whether their digest differs from the active one.
+  - It changes nothing.
+- **`RevokeAutomationPolicy`** marks the active row superseded and inserts none. Afterward every `PolicyDecision` is `NoMatch`. A `PolicyApproval` that was already issued stays valid until its short expiry.
+- **`CreateAutomationCredential(name)`** makes a new secret. `kkd` stores only its hash in `automation_credentials` and writes the secret to `~/.config/kiki/automation/<name>.cred` with mode `0600`.
+- **`RotateAutomationCredential(name)`** replaces the secret and the file. The old secret stops working at once.
+- **`RevokeAutomationCredential(name)`** marks the row revoked. Approvals bound to that credential can no longer be claimed.
+- **`ListAutomationCredentials`** returns names and timestamps, never a secret or a hash.
+
+The revoke methods only remove authority. So they need no approval, and they accept any valid credential of this user: thread, registration, automation, or Admin. The status and list methods accept the same credentials.
+
+Every call on this surface writes a row to `user_audit_log`.
 
 ### Repair
 
@@ -74,6 +122,8 @@ Repair has a diagnose step and an apply step at each of three scopes. Diagnose c
 - `DiagnoseServerRepair` returns the `replace-terminal-server` plan. The plan lists every thread and every process that the replacement stops.
 - `ApplyServerRepair` needs a one-shot approval. The plan is user-scoped, not thread-scoped, so no thread credential can authorize it alone. It stops the old server with [verified exit](../appendix-a-glossary.md#verified-exit) and then starts a new one.
 - Every apply method claims its approval together with its operation journal, like any other consequential method.
+- The three diagnose methods also accept an automation credential, for any registered repo or thread. They change nothing. An apply from that credential needs a `PolicyApproval`. For a plan that needs a one-shot approval in every context, the rule must name `repair:<plan-name>` or `repair:*`. For a plan that needs none in the thread's own context, such as `restart-agent`, the rule must name `thread-op`. See [Authority](../04-authority.md#the-thread-op-operation).
+- A repair plan never asks a question during apply. A choice a plan needs, such as the target of a bookmark plan, is an argument of the apply call and part of the plan digest.
 
 ### Cascade hook
 
@@ -89,6 +139,8 @@ Repair has a diagnose step and an apply step at each of three scopes. Diagnose c
 [Provider-egress consent](../appendix-a-glossary.md#provider-egress-consent) is the user's permission to send transcript text to a model provider. It is durable privacy policy. It is not reusable operational Admin authority.
 
 - `GrantEgressConsent` uses the foreground presenter to bind an exact `(repo_id, thread_id, provider_identity, purpose, disclosure_version)` tuple. The purpose is `catch_up | transcript_mcp`.
+- A `PolicyApproval` can stand in for the presenter only when the rule that allowed it names the operation `consent:<purpose>` and lists the normalized provider identity. A `*` in a rule's operations never matches a consent operation. A plain configuration key still grants no consent. See [Authority](../04-authority.md#automation-policy).
+- `RevokeEgressConsent` only takes permission away. It needs no approval, and it accepts any valid credential of this user.
 - Agent-facing MCP ([Model Context Protocol](https://modelcontextprotocol.io/)) cannot call grant or revoke methods.
 - A missing consent returns `ConsentRequired` without transcript content.
 
@@ -112,6 +164,7 @@ Repair has a diagnose step and an apply step at each of three scopes. Diagnose c
 
 - It returns the session name and the server's peer identity `(pid, start_time)`. With these, `kk` can verify that it is talking to the same instance.
 - `kk attach` calls it and then uses Herdr's connect-only client mode for that session.
+- The server it returns may have no attached client at all. No method in this service needs one.
 - `kk` never uses a client entry point that would start a server.
 - So the server is always started by `kkd`, with the regenerated and validated configuration and the constructed environment described in [Daemon](daemon.md#the-dedicated-herdr-server).
 - The method creates no [terminal group](../appendix-a-glossary.md#terminal-group), starts no agent, restarts no thread, and consumes no approval.
@@ -201,6 +254,7 @@ The terminal target is the session name, the server's peer identity `(pid, start
 - The target is a locator, valid only within that instance. It carries no authority.
 - Selecting a thread consumes no human approval and mutates no terminal.
 - If the runtime does not advertise [`client_targeted_focus`](../appendix-a-glossary.md#client-targeted-focus), `kk switch` fails naming that capability. `kk switch --all-clients` is the explicit form that moves every attached client.
+- A caller with no attached Herdr client, such as a script, resolves `NoCallerClient`. `kk switch` then moves no one and exits with code 4. Switch and attach are the only commands that need a Herdr client, and they exist only to move or open a view.
 - `kk attach` uses the same lookup to choose its initial target.
 
 ### Repo summaries
@@ -209,6 +263,9 @@ The terminal target is the session name, the server's peer identity `(pid, start
 
 - Its proto message is shared by `kk ls`, `kk log`, switch and attach lookup, the overlay, and the optional `ui` pane.
 - Renderers cannot add fields by querying a more privileged endpoint.
+- `--json` on a command prints the same message as [JSON](https://en.wikipedia.org/wiki/JSON). It changes rendering only. So the overlay and the `ui` pane show nothing that a command cannot print.
+- An automation credential may read the summaries of every registered repo. Through this method it reads no more fields than a registration credential does.
+- An automation credential may also read each registered thread's status and non-sensitive state, through `GetThreadState`, `GetCascadeStatus`, and the diagnose methods. This is what `kk status` and `kk repair` without `--apply` need. Those replies never carry transcript text, diff content, detailed audit arguments, or sync-intent payloads to it. Such a read needs a `sensitive-read` rule.
 - Herdr's native sidebar is not a client of this service. `kkd` publishes the label and tokens it shows, one way, through `TerminalRuntime`.
 
 (The MCP transcript surface, when it ships, lives on a separate socket (see [Roadmap](../16-roadmap.md).)
@@ -219,15 +276,25 @@ UIs subscribe through server-streaming RPCs rather than polling (asking again an
 
 - `StreamThreadEvents(thread_id)`: state transitions, cascade events, and transcript appends for one thread.
 - `RepoThreadSummaries(repo_id)`: one-line summaries for sibling threads in the same repo. It is used by `kk ls`, the overlay, and the optional `ui` pane.
+- `StreamRepoEvents(repo_id)`: the events of every thread in one repo, on one stream. An optional thread filter narrows it to one thread.
+  - Each event carries its kind, its thread id, its sequence numbers, its time, and summary-class fields only. It never carries transcript text or any other [sensitive read](../04-authority.md#sensitive-reads).
+  - It accepts the same credentials as `RepoThreadSummaries`: a thread or registration credential for its own repo, or an automation credential for any registered repo.
 
 On disconnect, clients reconnect and re-subscribe. Events carry a monotonic `seq` (a number that only goes up), so clients can detect gaps.
 
 `StreamThreadEvents.seq` is backed by the `thread_events` table in the repo database. `kkd` writes each event as a row and takes `seq` from that row. So `seq` keeps counting up across a `kkd` restart, and a client that reconnects can tell exactly which events it missed.
 
+`StreamRepoEvents` orders events by `repo_seq`, a second number on the same row that only goes up across the whole repo. Both streams take a starting sequence number and replay the stored rows after it before they follow new ones.
+
+**`kk events`.** [`kk events`](../09-commands.md#kk-events) is the command-line face of these two streams. With `--thread` in that thread's own context it reads `StreamThreadEvents`. Otherwise it reads `StreamRepoEvents`, with the thread filter when `--thread` is given. `--since <seq>` is the starting sequence number, and `--follow` keeps the stream open.
+
+**`kk wait`.** `kk wait` needs no method of its own. `kk` subscribes to `StreamRepoEvents` with the thread filter, then reads the thread's current summary, and then follows the stream until the summary shows the wanted state. Subscribing first means no change can slip between the read and the stream. Every wait state is a summary-class field, so an automation credential can wait. The timeout is counted by `kk`: exit code 0 when the state is reached and 6 on timeout.
+
 **Audit.** Audit interception happens before method dispatch. That is, the audit layer sees every call before the call is routed to a method.
 
 - Requests with a resolved repo write exactly one row to that repo database's `audit_log`.
-- Bootstrap, registry-wide, unknown-repo, and pre-resolution failures write to `user_audit_log` in the per-user database.
+- Bootstrap, registry-wide, unknown-repo, and pre-resolution failures write to `user_audit_log` in the per-user database. So do policy activation and revoke, and the creation, rotation, and revoke of an automation credential.
+- The audit row of a `BeginApproval` that issues a `PolicyApproval` records the rule name, the policy digest, the principal, the operation, and the risk labels.
 - Logging an unidentified caller uses a safe fingerprint and a null credential id, never raw credential bytes.
 
 ## Protocol stability
@@ -249,3 +316,7 @@ approval. The host must also verify which device sent each request and
 check that its grant covers the profile and target. The first connection
 to test uses Secure Shell (SSH) restricted to a kiki command.
 See [Remote access through profiles](remote-access.md).
+
+A remote grant never implies a policy rule. In v1 every policy principal is
+local. A host's activated automation policy applies to remote callers only
+once a remote principal kind exists, and that arrives with remote access.

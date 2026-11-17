@@ -43,6 +43,14 @@ Rejected for v1. Each parseable attempt has exactly one authoritative [SQLite](h
 
 Two additions were considered: mirroring the same attempt to [JSONL](https://jsonlines.org/) or both databases, and adding [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) chaining. They would create another consistency protocol without defending against the documented same-UID threat model.
 
+## Blanket `--yes` and other approval shortcuts
+
+Rejected, and still rejected. A blanket `--yes` flag, confirmation piped in on standard input, approval through an environment variable, approval by an ordinary config key, and a reusable approval token would each let any caller skip the plan-bound approval. An agent could use them by accident.
+
+Note added 2026-11-17: kiki must now run [headless](../appendix-a-glossary.md#headless), with no human present. The supported path for unattended approval is an activated [automation policy](../04-authority.md#automation-policy). It differs from the shortcuts above in three ways. The owner writes rules that name the caller, the operation, and the accepted [risk labels](../04-authority.md#risk-labels). The policy does nothing until the enrolled presenter or the Admin credential activates it. Each approval it gives is still single-use and bound to one exact plan.
+
 ## Automatic transcript redaction
 
 Rejected for v1. Heuristic or model-based redaction creates false confidence. It may also erase the context recall is meant to preserve. Kiki discloses [provider egress](../appendix-a-glossary.md#provider-egress) and asks for consent instead.
+
+Note added 2026-11-17: on a host with no human, that consent can come from an activated [automation policy](../04-authority.md#automation-policy) rule that names both the purpose and the provider. No wildcard rule and no plain config key can grant it.
