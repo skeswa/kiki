@@ -35,8 +35,8 @@ Recording a decision does not grant permission for an action, and this
 convention does not import Swingset's separate blanket delegation policy.
 
 The [reference book's authority order](../../docs/reference/README.md#authority)
-still governs product behavior. Surface a disagreement and reconcile the
-owning chapter; do not use a journal entry to override it silently.
+still governs product behavior. Report a disagreement and update the
+chapter that defines the behavior; do not use a journal entry to override it silently.
 
 ## Decision index
 

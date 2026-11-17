@@ -114,8 +114,8 @@ whoever writes the code, and a wrong guess in several of them is unsafe.
 - **Re-prove surviving processes after a Herdr server handoff.** Deferred. v1
   ends the bindings and restarts the terminal.
 
-The new plans and the `[timeouts]` table add surface to `kk repair` and to
-configuration. The timeout defaults, the service-manager unit shape, and the
+The new plans add options to `kk repair`, and the `[timeouts]` table adds
+configuration settings. The timeout defaults, the service-manager unit shape, and the
 fallbacks for failed proofs are untested and may change once measured.
 
 ## Links

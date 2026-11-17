@@ -24,7 +24,7 @@ those workflows for Claude Code.
 ## Why
 
 The old guide claimed a colocated checkout even though `.jj/` was absent.
-Initializing jj makes the documented workflow real. A shared guide follows
+Initializing jj lets contributors use the documented workflow. A shared guide follows
 Swingset's pattern and prevents two copies of contributor rules from drifting.
 
 ## Alternatives and consequences

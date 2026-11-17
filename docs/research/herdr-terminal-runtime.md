@@ -4,11 +4,11 @@ import { withBase } from "vitepress";
 
 # Herdr as a replacement for tmux
 
-Herdr can replace tmux's terminal-hosting role in kiki: it owns real PTYs, keeps work running across client detach, provides layouts and terminal I/O, and exposes programmatic control. The strongest reason to choose it is the integrated agent interface and recovery experience. It does not remove kiki's need for controlled agent launch, process supervision, or safe workspace reconciliation.
+Herdr can replace tmux's terminal-hosting role in kiki: it hosts PTYs, keeps work running across client detach, provides layouts and terminal I/O, and exposes programmatic control. Its agent interface and recovery features are reasons to choose it. It does not remove kiki's need for controlled agent launch, process supervision, or safe workspace reconciliation.
 
 **Recommendation:** prototype Herdr as kiki's preferred terminal runtime, with one dedicated named server hosting one workspace per thread. Keep the existing tmux contract until caller-local switching, managed restart, and verified process cleanup pass explicit gates. A full fork is unnecessary for the initial prototype; a small public-interface extension may be needed for production navigation and lifecycle coordination.
 
-This follow-up to [Herdr and jj integration](herdr-jj.md) is research dated 2026-10-30, not a change to the reference specification. It adds real lifecycle tests and a tmux baseline to the earlier directory-hosting experiment.
+This follow-up to [Herdr and jj integration](herdr-jj.md) is research dated 2026-10-30, not a change to the reference specification. It adds process lifecycle tests and a tmux baseline to the earlier directory-hosting experiment.
 
 ## What was examined and run
 
@@ -94,7 +94,7 @@ resume_agents_on_restore = false
 
 Kiki then reconstructs credentials, isolated harness configuration, pending delivery, and a fresh ready handshake. A restored pane is only a terminal projection. The database thread cannot become `Active` from that pane's existence. See [saved pane fields](https://github.com/herdrdev/herdr/blob/ee5bfb5041bb3e4a49d591c72308aae3c81ecdde/src/persist/snapshot.rs#L99), [empty restore environment](https://github.com/herdrdev/herdr/blob/ee5bfb5041bb3e4a49d591c72308aae3c81ecdde/src/persist/restore.rs#L572), and [native resume](https://github.com/herdrdev/herdr/blob/ee5bfb5041bb3e4a49d591c72308aae3c81ecdde/src/app/agent_resume.rs#L250).
 
-The direct-command exit test closed its pane. Other launch paths can be configured internally to respawn a shell under the same terminal ID, again with a new process and empty extra environment. Track the actual launcher/harness incarnation independently of terminal IDs. Public workspace IDs can also recur across server lifetimes; the public JSON session snapshot lacks the client endpoint's boot token. A robust adapter needs verified server-instance evidence and process start identity. See [exit policy](https://github.com/herdrdev/herdr/blob/ee5bfb5041bb3e4a49d591c72308aae3c81ecdde/src/app/api.rs#L541), [respawn](https://github.com/herdrdev/herdr/blob/ee5bfb5041bb3e4a49d591c72308aae3c81ecdde/src/app/api.rs#L582), and [public snapshot](https://github.com/herdrdev/herdr/blob/ee5bfb5041bb3e4a49d591c72308aae3c81ecdde/src/api/schema/session.rs#L8).
+The direct-command exit test closed its pane. Other launch paths can be configured internally to respawn a shell under the same terminal ID, again with a new process and empty extra environment. Track the launcher/harness incarnation independently of terminal IDs. Public workspace IDs can also recur across server lifetimes; the public JSON session snapshot lacks the client endpoint's boot token. The adapter needs to verify the server instance and process start identity. See [exit policy](https://github.com/herdrdev/herdr/blob/ee5bfb5041bb3e4a49d591c72308aae3c81ecdde/src/app/api.rs#L541), [respawn](https://github.com/herdrdev/herdr/blob/ee5bfb5041bb3e4a49d591c72308aae3c81ecdde/src/app/api.rs#L582), and [public snapshot](https://github.com/herdrdev/herdr/blob/ee5bfb5041bb3e4a49d591c72308aae3c81ecdde/src/api/schema/session.rs#L8).
 
 ## Two gaps that prevent a drop-in replacement
 
