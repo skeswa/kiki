@@ -31,3 +31,7 @@ Current behavior and scope remain in the [reference book](../../docs/reference/R
 | Date       | Question                                                | Outcome                                                                         |
 | ---------- | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | 2026-11-17 | Which writing patterns needed revision across the docs? | [Documentation writing review](2026/2026-11-17-documentation-writing-review.md) |
+
+## Remote access
+
+- 2026-11-17 — [How can I pick up my threads from another machine and keep accounts separate?](2026/2026-11-17-multi-machine-access.md)
