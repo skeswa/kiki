@@ -4,7 +4,7 @@ Authority means who is allowed to do what. kiki's v1 authorization model limits 
 
 It does not defend against an actively malicious process running as the same OS user (the same UID). A terminal confirmation prompt is not a security boundary against such a process.
 
-The important v1 property is narrower: a normal `kk` subprocess does not get reusable repo-wide authority just because a human ran it.
+In v1, running a normal `kk` subprocess as a human does not grant that subprocess reusable repo-wide authority.
 
 ## Credential and capability classes
 
@@ -44,7 +44,7 @@ A [`HumanApproval`](appendix-a-glossary.md#human-approval) capability:
 
 - is minted (created) by the [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>) only after a human confirms through an interactive foreground channel. The daemon is [`kkd`](appendix-a-glossary.md#kkd), the background server;
 - is bound to the credential identity, the daemon method, the target repo and thread, a digest ([hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function)) of the security-relevant arguments, and a short expiry;
-- is single-use: a single-ride ticket, not a season pass. Exactly one durable operation record claims it, atomically, before any external side effect;
+- is single-use. Exactly one durable operation record claims it, atomically, before any external side effect;
 - cannot be refreshed or broadened by a `ThreadScoped` caller.
 
 ### `ApprovalPresenter`

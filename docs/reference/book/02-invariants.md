@@ -40,7 +40,7 @@ Creating, closing, reopening, repairing, and destroying a thread each touch five
 
 These operations are therefore durable [sagas](appendix-a-glossary.md#saga). A saga is a multi-step job that records its progress as it goes. It is not an atomic transaction across systems.
 
-- If a step crashes, or a [compensating](appendix-a-glossary.md#compensation) cleanup step fails, kiki must leave behind a persisted journal and an honest lifecycle state.
+- If a step crashes, or a [compensating](appendix-a-glossary.md#compensation) cleanup step fails, kiki must leave behind a persisted journal and a lifecycle state that reflects the completed steps.
 - Restart recovery or an explicit command can then continue from that record.
 - A reopened thread stays `Closed` until the replacement [incarnation's](appendix-a-glossary.md#incarnation) [ready handshake](appendix-a-glossary.md#ready-handshake) commits.
 - No recovery path may leave a thread that looks `Active` after its managed agent and [terminal group](appendix-a-glossary.md#terminal-group) were already destroyed.

@@ -263,7 +263,7 @@ What separates kiki's server from the user's default Herdr server is therefore a
 
 ### Changing a terminal key while a server is running
 
-A change to `session`, `herdr_bin`, or `[paths] herdr_dir` cannot just be applied, because the server that is running was started with the old values.
+A change to `session`, `herdr_bin`, or `[paths] herdr_dir` cannot take effect immediately, because the server that is running was started with the old values.
 
 - If a [server instance](appendix-a-glossary.md#server-instance) is open, `kkd` does not start a second server. It keeps the old one and keeps using the old values for it.
 - `kkd` reports that a change is pending. `kk repair --server` shows it.

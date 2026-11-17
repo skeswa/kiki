@@ -1,6 +1,6 @@
 # Metadata Evolution
 
-kiki may eventually help keep three kinds of text current as work changes:
+The planned metadata features would keep three kinds of text current as work changes:
 
 - [thread](appendix-a-glossary.md#thread) names (a thread is kiki's unit of work);
 - checkpoint [bookmark](appendix-a-glossary.md#bookmark) names; and
@@ -14,7 +14,7 @@ The ownership ledger exists so that kiki does not overwrite words a human wrote.
 
 kiki tracks ownership in sqlite ([SQLite](https://www.sqlite.org/), its local database). It does not infer ownership by guessing from content, and it does not depend on jj trailers.
 
-The ledger works like a sign-out sheet: kiki may only edit prose it can prove it wrote last. For every kiki-authored revision description or bookmark name, kiki records a content [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function), a fingerprint of the text, in `metadata_writes`. On the next read:
+Kiki may only edit prose it can prove it wrote last. For every kiki-authored revision description or bookmark name, kiki records a content [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function), a fingerprint of the text, in `metadata_writes`. On the next read:
 
 - if the current content still matches the stored hash, kiki may update it;
 - if the current content differs, the artifact becomes human-owned;

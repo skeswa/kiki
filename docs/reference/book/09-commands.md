@@ -51,7 +51,7 @@ Each step is a lookup, not a grant. Whatever step resolves the thread, the CLI t
 - **Authority.** A Herdr id never authorizes anything and never substitutes for a credential. A verified ref only locates the caller's contextual thread. The thread's own credential is what authorizes.
 - **Working directory.** `kk` matches the canonical current [working directory](https://en.wikipedia.org/wiki/Working_directory) against registered [jj workspace](appendix-a-glossary.md#workspace) paths.
 
-If no thread resolves but the command is repo-scoped, the command may fall back to the registered repo. If no registered repo resolves either, commands that need repo state must error with an actionable message.
+If no thread resolves but the command is repo-scoped, the command may fall back to the registered repo. If no registered repo resolves either, commands that need repo state must return an error explaining how to proceed.
 
 ## Foreground approval flow
 

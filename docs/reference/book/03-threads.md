@@ -257,7 +257,7 @@ Successful creation leaves all required v1 projections and an `Active` row. Unsu
 
 `kk new [<name>]` takes an optional name. In the acceptance slice, a thread created without a name is called `unnamed-<short-hex>`, even when it has an initial prompt. Deriving a placeholder name from the prompt is v1.x work. The placeholder is kiki-owned metadata and follows the metadata ownership rules.
 
-`kk new --harness <name>` selects the harness for the thread. v1 accepts `claude-code` and `codex`. Unsupported harness names error clearly.
+`kk new --harness <name>` selects the harness for the thread. v1 accepts `claude-code` and `codex`. An unsupported harness name returns an error that identifies the rejected name.
 
 The follows graph is a DAG: a [graph with no cycles](https://en.wikipedia.org/wiki/Directed_acyclic_graph). kiki rejects a [follows edge](appendix-a-glossary.md#follows-edge) that would introduce a cycle.
 
@@ -292,7 +292,7 @@ V1 ownership is deliberately structural. Every revision on that exact validated 
 
 - An external linear insertion on the path is therefore included.
 - A user who does not want later follows reconciliation to move that chain must detach before introducing such topology.
-- Split, squash, and abandon need no root-membership update. They either leave one valid chain or make validation stop loud.
+- Split, squash, and abandon need no root-membership update. They either leave one valid chain or cause validation to report an error.
 
 Users may spawn any number of sibling threads. v1 does not rate-limit human-created threads.
 
@@ -568,7 +568,7 @@ Children of a closed thread auto-detach, with notification. Close may not rely o
 
 Every resulting transition must be reconciled or explicitly discarded as part of the approved plan. Auto-detach must not silently erase a parent change merely because watcher delivery lag had not recorded it yet.
 
-Close is intentionally boring. You should be able to close a thread confident that tracked work survives and that local junk is not silently swept away.
+Close preserves tracked work and does not silently delete local files that jj does not track.
 
 ### What close removes from the terminal
 
@@ -915,7 +915,7 @@ Preflight first refreshes the complete operation frontier. It then pins all of t
 
 Destroy always refuses while the thread has a follows child or an unresolved sync/recovery intent. The user must reconcile and detach children first.
 
-A transitional `Creating` thread, or failed-creation cleanup, uses its lifecycle compensation plan instead. It does not pretend a complete owned stack exists.
+A transitional `Creating` thread, or failed-creation cleanup, uses its lifecycle compensation plan instead. It does not assume a complete owned stack exists.
 
 ### Abandoning revisions
 

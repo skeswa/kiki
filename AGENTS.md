@@ -35,8 +35,8 @@ Review new and edited documentation for this reading level before handoff.
 kiki (binary `kk`) coordinates jujutsu (jj), Herdr terminals, and coding agents
 (Claude Code and Codex in v1). GitHub CLI (`gh`) support comes later. Each
 thread is a named line of work with a managed jj workspace. Its live head is
-that workspace's `@`. Its bookmark records a checkpoint for publication, and
-kiki tracks that checkpoint through jj's native rewrite successors.
+that workspace's `@`. Its bookmark points to an explicit checkpoint and represents the thread for
+publication. Kiki tracks that checkpoint through jj's native rewrite successors.
 
 Each thread has one Herdr workspace, called a terminal group, on a dedicated
 kiki server. Herdr owns the terminals. Kiki owns thread identity and decides
