@@ -231,7 +231,7 @@ What follows from the check:
 - Kiki does not choose a likely root, silently absorb a revision, or perform a partial rebase.
 - The discrepancy may concern a missing/moved external projection rather than revision ancestry. In that case kiki records `ProjectionDiverged` as described below.
 
-A single external op may logically evolve multiple workspaces in A→B→C. The watcher records a separate base-transition intent for every affected workspace. It does not pretend repository evolution occurred one hop at a time.
+A single external op may logically evolve multiple workspaces in A→B→C. The watcher records a separate base-transition intent for every affected workspace. It does not assume repository evolution occurred one hop at a time.
 
 #### Operations do not prove freshness
 

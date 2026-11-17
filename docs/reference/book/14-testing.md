@@ -401,7 +401,7 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
     - Exit is verified per recorded identity by kiki's own termination, before the runtime is asked to close anything.
     - Two fake runtimes change nothing: one that replies success to a close request while a process survives, and one that never replies.
     - Workspace deletion depends only on every frozen identity being gone, the holder scan, and the post-exit filesystem recheck.
-    - If exit cannot be verified, the files stay and the lifecycle fails loudly.
+    - If exit cannot be verified, the files stay and the lifecycle reports a failure.
 - **Close approval binding.** A close approval is bound to the rendered plan and the preflight fingerprint.
   - Drift discovered after the freeze causes a verified resume and a fresh plan and approval.
   - The daemon never prompts while leaving a terminal group frozen.
@@ -1182,7 +1182,7 @@ The terminal fakes expose:
 
 ## Integration-only surfaces
 
-Some parts can only be tested for real, against the actual programs. These are smoke-tested or integration-tested:
+These integrations require smoke tests or integration tests that run against the programs or OS facilities themselves:
 
 - the real [`jj`](https://docs.jj-vcs.dev/latest/)
 - [`gh`](https://cli.github.com/)

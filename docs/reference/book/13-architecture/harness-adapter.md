@@ -480,7 +480,7 @@ There is no workspace-merge fallback for Codex.
 
 ## Codex boundary mapping
 
-kiki's delivery protocol is written in terms of model turns and tool batches. This section says how the Codex adapter maps Codex's events onto those terms, and what must be proved for each mapping.
+The Codex adapter maps Codex's events onto the model turns and tool batches used by kiki's delivery protocol. Each mapping below has its own proof requirements.
 
 ### Identifying model steps
 

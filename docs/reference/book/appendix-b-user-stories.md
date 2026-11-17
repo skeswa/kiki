@@ -147,7 +147,7 @@ A cascade is how a change in a parent [thread](appendix-a-glossary.md#thread) re
     - Kiki acknowledges delivery only after that batch closes and a later [model turn](appendix-a-glossary.md#model-turn) begins.
     - (Claude Code's parallel batch is the hard case. Codex's proven-serial dispatch makes each batch a single call.)
 
-    34b. As a developer, I want v1 managed sessions to reserve the pre-tool boundary exclusively for kiki, so that the [safe boundary](appendix-a-glossary.md#safe-boundary) is real rather than configuration-order folklore.
+    34b. As a developer, I want v1 managed sessions to reserve the pre-tool boundary exclusively for kiki, so that the [safe boundary](appendix-a-glossary.md#safe-boundary) does not depend on hook configuration order.
     - This applies to Claude Code and Codex alike.
     - Kiki gives a clear startup diagnostic when effective user hooks would race the boundary.
 
@@ -170,7 +170,7 @@ Kiki is an [ambient coordinator](appendix-a-glossary.md#ambient-coordinator): it
     - Examples: a manual `git push --force`, etc.
     - Kk surfaces a "remote diverged" warning that requires explicit reconciliation.
 
-    40a. As a developer, I want kiki to follow my checkpoint bookmark through jj's own rewrite successors without complaint, and to catch real projection problems, so that an ordinary edit never sends a thread to repair and an unrelated bookmark or terminal problem does not silently freeze follows coordination.
+    40a. As a developer, I want kiki to follow my checkpoint bookmark through jj's own rewrite successors and detect projection failures, so that an ordinary edit never sends a thread to repair and an unrelated bookmark or terminal problem does not silently freeze follows coordination.
     - Kiki detects each of these:
       - missing, externally moved, or conflicted bookmarks;
       - missing jj workspace records;
@@ -270,7 +270,7 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
     - A `kk close` run from outside the closed thread moves my own client to the parent thread, when that thread is active with a bound terminal group.
     - A `kk close` typed inside the thread ends with it and leaves the result in `kk ls`.
     - Otherwise, Herdr places any client that was showing the closed terminal group.
-65. As a developer, I want `kk reopen <thread>` to restore an archived thread through a restart-recoverable [journal](appendix-a-glossary.md#lifecycle-journal), so that a crash during workspace, credential, terminal-group, or harness recreation leaves an honest repairable state.
+65. As a developer, I want `kk reopen <thread>` to restore an archived thread through a restart-recoverable [journal](appendix-a-glossary.md#lifecycle-journal), so that a crash during workspace, credential, terminal-group, or harness recreation leaves a recorded state that supports repair.
     - The launcher must report ready before the thread becomes Active.
 
     65a. As a developer whose machine rebooted or whose terminal server restarted, I want the layouts Herdr restores to be treated as [remnant containers](appendix-a-glossary.md#remnant-container), so that a pane that merely reappeared is never mistaken for a managed agent.
@@ -372,7 +372,7 @@ A [harness](appendix-a-glossary.md#harness) is the agent program kiki runs, such
     - Kiki's hooks are pre-trusted there.
     - My own `~/.codex/` configuration is structurally excluded.
 
-    91a. As a developer on a harness version that cannot prove its batch boundary, I want kk to gracefully degrade to proof-carrying restart+resume for context delivery, so that the tool still works, just less smoothly.
+    91a. As a developer on a harness version that cannot prove its batch boundary, I want kk to fall back to proof-carrying restart+resume for context delivery, so that delivery can continue at the cost of restarting the agent.
     - Examples of such a version: a Codex version whose dispatch discipline changed, or a Claude Code version without an unambiguous batch-completion signal.
     - A version that cannot supply the restart proofs either is unsupported for managed execution, not silently approximated.
 
@@ -391,7 +391,7 @@ A [harness](appendix-a-glossary.md#harness) is the agent program kiki runs, such
     - Unscoped or unresolved attempts go in the user-level table.
 96. As a developer, I want `kk audit log` and per-thread audit slices via `kk thread audit` to surface the audit trail.
     - I understand that append-only is enforced by daemon APIs and is not tamper-proof against my UID (my own user account).
-97. As a developer, I want the trust model documented honestly.
+97. As a developer, I want the trust model to state its protections and limits.
     - One-shot approvals reduce accidental agent authority.
     - They do not defend against an actively malicious same-UID process that can impersonate user interaction or modify local state.
 
@@ -502,7 +502,7 @@ The [overlay](appendix-a-glossary.md#overlay-tui) is kiki's interactive screen. 
      - The keys are j/k/arrows/enter/?, plus mouse click-to-focus and scroll.
      - Destructive/creative verbs are not bound.
 134. As a developer, I want the [role panes](appendix-a-glossary.md#role-pane) (agent, shell, and UI) to be provisioned with the terminal group during `kk new`'s recoverable creation [saga](appendix-a-glossary.md#saga), so that the panes are reliably present. (v1.x.)
-     - This does not pretend that the terminal runtime participates in a database transaction.
+     - The saga does not assume that a database transaction can include terminal-runtime operations.
      - Navigation does not mutate my layout.
      - Each pane is launched by direct argv with an explicit working directory and environment.
      - The panes are ensured again only at `kk reopen` and at a `kk repair` terminal restart.

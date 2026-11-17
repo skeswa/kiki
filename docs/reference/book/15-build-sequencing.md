@@ -100,7 +100,7 @@ Before committing to the full architecture, build a one-shot proof of concept (P
 
 If step 14 or step 15 fails for a harness, that harness ships managed sessions without cascade delivery, so its threads cannot follow other threads. That scope cut is a new decision record.
 
-The PoC needs no daemon, no terminal runtime, no [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface), and no polished CLI. Shell scripts are enough. It should answer one question: is the hardest coordination primitive real?
+The PoC needs no daemon, no terminal runtime, no [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface), and no polished CLI. Shell scripts are enough. It should demonstrate safe cascade reconciliation and context delivery for each harness.
 
 Failure of exclusive hook isolation makes the affected harness version unsupported. Failure of batch-boundary identification blocks soft cascade delivery. v1 must then use hard restart with `RestartStartup` delivery for that version, as proved in step 14 or 15.
 

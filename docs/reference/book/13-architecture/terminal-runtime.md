@@ -208,7 +208,7 @@ Rules that follow from the ladder:
 
 Three modules face the runtime and the OS. Each is described below as a [Rust trait](https://doc.rust-lang.org/book/ch10-02-traits.html), a named list of functions that each implementation provides.
 
-Each module has a real second adapter (a second implementation): an in-process fake that drives the deep-module tests. Because the second adapter really exists, each interface is a real seam, not a speculative one. A seam is a place where one implementation can be swapped for another.
+Each module has two implementations: the production adapter and an in-process fake used by the deep-module tests. Running both through the same interface tests whether implementations can be swapped without changing their callers.
 
 Harness safety and delivery are deliberately not in any of the three. They stay with the [harness adapter](harness-adapter.md) and the cascade protocol.
 
@@ -782,7 +782,7 @@ A command with no such viewer resolves `NoCallerClient` and moves no one. Exampl
 
 Until `client_targeted_focus` is advertised, `kk switch <thread>` fails with a message that names the missing capability.
 
-`kk switch --all-clients <thread>` is the explicit, differently named operation. It moves every attached client through the public focus method. It exists so that a single-viewer setup works today without pretending to be local.
+`kk switch --all-clients <thread>` is the explicit, differently named operation. It moves every attached client through the public focus method. A single-viewer setup can use it, with the explicit understanding that it moves all attached clients.
 
 Kiki never falls back from the first form to the second on its own.
 

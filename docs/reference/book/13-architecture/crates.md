@@ -2,7 +2,7 @@
 
 kiki is a [Cargo workspace](https://doc.rust-lang.org/cargo/reference/workspaces.html) with four crates. A crate is one [Rust](https://www.rust-lang.org/) package: either a library or a program. A Cargo workspace is a set of crates built together.
 
-The split exists so the [gRPC](https://grpc.io/) service surface is a real seam. A seam is a clean boundary between parts. [`kkd`](../appendix-a-glossary.md#kkd) is the only privileged process, and every UI is a client of the same protocol.
+The [gRPC](https://grpc.io/) service separates privileged operations from clients. [`kkd`](../appendix-a-glossary.md#kkd) is the only privileged process, and every UI uses the same protocol.
 
 | Crate       | Kind    | Responsibility                                                                                                                                                                                                                                                         |
 | ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -193,4 +193,4 @@ This split has two benefits:
 
 ## The Bun/TypeScript bootstrap
 
-The repo is currently bootstrapped as a Bun + TypeScript project (`package.json`, `tsconfig.json`, `index.ts` placeholder). Implementation will be Rust, per the original architectural decision. The Bun bootstrap is a placeholder pending the first real `kkd` commit.
+The repo is currently bootstrapped as a Bun + TypeScript project (`package.json`, `tsconfig.json`, `index.ts` placeholder). Implementation will be Rust, per the original architectural decision. The Bun bootstrap is a placeholder until implementation of `kkd` begins.
