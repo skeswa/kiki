@@ -30,3 +30,4 @@ The [research tools index](../tools/README.md) links the corresponding probes.
 | Recorded | Evidence | Investigation |
 | --- | --- | --- |
 | 2026-11-16 | [jj 0.46.0 revalidation: probe rerun and bookmark, operation-head, and snapshot probes](herdr-jj-revalidation/2026-11-16/README.md) | [2026-11-16 Herdr and jj revalidation](../investigations/2026/2026-11-16-herdr-jj-revalidation.md) |
+| 2026-11-17 | [Documentation audit: file inventory and quoted edits](documentation-writing/2026-11-17/audit.md) | [2026-11-17 documentation writing review](../investigations/2026/2026-11-17-documentation-writing-review.md) |

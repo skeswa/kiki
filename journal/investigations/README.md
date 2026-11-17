@@ -25,3 +25,9 @@ The owner later chose Herdr as the terminal runtime; see [D-0004](../decisions/0
 | 2026-11-16 | Do those findings hold for the Herdr revision and jj version the redesign targets? | [Herdr and jj revalidation](2026/2026-11-16-herdr-jj-revalidation.md)   |
 
 Current behavior and scope remain in the [reference book](../../docs/reference/README.md).
+
+## Documentation
+
+| Date       | Question                                                | Outcome                                                                         |
+| ---------- | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 2026-11-17 | Which writing patterns needed revision across the docs? | [Documentation writing review](2026/2026-11-17-documentation-writing-review.md) |
