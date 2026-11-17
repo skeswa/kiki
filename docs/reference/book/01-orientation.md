@@ -4,7 +4,7 @@ This chapter defines what kiki is. Later chapters define how it behaves.
 
 ## The workflow kiki automates
 
-kiki did not invent a workflow. It formalizes one that engineers who push agents hard converge on by hand:
+Kiki automates this setup for parallel agent work:
 
 - one [jj](appendix-a-glossary.md#ext-jj) repo, colocated with [Git](appendix-a-glossary.md#ext-git) (both tools share one checkout; jj is a version-control tool like Git);
 - a jj [workspace](appendix-a-glossary.md#ext-workspace) per line of work, so parallel edits never collide. A workspace is a separate copy of the files with its own current position in history;
@@ -32,40 +32,40 @@ flowchart LR
     repo --- wsC
 ```
 
-Every column of that picture pulls its weight:
+The workspaces separate file edits. The [terminal multiplexer](appendix-a-glossary.md#ext-terminal-multiplexer) keeps terminals running, and the agents work in those terminals.
 
-- jj workspaces give isolation;
-- the [terminal multiplexer](appendix-a-glossary.md#ext-terminal-multiplexer) (the program that keeps many terminals running) gives persistence;
-- the agents give initiative.
+Managing the connections between these tools takes repeated work:
 
-The trouble is the glue. Which workspace pairs with which terminal? Which bookmark names which chain? Which agent is waiting on what? All of it lives in the engineer's head, and the tax compounds with every added line of work:
+- Find the workspace that contains a particular change.
+- Check whether an agent is working or waiting for a permission prompt.
+- Visit the terminals to see all work in progress.
+- Create a workspace, terminal, bookmark, and agent session for each new task.
+- Keep workspaces current as their parent revisions change, including any
+  [rebases](appendix-a-glossary.md#ext-rebase) and
+  [conflicts](appendix-a-glossary.md#ext-conflict).
+- Find the relevant chain in a `jj log` that includes every workspace's revisions.
+- Rebuild this view when moving to another machine, because the terminal and
+  filesystem state are local.
 
-- **Where is that work?** Nothing maps a half-remembered change to the workspace that holds it.
-- **Who needs me right now?** An agent blocked on a permission prompt in terminal three looks exactly like an agent making progress.
-- **What is in flight?** There is no single view of the tree of work; assembling one means visiting every terminal.
-- **Another one is a ritual.** New workspace, `cd`, new terminal, name it, create the bookmark, launch the agent: every time, by hand.
-- **Staleness is homework.** Keeping N workspaces current against a moving trunk, and against each other, is a [rebase](appendix-a-glossary.md#ext-rebase)-and-[conflict](appendix-a-glossary.md#ext-conflict) chore that grows with N.
-- **`jj log` stops scaling.** Every workspace's revisions interleave in one log; finding your own chain means scrolling past everyone else's.
-- **A second machine multiplies all of it.** The state lives in one machine's terminal server and filesystem, so moving between machines means rebuilding the picture by hand.
-
-kiki's move is to register the hand-maintained tuple (workspace, terminal, agent, bookmark) as one durable object with a name: the **[thread](appendix-a-glossary.md#thread)**.
+Kiki records each workspace, terminal, agent, and bookmark together as a named,
+persistent [thread](appendix-a-glossary.md#thread).
 
 For the terminal, kiki standardizes on [Herdr](https://github.com/herdrdev/herdr). It runs one [dedicated Herdr server](appendix-a-glossary.md#dedicated-herdr-server), with one Herdr workspace per thread. kiki calls that Herdr workspace a **[terminal group](appendix-a-glossary.md#terminal-group)**.
 
-Once the tuple is a first-class thing that a [daemon](appendix-a-glossary.md#ext-daemon) (a background program) watches, each friction has an owner:
+A [daemon](appendix-a-glossary.md#ext-daemon), or background program, watches the registered threads and handles this bookkeeping:
 
 | Friction                              | What kiki does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Where                                                            |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Where is that work?                   | Threads are named and listed from anywhere. `kk ls` works across every registered repo. The TUI (kiki's interactive text screen) shows the same tree interactively.                                                                                                                                                                                                                                                                                                                                                                                                                                              | [Commands](09-commands.md), [Interface](10-interface/)           |
 | Who needs me right now?               | Every thread's agent projects a [display state](appendix-a-glossary.md#agent-display-states): `idle`, `working`, `finished`, or `blocked`. kiki shows it in listings, Herdr's sidebar, the overlay's Activity section, and OS notifications.                                                                                                                                                                                                                                                                                                                                                                     | [Interface](10-interface/), [Observability](12-observability.md) |
 | What is in flight?                    | `kk log` renders your thread and its follows-ancestors in full and collapses everything else to one line each. `--wide` adds PR, CI, and agent state for a one-screen bird's-eye view.                                                                                                                                                                                                                                                                                                                                                                                                                           | [Commands](09-commands.md#kk-log)                                |
-| Another one is a ritual               | `kk new <name>` runs the whole ritual (workspace, initial change, bookmark checkpoint, hooks, terminal group, agent) as one durable, crash-recoverable [saga](appendix-a-glossary.md#saga). Inside a thread, branching off the current thread is the default.                                                                                                                                                                                                                                                                                                                                                    | [Threads](03-threads.md)                                         |
-| Staleness is homework                 | A thread can [follow](appendix-a-glossary.md#follows) another thread. kiki classifies every parent change. It rebases or [materializes](appendix-a-glossary.md#materialization) the child at a safe agent boundary. It interrupts the human only for true ambiguity: textual conflicts, or topology it refuses to guess through. A root thread does not follow the moving trunk in v1: catching it up to `main` remains a direct `jj rebase`, which kiki then cascades through every following descendant. When a parent lands, the v1.x GitHub integration moves each child onto the exact merged trunk commit. | [Cascade](05-cascade.md)                                         |
+| Starting another task               | `kk new <name>` creates the workspace, initial change, bookmark checkpoint, hooks, terminal group, and agent through one durable, crash-recoverable [saga](appendix-a-glossary.md#saga). Inside a thread, branching off the current thread is the default.                                                                                                                                                                                                                                                                                                                                                    | [Threads](03-threads.md)                                         |
+| Updating stale workspaces                 | A thread can [follow](appendix-a-glossary.md#follows) another thread. kiki classifies every parent change. It rebases or [materializes](appendix-a-glossary.md#materialization) the child at a safe agent boundary. It asks the human to resolve textual conflicts or ambiguous revision topology. A root thread does not follow the moving trunk in v1: catching it up to `main` remains a direct `jj rebase`, which kiki then cascades through every following descendant. When a parent lands, the v1.x GitHub integration moves each child onto the exact merged trunk commit. | [Cascade](05-cascade.md)                                         |
 | `jj log` stops scaling                | [Stack-aware collapse](appendix-a-glossary.md#stack-aware-collapse). The chain you are working on renders revision by revision. Sibling and unrelated threads compress to one summary line apiece.                                                                                                                                                                                                                                                                                                                                                                                                               | [Commands](09-commands.md#kk-log)                                |
 | Naming work that keeps changing shape | `kk new` without a name gives the thread the placeholder `unnamed-<short-hex>`. Deriving a name from the first prompt is v1.x. v1.x metadata evolution also lets kiki rename threads and describe revisions as the work reveals its shape. It never overwrites prose a human wrote.                                                                                                                                                                                                                                                                                                                              | [Metadata Evolution](08-metadata.md)                             |
 | A second machine                      | Deferred, deliberately. Every client is already a pure [gRPC](appendix-a-glossary.md#ext-grpc) client of the daemon. So remote clients and daemon-to-daemon coordination are additive transports, not redesigns.                                                                                                                                                                                                                                                                                                                                                                                                 | [Architecture](13-architecture/), [Roadmap](16-roadmap.md)       |
 
-Because a thread can follow another thread, the flat sibling picture above generalizes to the shape work actually takes, a tree:
+Follows relationships can connect the threads into a tree:
 
 ```mermaid
 flowchart BT
@@ -80,7 +80,7 @@ flowchart BT
     authe2e -- "follows auth-ui —<br/>stacks go as deep as the work does" --> authui
 ```
 
-The table names the mechanisms. Whether each surface ships in the [acceptance slice](appendix-a-glossary.md#acceptance-slice) or as [v1.x polish](appendix-a-glossary.md#v1-x-polish) is recorded once, in the scope ledger below. For a scene-by-scene dramatization of the whole workflow, see the [storyboard](10-interface/storyboard.md).
+The table names the mechanisms. Whether each surface ships in the [acceptance slice](appendix-a-glossary.md#acceptance-slice) or as [v1.x polish](appendix-a-glossary.md#v1-x-polish) is recorded once, in the scope ledger below. The [storyboard](10-interface/storyboard.md) walks through the workflow.
 
 ## The tool
 
@@ -93,7 +93,7 @@ kiki (`kk`) coordinates agentic coding work: work done by AI coding agents. It g
 
 A thread can be paused, resumed, archived, and stacked on top of related work. Publishing to GitHub and transcript-backed recall build on that unit once the coordination core is proven.
 
-The point is to make parallel work cheap. Today, switching between agent-led lines of work means stashes, branches, rebases, lost terminals, and rebuilt context. kiki runs the coordination in the background instead:
+Kiki tracks work that would otherwise require checking terminals and revision histories by hand:
 
 - threads branch from threads;
 - children [follow](appendix-a-glossary.md#follows) their parents' live changes;
@@ -103,10 +103,10 @@ The point is to make parallel work cheap. Today, switching between agent-led lin
 
 - **kiki coordinates in the background.** You may always use `jj`, `gh` (the [GitHub command-line tool](appendix-a-glossary.md#ext-gh)), and [Herdr](appendix-a-glossary.md#herdr)'s own terminal controls directly. kiki watches and reacts; it does not stand in the way. The book calls this posture the [ambient coordinator](appendix-a-glossary.md#ambient-coordinator).
 - **The terminal is Herdr's; the thread is kiki's.** Herdr owns [panes](appendix-a-glossary.md#ext-pane), layout, and what you see. It never decides which [thread](appendix-a-glossary.md#thread) a terminal belongs to, whether an agent is ready, or whether files are safe to delete.
-- **Threads keep each other out of the way, not out.** Separate [workspaces](appendix-a-glossary.md#workspace) prevent accidents between parallel agents. They are not a security [sandbox](<https://en.wikipedia.org/wiki/Sandbox_(computer_security)>) against processes running as your user.
+- **Workspaces separate edits.** Separate [workspaces](appendix-a-glossary.md#workspace) prevent accidents between parallel agents. They are not a security [sandbox](<https://en.wikipedia.org/wiki/Sandbox_(computer_security)>) against processes running as your user.
 - **Your words are yours.** kiki may draft names, descriptions, and PR text (a PR is a [pull request](appendix-a-glossary.md#ext-pull-request)), but it must not silently overwrite something a human wrote.
 - **Transcript data stays out of what kiki publishes.** Transcript data, when transcript capture ships, is stored locally and never feeds anything kiki publishes. The one exception is explicit: a [reopen catch-up](appendix-a-glossary.md#catch-up) you ask for may send selected rows to the configured model provider, and only after you consent. See [thread transcript](appendix-a-glossary.md#thread-transcript).
-- **Safety beats eagerness.** [jj](appendix-a-glossary.md#ext-jj) may rewrite a child thread's commits in the repository immediately. But kiki changes the child's files, and informs its agent, only at a safe moment. A safe moment is an agent tool boundary or a moment the [harness](appendix-a-glossary.md#harness) proves the agent idle. It is never mid-edit. Explicit [rebases](appendix-a-glossary.md#ext-rebase) for a parent's new commits wait for the same moment. See [safe boundary](appendix-a-glossary.md#safe-boundary).
+- **Workspace changes wait for a safe boundary.** [jj](appendix-a-glossary.md#ext-jj) may rewrite a child thread's commits in the repository immediately. But kiki changes the child's files, and informs its agent, only at a safe moment. A safe moment is an agent tool boundary or a moment the [harness](appendix-a-glossary.md#harness) proves the agent idle. It is never mid-edit. Explicit [rebases](appendix-a-glossary.md#ext-rebase) for a parent's new commits wait for the same moment. See [safe boundary](appendix-a-glossary.md#safe-boundary).
 
 ## v1 contract
 
