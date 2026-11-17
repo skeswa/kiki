@@ -13,47 +13,47 @@ The custom UI is a `kk` process rendered with [ratatui](https://ratatui.rs/), a 
 
 ## Vocabulary
 
-- **[Herdr client](../appendix-a-glossary.md#herdr-client)** — one terminal attached to kiki's dedicated Herdr server. It is opened with `kk attach` (see [Commands](../09-commands.md#kk-attach)). Several clients may be attached at once. Each has its own view.
-- **Terminal group** — the thread's terminal home: one Herdr workspace on the dedicated server. In this book an unqualified "workspace" always means a [jj workspace](../appendix-a-glossary.md#workspace). See [terminal group](../appendix-a-glossary.md#terminal-group).
-- **Role pane** — a pane kiki provisions in the terminal group's first tab. See [role pane](../appendix-a-glossary.md#role-pane).
+- **[Herdr client](../appendix-a-glossary.md#herdr-client)**: one terminal attached to kiki's dedicated Herdr server. It is opened with `kk attach` (see [Commands](../09-commands.md#kk-attach)). Several clients may be attached at once. Each has its own view.
+- **Terminal group**: the thread's terminal home: one Herdr workspace on the dedicated server. In this book an unqualified "workspace" always means a [jj workspace](../appendix-a-glossary.md#workspace). See [terminal group](../appendix-a-glossary.md#terminal-group).
+- **Role pane**: a pane kiki provisions in the terminal group's first tab. See [role pane](../appendix-a-glossary.md#role-pane).
   - There are three: the **agent pane** (`agent`, required), the **shell pane** (`shell`), and the **UI pane** (`ui`).
   - A role is bound to the process identity that claimed it through the kiki [pane launcher](../appendix-a-glossary.md#pane-launcher).
   - The role ends when that process ends.
   - A role never comes from a pane's position, title, or label.
-- **User pane** — any pane or tab the user adds natively in Herdr. `user` is not a role; it is the absence of one. Kiki never recreates one. Close accounts for every process in it.
-- **Herdr sidebar** — Herdr's native sidebar at the left of a client.
+- **User pane**: any pane or tab the user adds natively in Herdr. `user` is not a role; it is the absence of one. Kiki never recreates one. Close accounts for every process in it.
+- **Herdr sidebar**: Herdr's native sidebar at the left of a client.
   - It lists the server's Herdr workspaces. So it lists every thread's terminal group across all registered repos.
   - The user can hide or collapse it. It is Herdr's, not kiki's.
   - Kiki feeds it a label and tokens; see [Herdr sidebar projection](#herdr-sidebar-projection).
-- **[Thread list](../appendix-a-glossary.md#thread-list)** — the left column of the overlay, holding the Stack and Activity sections. It is part of the overlay's own drawing. It is not the Herdr sidebar and not the UI pane.
-- **Overlay** — kiki's custom [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface) (text-based user interface).
+- **[Thread list](../appendix-a-glossary.md#thread-list)**: the left column of the overlay, holding the Stack and Activity sections. It is part of the overlay's own drawing. It is not the Herdr sidebar and not the UI pane.
+- **Overlay**: kiki's custom [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface) (text-based user interface).
   - It is opened by bare `kk` (inside a registered repo) or by the overlay keybinding.
   - It is transient. It is dismissed on switch, on `q` or `esc`, or on completing a verb.
   - Whenever no overlay is available, bare `kk` prints the `kk ls` listing instead. That covers three cases: before the overlay ships, outside a registered repo, and when `kk` is not running on an interactive terminal (see [Commands](../09-commands.md)).
-- **Shell pane** — the `shell` role pane: the user's `$SHELL` at the jj workspace path. It sits beside the agent pane in the same tab (default position: below; configurable to the right). On by default. Detailed semantics in [Shell pane](#shell-pane).
-- **UI pane** — the optional `ui` role pane: a narrow, navigation-only pane that keeps the Stack tree permanently visible. Off by default. Detailed semantics in [UI pane](#ui-pane).
-- **Stack section** — the threads in the current repo, rendered as a [follows](../appendix-a-glossary.md#follows)-aware tree in `kk log` order. Cursor moves here for navigation.
-- **Activity section** — the same threads, flat-listed by most-recent agent event (descending). Cursor moves here for triage. It appears in the overlay only. Outside the overlay, the Herdr sidebar carries the ambient attention role.
-- **[Preview pane](../appendix-a-glossary.md#preview-pane)** — the right two-thirds of the overlay. It renders one of: transcript tail, working-copy diff, PR comments. Toggled by `t` / `d` / `c`. It is a region of the overlay, not a Herdr pane.
-- **[Chord ribbon](../appendix-a-glossary.md#chord-ribbon)** — a one-line keybinding hint at the bottom edge of the overlay. Toggled by `?`. It adapts to the current selection (e.g. it hides `c` for a thread without a PR).
-- **Inlined status** — the per-thread status block the Stack section renders under the _current_ thread's [bookmark](../appendix-a-glossary.md#bookmark) line. It reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](../09-commands.md)). Single source of truth.
-- **Checkpoint lag** — a normal active-thread condition in which the tracked [checkpoint target](../appendix-a-glossary.md#checkpoint-target) trails the jj workspace's persisted [live head](../appendix-a-glossary.md#live-head). This is the `behind` relationship of `kk status`.
+- **Shell pane**: the `shell` role pane: the user's `$SHELL` at the jj workspace path. It sits beside the agent pane in the same tab (default position: below; configurable to the right). On by default. Detailed semantics in [Shell pane](#shell-pane).
+- **UI pane**: the optional `ui` role pane: a narrow, navigation-only pane that keeps the Stack tree permanently visible. Off by default. Detailed semantics in [UI pane](#ui-pane).
+- **Stack section**: the threads in the current repo, rendered as a [follows](../appendix-a-glossary.md#follows)-aware tree in `kk log` order. Cursor moves here for navigation.
+- **Activity section**: the same threads, flat-listed by most-recent agent event (descending). Cursor moves here for triage. It appears in the overlay only. Outside the overlay, the Herdr sidebar carries the ambient attention role.
+- **[Preview pane](../appendix-a-glossary.md#preview-pane)**: the right two-thirds of the overlay. It renders one of: transcript tail, working-copy diff, PR comments. Toggled by `t` / `d` / `c`. It is a region of the overlay, not a Herdr pane.
+- **[Chord ribbon](../appendix-a-glossary.md#chord-ribbon)**: a one-line keybinding hint at the bottom edge of the overlay. Toggled by `?`. It adapts to the current selection (e.g. it hides `c` for a thread without a PR).
+- **Inlined status**: the per-thread status block the Stack section renders under the _current_ thread's [bookmark](../appendix-a-glossary.md#bookmark) line. It reuses `StatusRenderer --no-jj` byte-identically with `kk status` (see [Commands](../09-commands.md)). Single source of truth.
+- **Checkpoint lag**: a normal active-thread condition in which the tracked [checkpoint target](../appendix-a-glossary.md#checkpoint-target) trails the jj workspace's persisted [live head](../appendix-a-glossary.md#live-head). This is the `behind` relationship of `kk status`.
   - Detailed status labels it `checkpoint behind head`.
   - Compact TUI surfaces append `↑` to the bookmark.
   - The other relationships (`current`, `ahead`, `diverged`) are spelled out in the inlined status.
   - A freshly reopened thread reads `current` and shows no `↑`. So does a thread whose head is an empty commit on top of the checkpoint.
   - This is not dirty state or cascade conflict.
-- **[Context strip](../appendix-a-glossary.md#context-strip)** — the bottom-most line of the overlay or the UI pane. One compressed sentence with TUI-specific content. It has two forms by context:
+- **[Context strip](../appendix-a-glossary.md#context-strip)**: the bottom-most line of the overlay or the UI pane. One compressed sentence with TUI-specific content. It has two forms by context:
   - The overlay form carries repo + bookmark + cascade glyph + agent model + ctx % + last op age.
   - The UI-pane form is shorter: bookmark, cascade glyph, and agent dot. It has no dirty marker. The agent pane next to it already surfaces model and ctx.
   - [Context strip](#context-strip) below is the one full definition of both forms.
   - This is a TUI footer, separate from the `StatusRenderer`-backed inlined status.
-- **Toast** — a non-modal floating pill in the overlay's top-right corner.
+- **Toast**: a non-modal floating pill in the overlay's top-right corner.
   - It is used for cascade events, agent finish/error notifications, the close proposal after a PR merge, and config-set warnings.
   - It auto-dismisses after `[ui] toast_ttl_ms` (default 4000).
   - It carries at most one optional named action. The action never performs or confirms anything consequential.
   - A **Herdr toast** is a different thing: Herdr's own notification, used as one attention transport (see [Toasts](#toasts)).
-- **Card** — a centered modal panel with title, body, and one or two action buttons. Used for spawn input and foreground approval.
+- **Card**: a centered modal panel with title, body, and one or two action buttons. Used for spawn input and foreground approval.
 
 ### What the overlay may read
 
@@ -169,11 +169,11 @@ The overlay is focused on the current thread. It resolves that thread via the st
 
 The overlay is one screen, three regions stacked vertically:
 
-1. Top: a single-line breadcrumb — `kiki · NAVIGATE · <repo>/<thread>`.
+1. Top: a single-line breadcrumb, `kiki · NAVIGATE · <repo>/<thread>`.
 2. Middle: a fixed-width [thread list](../appendix-a-glossary.md#thread-list) on the left (Stack on top, Activity on bottom) and a flexible-width [preview pane](../appendix-a-glossary.md#preview-pane) on the right.
 3. Bottom: a one-line [context strip](../appendix-a-glossary.md#context-strip). An optional [chord ribbon](../appendix-a-glossary.md#chord-ribbon) hovers above it when `?` is held.
 
-### Wireframe — bare overlay open
+### Wireframe: bare overlay open
 
 ```
  kiki · NAVIGATE · pi-extensions/codex-conv-tui                               ?  esc
@@ -199,7 +199,7 @@ The overlay is one screen, three regions stacked vertically:
  pi-extensions  pi/codex-conv*  ↻ pending  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
-### Wireframe — `t` opens transcript tail in the preview pane
+### Wireframe: `t` opens transcript tail in the preview pane
 
 ```
  kiki · NAVIGATE · pi-extensions/codex-conv-tui                              ?  esc
@@ -233,14 +233,14 @@ For the contextual thread, pressing `d` is an explicit, human-invoked passthroug
 
 - The overlay's `kk` process runs the diff in the caller's own jj workspace, exactly as `kk status --diff` does.
 - It may snapshot the working copy (see [Commands](../09-commands.md#kk-status)). A [snapshot](https://docs.jj-vcs.dev/latest/working-copy/) is jj recording the current files as a commit.
-- Those two — the `kk status` body and this `d` diff — are the only human-invoked CLI passthroughs.
+- Those two, the `kk status` body and this `d` diff, are the only human-invoked CLI passthroughs.
 - It runs only on that keypress, never on a timer or on cursor movement.
 
 For any other thread, `d` keeps its approval rule. It renders from a [pinned read](../appendix-a-glossary.md#pinned-read) that ignores the working copy.
 
 Everything else the overlay and the UI pane poll uses pinned reads only.
 
-### Wireframe — `d` shows working-copy diff
+### Wireframe: `d` shows working-copy diff
 
 ```
  kiki · NAVIGATE · pi-extensions/codex-conv-tui                              ?  esc
@@ -265,7 +265,7 @@ Everything else the overlay and the UI pane poll uses pinned reads only.
  pi-extensions  pi/codex-conv*  ↻ pending  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
-### Wireframe — `c` shows PR comments
+### Wireframe: `c` shows PR comments
 
 ```
  kiki · NAVIGATE · pi-extensions/codex-conv-tui                              ?  esc
@@ -291,7 +291,7 @@ Everything else the overlay and the UI pane poll uses pinned reads only.
  pi-extensions  pi/codex-conv*  ↻ pending  claude-opus-4-7  ctx ●●●●○ 78%  last op 12s
 ```
 
-### Wireframe — chord ribbon visible (`?` toggled)
+### Wireframe: chord ribbon visible (`?` toggled)
 
 ```
  kiki · NAVIGATE · pi-extensions/codex-conv-tui                              ?  esc
@@ -321,11 +321,11 @@ Everything else the overlay and the UI pane poll uses pinned reads only.
 The ribbon adapts to selection:
 
 - Closed rows are hidden until `a` shows them. `a` is always in the ribbon.
-- For a closed thread, `i`, `p`, and `x` drop out, and `r` (reopen — see keymap below) appears.
+- For a closed thread, `i`, `p`, and `x` drop out, and `r` (reopen: see keymap below) appears.
 - For a `Closed` thread with a reopen in progress, `i`, `p`, `x`, and `r` all drop out until the reopen finishes or fails.
 - For a thread without a PR, `c` (preview comments) drops out independently.
 
-### Wireframe — foreground approval card (`x` close on cursored thread)
+### Wireframe: foreground approval card (`x` close on cursored thread)
 
 ```
  kiki · NAVIGATE · pi-extensions/codex-conv-tui                              ?  esc
@@ -369,7 +369,7 @@ A close, destroy, or terminal-restart card says exactly what it covers:
 
 An approval card needs a terminal its `kk` process owns in the foreground. A pane's PTY is the [controlling terminal](<https://en.wikipedia.org/wiki/Job_control_(Unix)>) of its child, so a `kk` typed in a pane qualifies. Whether a popup's terminal qualifies is part of the popup gate. Where it does not, the approval flow [fails closed](../appendix-a-glossary.md#fail-closed), and the same verb is available from `kk` in a pane. ("Fails closed" means the action is refused, not allowed by default.)
 
-### Wireframe — spawn card (`n` for new thread, `N` for new-as-child-of-cursored)
+### Wireframe: spawn card (`n` for new thread, `N` for new-as-child-of-cursored)
 
 ```
  kiki · SPAWN · child of pi-extensions/codex-conv-tui                          esc
@@ -431,7 +431,7 @@ The [projection](../appendix-a-glossary.md#herdr-sidebar-projection) is one-way,
 
 The sidebar lists terminal groups from every registered repo in one list. The label names the repo, so rows from different repos stay distinct.
 
-### Wireframe — a Herdr client on the kiki server (Herdr sidebar · agent pane · shell pane)
+### Wireframe: a Herdr client on the kiki server (Herdr sidebar · agent pane · shell pane)
 
 ```
  ╭─ kiki ───────────────────────────────╮ ╭─ agent · codex-conv ─────────────────────────────╮
@@ -495,7 +495,7 @@ It is **navigation-only**:
 
 The UI pane is ensured when the [terminal group](../appendix-a-glossary.md#terminal-group) is provisioned: at `kk new`, at `kk reopen`, and by the [`restart-terminal`](../appendix-a-glossary.md#restart-terminal) plan of `kk repair`. `kk switch` never creates it. The user may close the pane, or the UI process may exit so that Herdr removes the pane. In either case kiki does not put it back until one of those events.
 
-### Wireframe — a thread's tab with the UI pane (UI pane · agent pane; Herdr's sidebar sits to the left of the tab as above)
+### Wireframe: a thread's tab with the UI pane (UI pane · agent pane; Herdr's sidebar sits to the left of the tab as above)
 
 ```
  ╭─ ui ────────────────────────╮ ╭─ agent · codex-conv ─────────────────────────────╮
@@ -570,9 +570,9 @@ The table shows the four layout combinations of `[ui] ui_pane` × `[ui] shell_pa
 | `ui_pane` | `shell_pane` | tab layout                                                                  |
 | --------- | ------------ | --------------------------------------------------------------------------- |
 | `true`    | `true`       | UI pane left (32 cols) · agent top-right (~75%) · shell bottom-right (~25%) |
-| `false`   | `true`       | agent top (~75%) · shell bottom (~25%) — full width                         |
+| `false`   | `true`       | agent top (~75%) · shell bottom (~25%): full width                          |
 | `true`    | `false`      | UI pane left (32 cols) · agent right (full height)                          |
-| `false`   | `false`      | agent only — full tab                                                       |
+| `false`   | `false`      | agent only: full tab                                                        |
 
 Under `shell_pane_position = right`, the agent / shell rows flip orientation:
 
@@ -636,8 +636,8 @@ See [Authority](../04-authority.md).
 
 Two subtypes share the surface:
 
-- **Notification toast** — no interactive action. The body may include hint text naming an overlay verb (e.g., "tap T to read transcript"). The verb is fielded by the overlay's normal keymap; the toast does not intercept it.
-- **Actionable toast** — carries exactly one named action.
+- **Notification toast**: no interactive action. The body may include hint text naming an overlay verb (e.g., "tap T to read transcript"). The verb is fielded by the overlay's normal keymap; the toast does not intercept it.
+- **Actionable toast**: carries exactly one named action.
   - The action is invoked by clicking the action label, or by pressing the named key while the toast is the most-recent unactioned toast.
   - That key is the _only_ keystroke a toast intercepts. Everything else passes through to the overlay.
   - The action never performs or confirms a consequential operation.
@@ -653,12 +653,12 @@ Dismissal rules (apply to both subtypes):
 
 Toast triggers (v1):
 
-- agent finish (`✓`), the goal-complete event — notification. Its default level is `soft`: a status mark plus this overlay toast, and no OS notification or Herdr toast. [Configuration](../11-configuration.md) owns the per-event level table.
-- agent error / blocked (`◐`) — notification
-- cascade conflict on a non-current thread (`✗`) — notification
-- cascade materialized for a child thread (`──`, only when ≥ 2 child reconciliations [coalesce](../appendix-a-glossary.md#coalescing)) — notification
-- config-set warning that won't take effect until next `kk new` / `kk reopen` — notification
-- close proposed after a PR merge (`✓`), with a `review` action that opens the close plan's approval card (v1.x, with the GitHub integration — see [Publishing](../07-publishing.md)) — actionable. Kiki never closes a thread by itself, and there is no undo grace: nothing happens until the human approves the card.
+- agent finish (`✓`), the goal-complete event: notification. Its default level is `soft`: a status mark plus this overlay toast, and no OS notification or Herdr toast. [Configuration](../11-configuration.md) owns the per-event level table.
+- agent error / blocked (`◐`): notification
+- cascade conflict on a non-current thread (`✗`): notification
+- cascade materialized for a child thread (`──`, only when ≥ 2 child reconciliations [coalesce](../appendix-a-glossary.md#coalescing)): notification
+- config-set warning that won't take effect until next `kk new` / `kk reopen`: notification
+- close proposed after a PR merge (`✓`), with a `review` action that opens the close plan's approval card (v1.x, with the GitHub integration, see [Publishing](../07-publishing.md)): actionable. Kiki never closes a thread by itself, and there is no undo grace: nothing happens until the human approves the card.
 
 Overlay toasts are drawn only by the overlay. The UI pane hosts none, and kiki draws nothing over the live agent pane.
 
@@ -667,7 +667,7 @@ Overlay toasts are drawn only by the overlay. The UI pane hosts none, and kiki d
 When no overlay is open, [attention events](../appendix-a-glossary.md#attention-event) travel on two channels:
 
 - **The Herdr sidebar.** The thread's tokens change, so the entry shows the new glyph and word. This is passive: it needs a client to be attached, with the sidebar shown, and someone looking.
-- **The configured notification transport**, `[notifications] os_provider` (`auto | notify-rust | osascript | herdr | off` — see [Configuration](../11-configuration.md) and [Observability](../12-observability.md)).
+- **The configured notification transport**, `[notifications] os_provider` (`auto | notify-rust | osascript | herdr | off` (see [Configuration](../11-configuration.md) and [Observability](../12-observability.md)).
 
 Whether an event uses each channel depends on its level (`loud | soft | silent`). Configuration owns the table of event keys, default levels, and what each level does on each surface. [Orientation](../01-orientation.md) lists which attention events the acceptance slice raises.
 
@@ -684,7 +684,7 @@ That is acceptable because kiki's attention events are not caller-scoped. A casc
 
 A Herdr toast or an OS notification carries the same one-line summary as an overlay toast, with its glyph and words. It carries no action, intercepts no key, and never displays or confirms an approval. Actionable toasts exist only in the overlay. Outside it, the notification names the event and the user acts through `kk`.
 
-### Wireframe — conflicted-thread toast in overlay
+### Wireframe: conflicted-thread toast in overlay
 
 ```
  kiki · NAVIGATE · pi-extensions/codex-conv-tui     ┌─────────────────────────────┐
@@ -760,7 +760,7 @@ Overlay (`NAVIGATE` mode):
 | `space`   | toggle preview pane on the cursored thread                                      |
 | `t`       | preview-mode = transcript tail                                                  |
 | `d`       | preview-mode = working-copy diff                                                |
-| `c`       | preview-mode = PR comments (preview only — not close)                           |
+| `c`       | preview-mode = PR comments (preview only, not close)                            |
 | `T`       | open full-screen transcript reader                                              |
 | `n`       | spawn modal (new thread; follows the contextual thread by default, as `kk new`) |
 | `N`       | spawn modal (new thread, follows cursored)                                      |
@@ -860,8 +860,8 @@ If `[ui] mouse_enabled = false`, kiki's own processes do not request mouse captu
 
 `[ui]` keys referenced by this spec:
 
-- `ui_pane` (bool, default `false`) — whether the UI pane is provisioned
-- `ui_pane_width` (int, default `32`) — the UI pane's width in columns
+- `ui_pane` (bool, default `false`): whether the UI pane is provisioned
+- `ui_pane_width` (int, default `32`): the UI pane's width in columns
 - `shell_pane` (bool, default `true`)
 - `shell_pane_position` (string, default `"below"`)
 - `shell_pane_size_pct` (int, default `25`)
@@ -874,7 +874,7 @@ All `[ui]` keys are personal preference. They are valid in user and per-thread c
 
 - `mouse_enabled`, `toast_ttl_ms`, and `theme` are cosmetic and hot-reload (they take effect without a restart). `theme` styles kiki's own surfaces; the [Herdr client](../appendix-a-glossary.md#herdr-client)'s theme is Herdr's.
 - `overlay_min_cols` takes effect at the next overlay open.
-- `ui_pane`, `ui_pane_width`, `shell_pane`, `shell_pane_position`, and `shell_pane_size_pct` take effect the next time a terminal group is provisioned — `kk new`, `kk reopen`, or a `kk repair` terminal restart. They do not reshape a live terminal group, and `kk switch` never applies them.
+- `ui_pane`, `ui_pane_width`, `shell_pane`, `shell_pane_position`, and `shell_pane_size_pct` take effect the next time a terminal group is provisioned: `kk new`, `kk reopen`, or a `kk repair` terminal restart. They do not reshape a live terminal group, and `kk switch` never applies them.
 
 Outside `[ui]`:
 

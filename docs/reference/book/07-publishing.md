@@ -11,7 +11,7 @@ Stack-aware publishing is the first [v1.x](appendix-a-glossary.md#v1-x-polish) w
 This section lists what `kk publish` does when you give it no extra instructions. It also says how kiki makes sure it pushes exactly the commit the human approved.
 
 - PRs open as drafts by default. Opening one ready-for-review requires an explicit flag.
-- When a thread is stacked on a parent, its PR base — the branch the PR merges into — is the parent thread's branch. (A thread is stacked on a parent when it [follows](appendix-a-glossary.md#follows) that parent thread.)
+- When a thread is stacked on a parent, its PR base, the branch the PR merges into, is the parent thread's branch. (A thread is stacked on a parent when it [follows](appendix-a-glossary.md#follows) that parent thread.)
 - Unstacked, detached, or parentless threads use the repo default branch as the base.
 - If a parent is unpublished, `kk publish` publishes the unpublished ancestors first, top-down.
 - Each PR in a stack publish gets its own editor session, top-down.
@@ -29,7 +29,7 @@ Publishing is manual by default. Configurable eager modes may later push or open
 Before presenting the publish plan for approval, kiki does two things in order:
 
 1. It takes the [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) under the same rule as close preflight. The boundary snapshot records the workspace's tracked edits in [jj](https://docs.jj-vcs.dev/latest/), the version-control tool kiki drives.
-2. It then pins the current [operation](https://docs.jj-vcs.dev/latest/operation-log/) view and the exact `thread_head_commit_id` — the commit at the thread's [live head](appendix-a-glossary.md#live-head).
+2. It then pins the current [operation](https://docs.jj-vcs.dev/latest/operation-log/) view and the exact `thread_head_commit_id`, the commit at the thread's [live head](appendix-a-glossary.md#live-head).
 
 It validates the v1 linear [owned stack](appendix-a-glossary.md#owned-stack). It includes that head in the [plan digest](appendix-a-glossary.md#plan-digest) (a [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the plan).
 
@@ -91,7 +91,7 @@ Polling, comments, [CI](https://en.wikipedia.org/wiki/Continuous_integration) (c
 
 ### Backend and authentication
 
-The first publishing release uses `gh` as the GitHub backend. The architecture keeps this behind a `GitHubBackend` [trait](https://doc.rust-lang.org/book/ch10-02-traits.html) — a swappable interface — so a direct REST or GraphQL backend can replace it later.
+The first publishing release uses `gh` as the GitHub backend. The architecture keeps this behind a `GitHubBackend` [trait](https://doc.rust-lang.org/book/ch10-02-traits.html), a swappable interface, so a direct REST or GraphQL backend can replace it later.
 
 kiki reuses the `gh` authentication already on the user's machine.
 

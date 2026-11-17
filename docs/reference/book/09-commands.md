@@ -1,6 +1,6 @@
 # Commands
 
-`kk` is kiki's command-line program (its CLI). It is porcelain — a friendly front end — over the [thread](appendix-a-glossary.md#thread) model. A thread is one line of work: a themed series of [jj](https://docs.jj-vcs.dev/latest/) revisions with its own workspace, terminals, and coding agent.
+`kk` is kiki's command-line program (its CLI). It is porcelain, a friendly front end, over the [thread](appendix-a-glossary.md#thread) model. A thread is one line of work: a themed series of [jj](https://docs.jj-vcs.dev/latest/) revisions with its own workspace, terminals, and coding agent.
 
 The `kk` CLI should make common kiki operations obvious. It does not try to replace `jj`, `gh` (the [GitHub CLI](https://cli.github.com/)), or native [Herdr](appendix-a-glossary.md#herdr) use. Herdr is the [terminal multiplexer](https://en.wikipedia.org/wiki/Terminal_multiplexer) that hosts kiki's terminals. Panes, splits, tabs, scrollback, and Herdr's own navigation stay Herdr's; see [Terminal runtime](13-architecture/terminal-runtime.md#native-and-custom-ui).
 
@@ -118,8 +118,8 @@ An approval is normally begun with a thread credential or a repo's registration 
 
 It verifies prerequisites:
 
-- [jj](https://docs.jj-vcs.dev/latest/) is initialized — hard error if not. The message names `jj git init --colocate` as the typical fix. (A [colocated](https://docs.jj-vcs.dev/latest/git-compatibility/) repository holds jj and [Git](https://git-scm.com/) data side by side.)
-- [`kkd`](appendix-a-glossary.md#kkd) can write the per-repo state directory at `~/.config/kiki/repos/<repo_id>/` — hard error if it cannot.
+- [jj](https://docs.jj-vcs.dev/latest/) is initialized, hard error if not. The message names `jj git init --colocate` as the typical fix. (A [colocated](https://docs.jj-vcs.dev/latest/git-compatibility/) repository holds jj and [Git](https://git-scm.com/) data side by side.)
+- [`kkd`](appendix-a-glossary.md#kkd) can write the per-repo state directory at `~/.config/kiki/repos/<repo_id>/`, hard error if it cannot.
   - kiki writes nothing into the source repo itself.
   - The only kiki file that may live there is the optional committed `<repo>/.kiki.toml` (the repo-shared config layer), and `kk init` does not create it.
 
@@ -188,7 +188,7 @@ This keeps agent-driven spawning out of v1 without granting the CLI reusable Adm
 
 Important flags:
 
-- `--follows <parent>` creates a live [follows](appendix-a-glossary.md#follows) edge — a link that makes this thread track a parent thread;
+- `--follows <parent>` creates a live [follows](appendix-a-glossary.md#follows) edge: a link that makes this thread track a parent thread;
 - `--no-follow` suppresses contextual following;
 - a request to make the new thread follow another is refused when the new thread's harness failed its [`RestartStartup`](appendix-a-glossary.md#restartstartup-delivery-proof) proof. That harness runs managed sessions without cascade delivery, so its threads cannot follow. The refusal names that reason. This covers `--follows <parent>` and the contextual default alike; `--no-follow` creates the thread with no edge;
 - `-m "<prompt>"` supplies an initial prompt, delivered to the [harness](appendix-a-glossary.md#harness) as the first user turn;
@@ -231,7 +231,7 @@ When v1.x [transcript](appendix-a-glossary.md#thread-transcript) capture is enab
 
 ## `kk switch`
 
-`kk switch <thread>` moves your terminal view to another thread. More exactly, it moves the caller's [Herdr client](appendix-a-glossary.md#herdr-client) — the terminal view the person who ran the command is attached with — to the target thread's agent pane. It moves that one client and no other.
+`kk switch <thread>` moves your terminal view to another thread. More exactly, it moves the caller's [Herdr client](appendix-a-glossary.md#herdr-client), the terminal view the person who ran the command is attached with, to the target thread's agent pane. It moves that one client and no other.
 
 See [Terminal runtime · Caller-local focus](13-architecture/terminal-runtime.md#caller-local-focus) for the mechanism and [Authority](04-authority.md) for why it needs no approval.
 
@@ -365,7 +365,7 @@ PR number, PR state, and CI fields appear only after their v1.x integrations shi
 
 ### Only one jj-shaped flag
 
-`kk log` adopts no other jj-log flags: `-r <revset>` is the only jj-shaped flag in v1. Other `jj log` affordances — patches, templates, reverse order, custom color — remain direct `jj log` usage. This avoids a near-mirror CLI that drifts as jj evolves.
+`kk log` adopts no other jj-log flags: `-r <revset>` is the only jj-shaped flag in v1. Other `jj log` affordances (patches, templates, reverse order, custom color) remain direct `jj log` usage. This avoids a near-mirror CLI that drifts as jj evolves.
 
 The escape hatch for arbitrary revision selection is `jj` itself. kiki decorates the model it owns; it does not clone every flag of the tools beneath it.
 
@@ -389,7 +389,7 @@ The two parts are produced differently:
 
 - **The header** comes from [`kkd`](appendix-a-glossary.md#kkd) and uses [pinned reads](appendix-a-glossary.md#pinned-read) only: every jj read names an exact [operation](https://docs.jj-vcs.dev/latest/operation-log/) id and ignores the [working copy](https://docs.jj-vcs.dev/latest/working-copy/). `kk status --no-jj` prints only this part and never touches the working copy.
 - **The body** is an explicit, human-invoked passthrough.
-  - The `kk` CLI — never `kkd` — runs `jj st` (and the `--diff` forms) in the caller's own contextual jj workspace, exactly as if the human had typed it.
+  - The `kk` CLI, never `kkd`, runs `jj st` (and the `--diff` forms) in the caller's own contextual jj workspace, exactly as if the human had typed it.
   - Like any direct jj use it may snapshot the working copy. (A snapshot is jj recording the current files as a commit.)
   - It is allowed only for an explicit user command against the caller's contextual workspace.
   - It is one of the two human-invoked CLI passthroughs in the closed list of unpinned commands in [Invariants](02-invariants.md). The other is the overlay's `d` diff for the contextual thread.
@@ -409,18 +409,18 @@ The header identifies the exact live `thread_head_commit_id` and a checkpoint li
 
 The checkpoint line shows three facts:
 
-- the **placed checkpoint** — the bookmark name and `checkpoint_commit_id`, the commit where kiki last explicitly placed it;
-- the **tracked expected target** — `bookmark_expected_commit_id`, the commit the bookmark is expected to name now, after any rewrite [successors](appendix-a-glossary.md#native-successor) jj carried it to (see [expected bookmark target](appendix-a-glossary.md#expected-bookmark-target));
+- the **placed checkpoint**: the bookmark name and `checkpoint_commit_id`, the commit where kiki last explicitly placed it;
+- the **tracked expected target**: `bookmark_expected_commit_id`, the commit the bookmark is expected to name now, after any rewrite [successors](appendix-a-glossary.md#native-successor) jj carried it to (see [expected bookmark target](appendix-a-glossary.md#expected-bookmark-target));
 - the **relationship** of the tracked expected target to the live head, exactly one of `current`, `behind`, `ahead`, or `diverged` (see [checkpoint relationship](appendix-a-glossary.md#checkpoint-relationship)).
 
 The relationship is defined purely on `bookmark_expected_commit_id` and the live head, tested on a single-parent path between them:
 
-| value      | meaning                                                                                                                                                          |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `current`  | the expected target is the live head, or it is the commit the checkpoint target rule below picks — the state right after `jj commit` and right after `kk reopen` |
-| `behind`   | the live head is any other descendant of the expected target; the detailed label is `checkpoint behind head`                                                     |
-| `ahead`    | the live head is an ancestor of the expected target, for example after `jj edit` of an earlier commit                                                            |
-| `diverged` | anything else                                                                                                                                                    |
+| value      | meaning                                                                                                                                                         |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `current`  | the expected target is the live head, or it is the commit the checkpoint target rule below picks: the state right after `jj commit` and right after `kk reopen` |
+| `behind`   | the live head is any other descendant of the expected target; the detailed label is `checkpoint behind head`                                                    |
+| `ahead`    | the live head is an ancestor of the expected target, for example after `jj edit` of an earlier commit                                                           |
+| `diverged` | anything else                                                                                                                                                   |
 
 `behind` is the ordinary reading once work continues past a checkpoint.
 
@@ -531,7 +531,7 @@ Once termination has begun there is no resume. If exit cannot be verified within
 
 ### Processes outside the listed containers
 
-A same-UID process can hold the workspace from outside the listed containers — an editor opened elsewhere, for example. "Same-UID" means it runs as the same [user](https://en.wikipedia.org/wiki/User_identifier). Such a [holder](appendix-a-glossary.md#holder) is not a standing issue and never blocks an `Active` thread.
+A same-UID process can hold the workspace from outside the listed containers: an editor opened elsewhere, for example. "Same-UID" means it runs as the same [user](https://en.wikipedia.org/wiki/User_identifier). Such a [holder](appendix-a-glossary.md#holder) is not a standing issue and never blocks an `Active` thread.
 
 At close it makes the result `Unknown`, and the files are kept, unless the approved plan names that exact holder as accepted (an [accepted holder](appendix-a-glossary.md#accepted-holder)). Every `Unknown` result reports each offending pid, its command line, and the step that clears it. Writers running as another user are invisible to this scan.
 
@@ -618,7 +618,7 @@ The first comments surface is read-only. Feeding review comments into agent cont
 
 It hard-stops the thread's agent and reframes it through the harness resume path. It is the explicit human escape hatch for a stuck or off-track agent, and it uses the same [hard-escalation](appendix-a-glossary.md#hard-escalation) shape as cascade conflict handling.
 
-Interrupt destroys a process at a human's request, so it requires one-shot [foreground approval](#foreground-approval-flow) — even for the contextual thread. Kiki's own protocol restarts, such as a cascade hard restart, are daemon-initiated steps of the delivery protocol and need no approval.
+Interrupt destroys a process at a human's request, so it requires one-shot [foreground approval](#foreground-approval-flow), even for the contextual thread. Kiki's own protocol restarts, such as a cascade hard restart, are daemon-initiated steps of the delivery protocol and need no approval.
 
 ## `kk thread restart`
 
@@ -663,7 +663,7 @@ Before detach decides that no reconciliation is pending, it does these things:
 
 The user must reconcile that exact transition or explicitly discard it. Pending parent work is discarded only with `--discard-pending`; without that flag, detach refuses while a transition is pending and says so. Only then does detach checkpoint the child at its [checkpoint target](appendix-a-glossary.md#checkpoint-target) and delete the edge.
 
-Follows graph surgery — `kk thread attach` and `kk thread reparent` — is out of v1. When those commands ship, they refuse the same way as `kk new --follows` for a thread whose harness failed its `RestartStartup` proof.
+Follows graph surgery, `kk thread attach` and `kk thread reparent`, is out of v1. When those commands ship, they refuse the same way as `kk new --follows` for a thread whose harness failed its `RestartStartup` proof.
 
 ### Approval
 
@@ -683,7 +683,7 @@ It permanently removes kiki's thread [projections](appendix-a-glossary.md#projec
 Important flags:
 
 - `--keep-log` retains the thread's transcript rows instead of deleting them. The view that reads those kept rows is future work; until it ships, no command shows them.
-- `--abandon-revisions` additionally abandons revisions — but only the exact validated linear owned chain named in the approval plan.
+- `--abandon-revisions` also abandons revisions, but only the exact validated linear owned chain named in the approval plan.
   - The plan lists every change/commit id and every affected registered descendant.
   - Ambiguous topology, foreign commits, or plan drift refuses the operation rather than widening the revset.
 
@@ -935,7 +935,7 @@ After a cold restore, the panes Herdr restored are **remnant panes** (see [remna
 
 - Their launch command is not rerun.
 - They are accounted terminal members, not orphans, because the current runtime observation names each one's pane and root process.
-- Kiki ties a remnant container to a thread only by OS evidence — a pane process that holds that thread's workspace — never by the container's id or label.
+- Kiki ties a remnant container to a thread only by OS evidence, a pane process that holds that thread's workspace, never by the container's id or label.
 
 No plan adopts or reuses a restored or surviving pane. A thread never returns to `Active` because a pane, a label, or a Herdr agent state reappeared.
 
@@ -968,7 +968,7 @@ While the issue is open, kiki blocks exactly replacement, materialization, and d
 
 An unrecorded same-UID [holder](appendix-a-glossary.md#holder) of the workspace is not `OrphanedProcess` and never blocks an `Active` thread's boundaries. It matters only to a plan that deletes the workspace: close, destroy, `close-without-terminal`, and the failed-create and failed-reopen cleanups.
 
-- There the result is `Unknown`, and the files are kept, unless the approved plan names that exact holder identity as accepted — the human's informed choice.
+- There the result is `Unknown`, and the files are kept, unless the approved plan names that exact holder identity as accepted: the human's informed choice.
 - A holder the plan did not name is drift.
 - The diagnosis reports each such holder's pid, its command line, and the step that clears it.
 - Kiki never [signals](<https://en.wikipedia.org/wiki/Signal_(IPC)>) a process whose identity it did not record. (A harness remnant is recorded by freeze discovery under the `terminate-orphans` approval before it is signalled.)
@@ -987,14 +987,14 @@ Otherwise the [saga](appendix-a-glossary.md#saga) stops with its projections int
 
 `kk repair` then offers the [`cleanup-failed-create`](appendix-a-glossary.md#cleanup-failed-create) plan, or [`cleanup-failed-reopen`](appendix-a-glossary.md#cleanup-failed-reopen) for a reopen.
 
-- It uses the close machinery — freeze, loss inventory, final proof, terminate, verified exit.
+- It uses the close machinery: freeze, loss inventory, final proof, terminate, verified exit.
 - It requires one-shot approval with the same container-scope statement as close.
 
 `CreateFailed` has no retry plan. Its exit is `cleanup-failed-create`; after that the human runs `kk new` again.
 
 #### A failed terminal restart
 
-A [`restart-terminal`](appendix-a-glossary.md#restart-terminal) can fail after it provisioned a new terminal group — for example, when the ready handshake did not arrive within `[timeouts] ready_handshake`. `kk repair` then offers [`cleanup-failed-restart`](appendix-a-glossary.md#cleanup-failed-restart).
+A [`restart-terminal`](appendix-a-glossary.md#restart-terminal) can fail after it provisioned a new terminal group, for example, when the ready handshake did not arrive within `[timeouts] ready_handshake`. `kk repair` then offers [`cleanup-failed-restart`](appendix-a-glossary.md#cleanup-failed-restart).
 
 - It has the same limits as `cleanup-failed-create`: the close machinery, and a one-shot approval with the container-scope statement.
 - It removes the half-made terminal group.
@@ -1047,7 +1047,7 @@ One rule covers every bookmark move kiki makes:
 - **Adopt and choose may place it anywhere on the chain.** The approved plans `adopt-bookmark` and `choose-bookmark-target` may place the bookmark on the live head or on any commit on the validated owned chain. That includes a commit behind the expected target. These plans may pass `--allow-backwards`.
 - **Restore goes back to the expected target.** `restore-bookmark` puts the bookmark back on the expected target. jj may see that as a backward move, so the plan may pass `--allow-backwards`. It still needs no approval in the thread's own context; applied to a different thread, it needs a one-shot approval.
 - **Unhide may pass the flag too.** `unhide-checkpoint` may also pass `--allow-backwards`.
-- **Never off the chain.** Kiki never places the bookmark on a commit that is off the owned chain. v1 has no plan for that. The human first fixes the shape with jj — for example, a rebase that puts the commit on the chain — and then adopts or chooses.
+- **Never off the chain.** Kiki never places the bookmark on a commit that is off the owned chain. v1 has no plan for that. The human first fixes the shape with jj (for example, a rebase that puts the commit on the chain) and then adopts or chooses.
 
 For a `Closed` thread, adopt and choose must also validate the retained owned chain and every follows child, and they advance the archived `thread_head_commit_id` with the checkpoint. The full adoption rule is in [Threads](03-threads.md#projection-divergence-and-repair).
 
@@ -1186,7 +1186,7 @@ By default, `kk repo unregister` removes two things:
 - the row in `~/.config/kiki/state.db`'s `repos` table;
 - the centralized state directory at `~/.config/kiki/repos/<repo_id>/` (threads, optional transcript rows, SQLite audit rows, credentials, per-thread error logs, and any workspace-recovery bundles).
 
-The action is irreversible — there is no kiki-managed undo, matching the shape of `kk thread destroy` (see [Threads · destroy](03-threads.md#destroy)).
+The action is irreversible: there is no kiki-managed undo, matching the shape of `kk thread destroy` (see [Threads · destroy](03-threads.md#destroy)).
 
 - It therefore requires a one-shot [foreground approval](#foreground-approval-flow) bound to the canonical repo path, the repo id, and whether state is retained.
 - Non-interactive unregister is unavailable in v1.

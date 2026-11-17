@@ -2,7 +2,7 @@
 
 The [thread transcript](appendix-a-glossary.md#thread-transcript) is a local recall surface. It is a searchable record of conversational text written by the human, by the agent, and by kiki itself. (A [thread](appendix-a-glossary.md#thread) is kiki's unit of work.)
 
-It is a memory aid for the human. After explicit [provider-egress consent](appendix-a-glossary.md#provider-egress-consent) — permission to send text to the model provider — it also serves the same thread's resumed agent. Code truth stays in [jj](https://docs.jj-vcs.dev/latest/) (the Jujutsu version-control system) and the filesystem.
+It is a memory aid for the human. After explicit [provider-egress consent](appendix-a-glossary.md#provider-egress-consent), permission to send text to the model provider, it also serves the same thread's resumed agent. Code truth stays in [jj](https://docs.jj-vcs.dev/latest/) (the Jujutsu version-control system) and the filesystem.
 
 Transcript capture, transcript reads, and transcript-backed [reopen catch-up](appendix-a-glossary.md#catch-up) are [v1.x](appendix-a-glossary.md#v1-x-polish) work. They are not part of the [acceptance slice](appendix-a-glossary.md#acceptance-slice) (the minimal first release). The acceptance-slice cascade protocol does not depend on a transcript row being written. This chapter fixes the privacy and data-model boundary for when the feature ships.
 
@@ -30,9 +30,9 @@ Each piece of captured text is one database row. This section lists the fields e
 Each captured row records:
 
 - `thread_id`
-- optional `change_id`, `commit_id`, and `op_id` — jj anchors that tie the row to a point in repo history
+- optional `change_id`, `commit_id`, and `op_id`: jj anchors that tie the row to a point in repo history
 - `session_id`
-- monotonic per-thread `seq` — a counter that only increases
+- monotonic per-thread `seq`: a counter that only increases
 - `captured_at`
 - `author`: `human`, `agent`, or `kk`
 - `direction`: `inbound_to_agent`, `outbound_from_agent`, or `local_record`
@@ -63,7 +63,7 @@ The first capture adapters (see [TranscriptAdapter](appendix-a-glossary.md#trans
 - [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) session JSONL; and
 - [Codex](https://github.com/openai/codex) rollout JSONL.
 
-JSONL is a file format with one JSON record per line. A managed Codex thread's rollouts live under its launch-scoped `CODEX_HOME`, so discovery is deterministic — kiki always knows where to look.
+JSONL is a file format with one JSON record per line. A managed Codex thread's rollouts live under its launch-scoped `CODEX_HOME`, so discovery is deterministic: kiki always knows where to look.
 
 Captured:
 

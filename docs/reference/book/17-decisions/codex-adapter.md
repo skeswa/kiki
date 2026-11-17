@@ -41,7 +41,7 @@ The answer keeps the protocol untouched: `parallel_batch_boundary` requires an u
 
 The integration gate first proves two things about a pinned Codex version:
 
-- it never runs two tool calls of one turn concurrently — subagent-originated calls included — and
+- it never runs two tool calls of one turn concurrently, subagent-originated calls included, and
 - it requests a new tool only after the model consumed the previous call's result.
 
 Once that is proved, each batch contains exactly one call. The concurrent-sibling steps of the delivery protocol are then vacuously satisfied: with no siblings, there is nothing for them to check.
@@ -64,7 +64,7 @@ Hook-side write evidence is `MarkDelivered`, or any durable mark the hook record
 
 The proof that closes the gap is the harness's own bookkeeping. Codex durably persists every tool result in its session record, deny reasons included, because resume must reconstruct exactly what the model saw. That record is the **[delivery receipt](../appendix-a-glossary.md#delivery-receipt)**. Acknowledgement requires the blocked `tool_use_id`'s recorded result to be the byte-identical saved payload. That also makes the deny-fidelity gate proof runtime-enforced.
 
-A contrary receipt (one that does not match) redelivers byte-identically on the arriving batch — but only once. A receipt that keeps coming back contrary is no longer a transient. It is evidence the deny channel itself rejects this payload on this version. Redelivering down a channel proven defective is an infinite loop wearing a retry's clothes.
+A contrary receipt (one that does not match) redelivers byte-identically on the arriving batch, but only once. A receipt that keeps coming back contrary is no longer a transient. It is evidence the deny channel itself rejects this payload on this version. Redelivering down a channel proven defective is an infinite loop wearing a retry's clothes.
 
 The second contrary receipt fails the intent over to `RestartStartup`. Its delivery is the replacement process's mandatory first input and does not touch the hook output. Bounded restart attempts that keep failing their handshake stop loud rather than looping: the agent is [hard-paused](../appendix-a-glossary.md#hard-pause), an [attention event](../appendix-a-glossary.md#attention-event) is raised, and a human is required.
 
@@ -89,7 +89,7 @@ Note added 2026-11-16: the first property is now worded differently. There is no
 
 ### Identity
 
-Identity needed the same care. Codex's `turn_id` scopes the whole agentic loop for one user input, and many sequential model steps share it. So it cannot serve as the protocol's `model_turn_id`. Two consecutive tool calls with one `turn_id` are separated by a model step that consumed the first call's result. Keying acknowledgement on `turn_id` would postpone it until the next user prompt.
+Identity needed the same care. Codex's `turn_id` scopes the whole agentic loop for one user input, and many sequential model steps share it. So it cannot be the protocol's `model_turn_id`. Two consecutive tool calls with one `turn_id` are separated by a model step that consumed the first call's result. Keying acknowledgement on `turn_id` would postpone it until the next user prompt.
 
 Under the serial-dispatch proof, each `tool_use_id` names a distinct model step, and durable hook-arrival order is step order. So a later `PreToolUse` with a distinct, serially later `tool_use_id` is the later-model-turn acknowledgement proof. The `Stop` event, like `PostToolBatch`, never acknowledges.
 

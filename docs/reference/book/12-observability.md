@@ -6,7 +6,7 @@ kiki should make important state visible without turning every event into an int
 
 - command output, for explicit inspection;
 - durable lifecycle, cascade, and audit state, for diagnosis;
-- notifications — OS-native or Herdr [toasts](appendix-a-glossary.md#toast) — for [acceptance-slice](appendix-a-glossary.md#acceptance-slice) events that need attention;
+- notifications, OS-native or Herdr [toasts](appendix-a-glossary.md#toast), for [acceptance-slice](appendix-a-glossary.md#acceptance-slice) events that need attention;
 - the Herdr sidebar, where each thread's [terminal group](appendix-a-glossary.md#terminal-group) appears under the label kiki publishes.
 
 Some terms used here:
@@ -18,7 +18,7 @@ Some terms used here:
 - A [cascade](appendix-a-glossary.md#cascade-reconciliation) is kiki updating a thread after the work it builds on has changed.
 - "Durable" state is state kiki has saved to its database, so it survives a restart.
 
-The Herdr sidebar, the deferred [overlay](appendix-a-glossary.md#overlay-tui), and the optional [`ui` pane](appendix-a-glossary.md#ui-role-pane) all project the same durable state. They never become new authorities — new sources of truth.
+The Herdr sidebar, the deferred [overlay](appendix-a-glossary.md#overlay-tui), and the optional [`ui` pane](appendix-a-glossary.md#ui-role-pane) all project the same durable state. They never become new authorities, meaning new sources of truth.
 
 Audit logs are separate. They answer what happened and who invoked it. Notifications answer what needs the human right now.
 
@@ -110,7 +110,7 @@ The `herdr` provider has these semantics, and kiki does not present it as more:
   - These behaviors are read from Herdr's source at the candidate revision and have not been run with attached clients. They are an integration gate, and kiki depends on none of them.
   - Kiki does not queue, retry, or fall back to another provider for a toast that was not shown.
 - **Not a record.** A shown toast proves nothing about delivery to a human.
-  - The thread's durable state — its blocked mark, cascade state, or [projection issue](appendix-a-glossary.md#projection-issue) — is what persists.
+  - The thread's durable state, its blocked mark, cascade state, or [projection issue](appendix-a-glossary.md#projection-issue), is what persists.
   - `kk status`, `kk ls`, and the sidebar projection show that state whether or not any toast appeared.
 - **Not an action.** A toast carries no approval and no authority. Acting on the event goes through the ordinary command and approval flow.
 
@@ -145,7 +145,7 @@ The sidebar is the ambient cross-repo view of threads and takes the place of a k
 
 ### Rules for publishing
 
-- **Only to bound groups.** Kiki publishes only to a terminal group with a current [binding](appendix-a-glossary.md#terminal-binding) (kiki's record tying the group to a thread). A [remnant container](appendix-a-glossary.md#remnant-container) — a Herdr workspace restored without a binding — keeps whatever label Herdr restored and receives no kiki tokens.
+- **Only to bound groups.** Kiki publishes only to a terminal group with a current [binding](appendix-a-glossary.md#terminal-binding) (kiki's record tying the group to a thread). A [remnant container](appendix-a-glossary.md#remnant-container), a Herdr workspace restored without a binding, keeps whatever label Herdr restored and receives no kiki tokens.
 - **One-way.** Publishing is one-way. Kiki never reads a label or token back, and nothing a user or another process writes into them changes kiki's state.
   - Any process on the server's socket can rename a Herdr workspace or overwrite a token.
   - All tokens vanish when the server restarts.
@@ -175,7 +175,7 @@ A thread can [follow](appendix-a-glossary.md#follows) a parent thread, which mea
 
 ### The parent's head advances
 
-In the acceptance slice, when a parent thread's head advances, kiki creates a [`ParentAdvance`](appendix-a-glossary.md#parentadvance) reconciliation targeting the exact recorded commit. Rebase and workspace [materialization](appendix-a-glossary.md#materialization) occur only at the child's [safe boundary](appendix-a-glossary.md#safe-boundary) — a point where changing the child's files cannot race its agent.
+In the acceptance slice, when a parent thread's head advances, kiki creates a [`ParentAdvance`](appendix-a-glossary.md#parentadvance) reconciliation targeting the exact recorded commit. Rebase and workspace [materialization](appendix-a-glossary.md#materialization) occur only at the child's [safe boundary](appendix-a-glossary.md#safe-boundary): a point where changing the child's files cannot race its agent.
 
 ### The parent is merged
 
@@ -185,7 +185,7 @@ Remote force-push and PR-base mutation, however, remain a named pending plan. Th
 
 ### The parent's bookmark or revisions go away
 
-Deleting or moving only a parent's checkpoint [bookmark](appendix-a-glossary.md#bookmark) creates a projection-repair condition. It does not change the pinned [follows edge](appendix-a-glossary.md#follows-edge) — the recorded parent-child link.
+Deleting or moving only a parent's checkpoint [bookmark](appendix-a-glossary.md#bookmark) creates a projection-repair condition. It does not change the pinned [follows edge](appendix-a-glossary.md#follows-edge): the recorded parent-child link.
 
 If the parent's live head or owned revisions are abandoned, kiki surfaces topology divergence and waits for a human decision. It does not guess a new head or parent.
 
@@ -213,7 +213,7 @@ Once a valid target repo is resolved, the authoritative row belongs to that repo
 - unknown-repo targets;
 - failures before repo resolution.
 
-kiki represents an unidentified caller with null credential/approval ids and a safe presented-identity [fingerprint](https://en.wikipedia.org/wiki/Cryptographic_hash_function) — never raw credential bytes. A request is not mirrored across the two tables.
+kiki represents an unidentified caller with null credential/approval ids and a safe presented-identity [fingerprint](https://en.wikipedia.org/wiki/Cryptographic_hash_function), never raw credential bytes. A request is not mirrored across the two tables.
 
 ### Reading and trusting the tables
 

@@ -2,7 +2,7 @@
 
 A [thread](appendix-a-glossary.md#thread) is kiki's unit of work. Bookmarks, jj workspaces, terminal groups, and agent processes all hang off that unit. ([jj](https://docs.jj-vcs.dev/latest/) is the version-control tool kiki drives.)
 
-In this book an unqualified "workspace" is always a [jj workspace](https://docs.jj-vcs.dev/latest/working-copy/). The per-thread terminal home is a **terminal group** — one [Herdr](https://github.com/herdrdev/herdr) workspace on kiki's [dedicated Herdr server](appendix-a-glossary.md#dedicated-herdr-server) (see [Terminal runtime](13-architecture/terminal-runtime.md)).
+In this book an unqualified "workspace" is always a [jj workspace](https://docs.jj-vcs.dev/latest/working-copy/). The per-thread terminal home is a **terminal group**: one [Herdr](https://github.com/herdrdev/herdr) workspace on kiki's [dedicated Herdr server](appendix-a-glossary.md#dedicated-herdr-server) (see [Terminal runtime](13-architecture/terminal-runtime.md)).
 
 ## Thread identity
 
@@ -10,10 +10,10 @@ Each thread has a stable sqlite `thread_id`. That id never changes. It is the jo
 
 A [projection](appendix-a-glossary.md#projection) is an external object that stands in for the thread. Mutable projections include:
 
-- jj workspace path — a [workspace](appendix-a-glossary.md#workspace) is a separate jj working copy with its own files
-- jj bookmark name — a [bookmark](appendix-a-glossary.md#bookmark) is a named pointer to a commit, like a git branch
-- [terminal group](appendix-a-glossary.md#terminal-group) — the thread's Herdr workspace and its [role panes](appendix-a-glossary.md#role-pane), which keep running when no terminal client is attached
-- harness session id — the [harness](appendix-a-glossary.md#harness) is the coding agent ([Claude Code](https://docs.claude.com/en/docs/claude-code/overview) or [Codex](https://github.com/openai/codex))
+- jj workspace path: a [workspace](appendix-a-glossary.md#workspace) is a separate jj working copy with its own files
+- jj bookmark name: a [bookmark](appendix-a-glossary.md#bookmark) is a named pointer to a commit, like a git branch
+- [terminal group](appendix-a-glossary.md#terminal-group): the thread's Herdr workspace and its [role panes](appendix-a-glossary.md#role-pane), which keep running when no terminal client is attached
+- harness session id: the [harness](appendix-a-glossary.md#harness) is the coding agent ([Claude Code](https://docs.claude.com/en/docs/claude-code/overview) or [Codex](https://github.com/openai/codex))
 
 ```mermaid
 flowchart TD
@@ -27,7 +27,7 @@ flowchart TD
 
 ### The live head
 
-An active thread's [live head](appendix-a-glossary.md#live-head) is the exact `@` commit of its managed workspace. In jj, `@` names the [working-copy commit](https://docs.jj-vcs.dev/latest/glossary/) — the page you are on right now.
+An active thread's [live head](appendix-a-glossary.md#live-head) is the exact `@` commit of its managed workspace. In jj, `@` names the [working-copy commit](https://docs.jj-vcs.dev/latest/glossary/), the page you are on right now.
 
 Kiki stores the last `@` it observed as `thread_head_commit_id`. That stored value is a cache of a workspace-local fact, not a second source of truth. Every watcher or lifecycle transaction that observes a new `@` updates the cache. It records the exact jj [operation](https://docs.jj-vcs.dev/latest/operation-log/) view the value was read from.
 
@@ -170,9 +170,9 @@ An open bookmark issue resolves by itself when a later operation shows the bookm
 
 Status must show the relationship between the expected target and the live head (the [checkpoint relationship](appendix-a-glossary.md#checkpoint-relationship)):
 
-- `current` — the expected target equals the head, or equals the commit the [checkpoint target](appendix-a-glossary.md#checkpoint-target) rule picks for that head. The second case is an empty, undescribed head, or a run of them, sitting above the expected target;
-- `behind` — the head is any other descendant;
-- `ahead` — the head is an ancestor;
+- `current`: the expected target equals the head, or equals the commit the [checkpoint target](appendix-a-glossary.md#checkpoint-target) rule picks for that head. The second case is an empty, undescribed head, or a run of them, sitting above the expected target;
+- `behind`: the head is any other descendant;
+- `ahead`: the head is an ancestor;
 - `diverged`.
 
 These tests need only a single-parent path between the two commits. The stricter owned-stack conditions below apply to rebase and abandon plans.
@@ -190,7 +190,7 @@ Kiki must not "helpfully" place the bookmark after each jj operation. Tracking a
 - a sqlite thread row
 - a jj [workspace](appendix-a-glossary.md#workspace)
 - an initial jj working-copy change, plus a [bookmark](appendix-a-glossary.md#bookmark) checkpoint at its exact commit
-- a [terminal group](appendix-a-glossary.md#terminal-group) — one Herdr workspace on kiki's dedicated server — rooted in the jj workspace
+- a [terminal group](appendix-a-glossary.md#terminal-group), one Herdr workspace on kiki's dedicated server, rooted in the jj workspace
 - an `agent` [role pane](appendix-a-glossary.md#role-pane) whose direct child is the kiki [pane launcher](appendix-a-glossary.md#pane-launcher), which hosts the [harness](appendix-a-glossary.md#harness) process
 - a v1.x `shell` role pane in the same tab, when that UI feature is enabled
 - a v1.x optional `ui` role pane, when that UI feature is enabled
@@ -259,11 +259,11 @@ Successful creation leaves all required v1 projections and an `Active` row. Unsu
 
 `kk new --harness <name>` selects the harness for the thread. v1 accepts `claude-code` and `codex`. Unsupported harness names error clearly.
 
-The follows graph is a DAG — a [graph with no cycles](https://en.wikipedia.org/wiki/Directed_acyclic_graph). kiki rejects a [follows edge](appendix-a-glossary.md#follows-edge) that would introduce a cycle.
+The follows graph is a DAG: a [graph with no cycles](https://en.wikipedia.org/wiki/Directed_acyclic_graph). kiki rejects a [follows edge](appendix-a-glossary.md#follows-edge) that would introduce a cycle.
 
 ### Recorded anchors
 
-Creating a thread records its exact [owned-stack base](appendix-a-glossary.md#owned-stack-base). Creating a follows edge additionally records the parent's exact `thread_head_commit_id`. That value is used as the child's initial [synchronized base](appendix-a-glossary.md#synchronized-base).
+Creating a thread records its exact [owned-stack base](appendix-a-glossary.md#owned-stack-base). Creating a follows edge also records the parent's exact `thread_head_commit_id`. That value is used as the child's initial [synchronized base](appendix-a-glossary.md#synchronized-base).
 
 The owned-stack base stays on the thread when a follows edge is detached. It advances only when a completed reconciliation records a new synchronized base.
 
@@ -674,7 +674,7 @@ Projection audits run at these times:
 - at every `kk ls`;
 - before `kk switch` or a lifecycle operation;
 - after relevant jj or filesystem events;
-- after every terminal-runtime resync — a reconnect, a reported event loss, or a changed [server instance](appendix-a-glossary.md#server-instance).
+- after every terminal-runtime resync: a reconnect, a reported event loss, or a changed [server instance](appendix-a-glossary.md#server-instance).
 
 V1 records at least these reasons, each with expected and observed values. Each reason names the repair plans that resolve it:
 
@@ -716,7 +716,7 @@ Kiki does not recreate, move, or adopt revisions merely because one outcome look
 Projection health gates only the operations that depend on the broken projection. It does not erase still-provable facts. This per-issue capability rule prevents an unrelated bookmark problem from silently freezing the follows graph.
 
 - **The workspace is still identified.** Suppose the stable jj workspace id and canonical path still identify exactly one workspace. Kiki then keeps observing its `@`, keeps updating `thread_head_commit_id`, and keeps classifying that thread as a follows parent. This holds even if its bookmark is missing, conflicted, or moved, or its terminal group is missing.
-- **An unrecorded holder.** A workspace [holder](appendix-a-glossary.md#holder) that kiki never recorded — an editor, a file watcher — is not a [projection issue](appendix-a-glossary.md#projection-issue). It never blocks an `Active` thread. It matters only to an operation that deletes the workspace. There the plan must name it as accepted, or the result is `Unknown`.
+- **An unrecorded holder.** A workspace [holder](appendix-a-glossary.md#holder) that kiki never recorded (an editor, a file watcher) is not a [projection issue](appendix-a-glossary.md#projection-issue). It never blocks an `Active` thread. It matters only to an operation that deletes the workspace. There the plan must name it as accepted, or the result is `Unknown`.
 - **`TerminalMissing`.** The thread cannot admit agent boundaries or materialize files, and lifecycle mutation is limited to its approved plans. Its unambiguous repository head remains observable.
 - **[`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess).** It blocks exactly three things: replacement, materialization, and deletion. The thread's unambiguous repository head remains observable.
 - **A missing workspace directory or record, or an ambiguous path mismatch.** This disables head observation and all workspace mutation until repair.
@@ -932,14 +932,14 @@ The flag never expands to descendants dynamically. Without it, non-linear or sha
 
 Active destroy uses the same proven process quiescence and workspace inventory machinery as close.
 
-The approval explicitly authorizes deletion of the named workspace paths. An omitted untracked path remains protected. When `--abandon-revisions` is present, the approval additionally names every tracked revision authorized for abandonment.
+The approval explicitly authorizes deletion of the named workspace paths. An omitted untracked path remains protected. When `--abandon-revisions` is present, the approval also names every tracked revision authorized for abandonment.
 
 Kiki then, in journaled order:
 
 1. [freezes](appendix-a-glossary.md#freeze) an active terminal group, and every listed remnant or unbound container, and runs the post-freeze recheck against the approved digest;
 2. runs the holder scan;
 3. runs the final proof, terminates the frozen processes with verified exit, requests the close of each container, and runs the post-exit filesystem recheck. This is the same order as close, and all of it happens before any jj mutation;
-4. deletes the local thread bookmark by name — bookmarks are deleted, not “abandoned”;
+4. deletes the local thread bookmark by name (bookmarks are deleted, not “abandoned”);
 5. only with `--abandon-revisions`, abandons exactly the separately approved revision ids, without a descendants selector, and verifies the resulting operation;
 6. forgets and deletes the workspace projections and revokes credentials;
 7. tombstones the thread row and deletes transcript rows unless `--keep-log` was approved.

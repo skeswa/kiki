@@ -13,8 +13,8 @@ The design splits responsibility the way jj already does:
 
 Every cascade is a [base transition](appendix-a-glossary.md#base-transition): a move from the last synchronized parent commit to a new exact parent commit. There are two kinds:
 
-- **[`NativeRewrite`](appendix-a-glossary.md#nativerewrite)** — jj has already evolved the child's repository history, so the new parent base is an ancestor of the child's current repository commit. kiki must not [rebase](https://git-scm.com/docs/git-rebase) it again. (To rebase is to move commits so they sit on a different parent.) Instead, kiki reconciles the on-disk workspace to jj's current view, at a [safe boundary](appendix-a-glossary.md#safe-boundary) — a moment when the child's agent is not mid-edit.
-- **[`ParentAdvance`](appendix-a-glossary.md#parentadvance)** — the new parent base is not already an ancestor of the child. jj cannot infer kiki's follows relationship from revision topology alone. (Topology is the shape of the commit graph: which commit sits on which.) So kiki explicitly rebases the child's [owned stack](appendix-a-glossary.md#owned-stack) onto that exact parent commit, at a safe boundary.
+- **[`NativeRewrite`](appendix-a-glossary.md#nativerewrite)**: jj has already evolved the child's repository history, so the new parent base is an ancestor of the child's current repository commit. kiki must not [rebase](https://git-scm.com/docs/git-rebase) it again. (To rebase is to move commits so they sit on a different parent.) Instead, kiki reconciles the on-disk workspace to jj's current view, at a [safe boundary](appendix-a-glossary.md#safe-boundary): a moment when the child's agent is not mid-edit.
+- **[`ParentAdvance`](appendix-a-glossary.md#parentadvance)**: the new parent base is not already an ancestor of the child. jj cannot infer kiki's follows relationship from revision topology alone. (Topology is the shape of the commit graph: which commit sits on which.) So kiki explicitly rebases the child's [owned stack](appendix-a-glossary.md#owned-stack) onto that exact parent commit, at a safe boundary.
 
 In pictures: parent thread A sits at a base commit, and child thread B follows it with owned commits f1 and f2. `NativeRewrite` first: jj has already evolved B's commits in repository state, and only B's on-disk files are stale.
 
@@ -74,7 +74,7 @@ A direct human `jj` command is an explicit escape hatch. It may reconcile a stal
 - The same update in a [colocated repository](https://docs.jj-vcs.dev/latest/git-compatibility/) (jj 0.46's default) records one. A [colocated repository](appendix-a-glossary.md#ext-colocated-repository) is one where jj and Git share the same folder.
 - A dirty update records several.
 
-So an operation, or its absence, is not freshness evidence. kiki discovers actual workspace freshness at the next managed boundary. It does not pretend every [materialization](appendix-a-glossary.md#materialization) — every actual change to on-disk files — shows up in the op log, jj's record of repository operations.
+So an operation, or its absence, is not freshness evidence. kiki discovers actual workspace freshness at the next managed boundary. It does not pretend every [materialization](appendix-a-glossary.md#materialization), every actual change to on-disk files, shows up in the op log, jj's record of repository operations.
 
 ### What counts as a safe boundary
 
@@ -189,7 +189,7 @@ Each reconciliation is one durable row in `sync_intents`. Durable means it is sa
 - `state: Detected | Reconciling | Materialized | Delivered | Acknowledged | RecoveryRequired | TopologyDiverged | Superseded`;
 - optional planned and result operation ids, plus the actual result workspace commit;
 - embedded outbox fields (see the [embedded cascade outbox](appendix-a-glossary.md#embedded-cascade-outbox)). These are the saved message for the agent and the facts about its delivery:
-  - the [byte-stable payload](appendix-a-glossary.md#byte-stable-payload) — the message text, saved once so every retry sends exactly the same bytes;
+  - the [byte-stable payload](appendix-a-glossary.md#byte-stable-payload): the message text, saved once so every retry sends exactly the same bytes;
   - a pinned transcript anchor;
   - preparation, delivery, and acknowledgement timestamps;
   - a transcript row id;
@@ -215,7 +215,7 @@ The thread's three-valued UI status is derived from all unresolved intents, plus
 
 ### The agent process and its delivery proof
 
-Each **[runtime agent incarnation](appendix-a-glossary.md#runtime-agent-incarnation)** — one running agent process — carries only `delivered_intent_id`. That field identifies the intent most recently emitted to that process and not yet acknowledged.
+Each **[runtime agent incarnation](appendix-a-glossary.md#runtime-agent-incarnation)**, one running agent process, carries only `delivered_intent_id`. That field identifies the intent most recently emitted to that process and not yet acknowledged.
 
 - The incarnation row has its own kiki [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier), a unique id.
 - The harness conversation/session id is a separate field, because `--resume` may reuse it.
@@ -260,11 +260,11 @@ The probe is read-only: it must not materialize anything. It checks three things
 
 It returns a [fingerprint](https://en.wikipedia.org/wiki/Cryptographic_hash_function) plus one of these results. In the names, "fresh" means the workspace is already reconciled to jj's current view of its base, and "stale" means jj's repository view evolved and the workspace has not been updated to it. "Clean" means no unsnapshotted edits, and "dirty" means there are some.
 
-- `FreshClean` — the workspace is already reconciled and has no unsnapshotted edits. This includes the case where a human updated it directly.
-- `FreshDirty` — the base is already reconciled, but the filesystem has unsnapshotted edits (changes jj has not yet recorded in a [snapshot](https://docs.jj-vcs.dev/latest/working-copy/)).
-- `StaleClean` — jj's repository view evolved, but the on-disk workspace has no unsnapshotted tracked changes relative to its last checked-out state.
-- `StaleDirty` — the workspace is stale and also contains unsnapshotted changes.
-- `Unknown` — the CLI backend cannot prove any of the preceding states without mutating the workspace.
+- `FreshClean`: the workspace is already reconciled and has no unsnapshotted edits. This includes the case where a human updated it directly.
+- `FreshDirty`: the base is already reconciled, but the filesystem has unsnapshotted edits (changes jj has not yet recorded in a [snapshot](https://docs.jj-vcs.dev/latest/working-copy/)).
+- `StaleClean`: jj's repository view evolved, but the on-disk workspace has no unsnapshotted tracked changes relative to its last checked-out state.
+- `StaleDirty`: the workspace is stale and also contains unsnapshotted changes.
+- `Unknown`: the CLI backend cannot prove any of the preceding states without mutating the workspace.
 
 The fingerprint covers the path inventory and the byte hashes used to classify edits. kiki rechecks the fingerprint immediately before mutation. If it drifted, kiki aborts to recovery.
 
@@ -368,7 +368,7 @@ Recovery is deliberately loud:
 
 The recovery payload names all preserved commit ids and recovery paths. "The work was preserved somewhere in the op log" is not enough if the agent resumes on files that omit it.
 
-Thread lifecycle operations never delete recovery bundles automatically — not close, not thread destroy. They surface the paths for manual disposition. The one exception is the deliberately repo-wide `kk repo unregister`; use `--keep-state` to retain the centralized directory and its recovery bundles.
+Thread lifecycle operations never delete recovery bundles automatically. Close does not, and thread destroy does not. They surface the paths for manual disposition. The one exception is the deliberately repo-wide `kk repo unregister`; use `--keep-state` to retain the centralized directory and its recovery bundles.
 
 ## `ParentAdvance` reconciliation
 
@@ -588,7 +588,7 @@ Without both the exact completion tuple and the later-turn proof, `Materialized`
 
 ### Single-call batches need a delivery receipt
 
-An adapter whose blocked batch has a single call must additionally prove consumption before recovered delivery. There are two reasons:
+An adapter whose blocked batch has a single call must also prove consumption before recovered delivery. There are two reasons:
 
 - A later arrival alone cannot show whether the model consumed the payload or a substituted result.
 - `MarkDelivered` proves only that the hook wrote stdout, not that the harness applied it.
@@ -615,7 +615,7 @@ In one transaction, kiki creates a replacement incarnation and a one-use `startu
 
 **No leftover processes.** Before that gate is activated, an inventory rooted at the launcher must show no process other than the launcher itself. No tool child of the retired harness may survive in the launcher's descendant, session, or [process-group](https://en.wikipedia.org/wiki/Process_group) set. A survivor raises [`OrphanedProcess`](appendix-a-glossary.md#orphanedprocess) with harness-remnant evidence (see [orphan](appendix-a-glossary.md#orphan)). It blocks replacement, materialization, and deletion until the approved [`terminate-orphans`](appendix-a-glossary.md#terminate-orphans) plan resolves it.
 
-**Approval.** These restarts — the cascade hard restart and the `RestartStartup` replacement — are daemon-initiated steps of the delivery protocol and need no human approval. A human-requested interruption or close does.
+**Approval.** These restarts, the cascade hard restart and the `RestartStartup` replacement, are daemon-initiated steps of the delivery protocol and need no human approval. A human-requested interruption or close does.
 
 **If the pane launcher is gone.** Then there is nothing to open a gate for:
 

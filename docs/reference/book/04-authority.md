@@ -14,10 +14,10 @@ A credential is a secret that proves who a caller is. A [capability](https://en.
 
 A [`ThreadScoped<thread_id>`](appendix-a-glossary.md#threadscoped-credential) credential:
 
-- is bound to one [thread](appendix-a-glossary.md#thread) — one themed line of work with its own workspace;
+- is bound to one [thread](appendix-a-glossary.md#thread): one themed line of work with its own workspace;
 - is written to `~/.config/kiki/repos/<repo_id>/credentials/<thread_id>` with mode `0600` ([readable only by the owning user](https://en.wikipedia.org/wiki/File-system_permissions));
 - is read by [`kk-hook`](appendix-a-glossary.md#kk-hook), by the thread's [pane launcher](appendix-a-glossary.md#pane-launcher), and by any `kk` command whose discovered context is that thread;
-- is rotated — replaced with a fresh secret — at three moments:
+- is rotated, replaced with a fresh secret, at three moments:
   - when an [incarnation](appendix-a-glossary.md#incarnation) (one live agent session for the thread) ends;
   - when a [terminal group](appendix-a-glossary.md#terminal-group) is restarted;
   - when a thread reopens;
@@ -25,7 +25,7 @@ A [`ThreadScoped<thread_id>`](appendix-a-glossary.md#threadscoped-credential) cr
 
 Rotation keeps the file in one place. The file's path is stable and its contents are replaced atomically (all at once). The pane launcher re-reads it after reporting a [harness](appendix-a-glossary.md#harness) exit. `kk` and `kk-hook` read it on every invocation.
 
-Rotation does not cut off a running pane launcher. A launcher presents the credential once, with its claim. After `kkd` accepts that claim, the launcher's calls are authenticated by the accepted peer process identity — the `(pid, start_time)` that `kkd` read from the OS. So rotating the credential when an incarnation ends does not close the launcher's `SuperviseLauncher` stream, and it does not reject the launcher's `ReportHarnessExit`.
+Rotation does not cut off a running pane launcher. A launcher presents the credential once, with its claim. After `kkd` accepts that claim, the launcher's calls are authenticated by the accepted peer process identity: the `(pid, start_time)` that `kkd` read from the OS. So rotating the credential when an incarnation ends does not close the launcher's `SuperviseLauncher` stream, and it does not reject the launcher's `ReportHarnessExit`.
 
 ### `RegistrationScoped<repo_id>`
 
@@ -44,7 +44,7 @@ A [`HumanApproval`](appendix-a-glossary.md#human-approval) capability:
 
 - is minted (created) by the [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>) only after a human confirms through an interactive foreground channel. The daemon is [`kkd`](appendix-a-glossary.md#kkd), the background server;
 - is bound to the credential identity, the daemon method, the target repo and thread, a digest ([hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function)) of the security-relevant arguments, and a short expiry;
-- is single-use — a single-ride ticket, not a season pass. Exactly one durable operation record claims it, atomically, before any external side effect;
+- is single-use: a single-ride ticket, not a season pass. Exactly one durable operation record claims it, atomically, before any external side effect;
 - cannot be refreshed or broadened by a `ThreadScoped` caller.
 
 ### `ApprovalPresenter`
@@ -53,7 +53,7 @@ An [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) is the part o
 
 - is a local frontend identity, enrolled explicitly through Admin bootstrap;
 - is stored outside managed workspaces. kiki never injects it into a harness, a hook, a shell pane environment, or an ordinary operational request;
-- may confirm or cancel a pending approval challenge only while its CLI or [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface) process owns the foreground [controlling terminal](<https://en.wikipedia.org/wiki/Job_control_(Unix)>) — the terminal the user is actively typing into;
+- may confirm or cancel a pending approval challenge only while its CLI or [TUI](https://en.wikipedia.org/wiki/Text-based_user_interface) process owns the foreground [controlling terminal](<https://en.wikipedia.org/wiki/Job_control_(Unix)>), the terminal the user is actively typing into;
 - cannot invoke thread operations, widen a challenge, or mint an approval without a daemon-issued challenge.
 
 ### `Admin`
@@ -71,7 +71,7 @@ An [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) is the part o
 Claiming an approval and performing an external side effect cannot share one [transaction](https://en.wikipedia.org/wiki/Database_transaction). So kiki works in this order:
 
 1. Kiki first claims the approval and creates a durable operation journal in one [SQLite](https://www.sqlite.org/) transaction.
-2. The journal then performs the exact approved plan [idempotently](https://en.wikipedia.org/wiki/Idempotence) — replaying it causes no extra effect.
+2. The journal then performs the exact approved plan [idempotently](https://en.wikipedia.org/wiki/Idempotence), so replaying it causes no extra effect.
 3. The journal marks the approval consumed on completion.
 
 After a crash, kiki resumes or reconciles that same operation id. It cannot reuse the approval for a second plan. If a remote outcome is unknown, kiki stops and observes. Any change to the method, target, argument digest, or repair/publish plan requires fresh approval.
@@ -107,7 +107,7 @@ Foreground-terminal checks and presenter enrollment reduce accidental agent auth
 A [thread-scoped credential](appendix-a-glossary.md#threadscoped-credential) may:
 
 - read its own thread state, working-state summary, and non-sensitive audit slice;
-- read and advance cascade delivery state — the record of updates flowing from a followed thread — for its own thread, through the specific hook methods;
+- read and advance cascade delivery state, the record of updates flowing from a followed thread, for its own thread, through the specific hook methods;
 - perform ordinary same-thread lifecycle or metadata operations that are neither destructive nor externally visible, and that are not on the approval list below;
 - read the minimal same-repo summary and [terminal target](appendix-a-glossary.md#terminal-target) (where the thread's [terminal group](appendix-a-glossary.md#terminal-group) currently lives) that `kk ls` and `kk switch` need.
 
@@ -148,7 +148,7 @@ The approval each repair plan needs is listed in one table, [Every issue and its
 
 ### No unattended approval
 
-The CLI displays the exact method, target, and consequential arguments before it asks the foreground user to approve. Non-interactive invocations fail closed — they stop rather than proceed.
+The CLI displays the exact method, target, and consequential arguments before it asks the foreground user to approve. Non-interactive invocations fail closed: they stop rather than proceed.
 
 v1 provides none of these:
 

@@ -163,7 +163,7 @@ See [`WorkspaceRecovery`](appendix-a-glossary.md#workspacerecovery).
 
 Delivery rides on the harness's pre-tool boundary. That is the [hook](appendix-a-glossary.md#pretooluse) that fires before an agent's tool call runs.
 
-For every v1 adapter — [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [Codex](https://github.com/openai/codex) alike — kiki exclusively owns that boundary in the managed session. It re-proves that exclusive ownership for every process incarnation. It must not race user-defined pre-tool handlers.
+For every v1 adapter, [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [Codex](https://github.com/openai/codex) alike, kiki exclusively owns that boundary in the managed session. It re-proves that exclusive ownership for every process incarnation. It must not race user-defined pre-tool handlers.
 
 A batch is the set of tool calls the harness dispatches together. See [tool batch](appendix-a-glossary.md#tool-batch). The rules for a batch are:
 
@@ -197,7 +197,7 @@ The implementation therefore stores four things on one durable [`sync_intent`](a
 
 ## Operation history is a DAG
 
-jj records every repository operation in a log, the [operation log](https://docs.jj-vcs.dev/latest/operation-log/). That history is a DAG — a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph), not a straight line. An operation may have multiple parents, and heads may temporarily diverge. A head is an operation with nothing after it yet.
+jj records every repository operation in a log, the [operation log](https://docs.jj-vcs.dev/latest/operation-log/). That history is a DAG: a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph), not a straight line. An operation may have multiple parents, and heads may temporarily diverge. A head is an operation with nothing after it yet.
 
 ### Kiki reads without changing
 

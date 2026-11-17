@@ -92,7 +92,7 @@ Some terms used throughout this section:
   - they cannot add another matching pre-tool hook.
 - `kk init` is [idempotent](https://en.wikipedia.org/wiki/Idempotence) in an already-registered repo: running it again changes nothing. It prints status and exits 0 without mutating anything.
 - `kk init` does not pre-validate harness binaries. A missing-harness error surfaces only at `kk new` time.
-- `kk init` succeeds when [`gh`](https://cli.github.com/) is missing or unauthenticated. The first GitHub-backed command performs the check. It reports an actionable error without corrupting local state.
+- `kk init` succeeds when [`gh`](https://cli.github.com/) is missing or unauthenticated. The first GitHub-backed command performs the check. It reports an error that says what to do, without corrupting local state.
 - If a thread's workspace directory is deleted out of band, the thread records `ProjectionDiverged { reason: WorkspaceDirectoryMissing }` at daemon boot or `kk ls`.
   - It fires exactly one notification.
   - It is neither recreated nor reclassified automatically.
@@ -212,7 +212,7 @@ A [pane launcher](appendix-a-glossary.md#pane-launcher) is the kiki process that
     - The `agent` role and the thread's lifecycle are unchanged.
     - No surface shows the thread as working.
   - A replacement incarnation is a new `agent_sessions` row and a new one-use gate claimed by the same accepted launcher, with no terminal provisioning.
-  - Kiki's own protocol restarts — a cascade hard restart or `RestartStartup` replacement — need no `HumanApproval`.
+  - Kiki's own protocol restarts, a cascade hard restart or `RestartStartup` replacement, need no `HumanApproval`.
   - The `kk repair` plan [`restart-agent`](appendix-a-glossary.md#restart-agent) restarts a crashed harness on the live launcher. It uses `RestartStartup` when an intent is pending. It needs no approval in thread context.
   - When the launcher itself exits, or its binding or server instance is lost:
     - The `agent` role ends.
@@ -285,7 +285,7 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
 - **Permission-prompt signal.** With `attention_events` proved, the named harness event makes the agent read `blocked`. Without that proof, a permission prompt changes nothing, and a crash still gives `blocked`.
 - **Close freeze and step order.** Close finds every process to freeze, records each one before signalling it, and runs its steps in a fixed order.
   - Roots:
-    - Close takes its roots from every pane in the terminal group — [role panes](appendix-a-glossary.md#role-pane) and `user` panes alike — plus every process identity recorded for the binding.
+    - Close takes its roots from every pane in the terminal group, [role panes](appendix-a-glossary.md#role-pane) and `user` panes alike, plus every process identity recorded for the binding.
     - It re-reads each root from the OS.
     - A pane root is trusted only if its parent is the current server process.
   - The freeze is write-ahead. Each discovered identity is committed to `process_records`, with its prior stop state and the freeze's lifecycle operation id, before it is signalled.
@@ -331,7 +331,7 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
   - A checkpoint, child step, or runtime call that exceeds it before termination begins takes verified resume. The thread is never left frozen behind a stalled step.
   - Once termination has begun, a failure is `CloseFailed` (or the plan's failed state). It is never a resume.
   - Waiting for a terminated process to be gone is limited by `[timeouts] verified_exit` (default `10s`). Expiry there is also `CloseFailed`, with files preserved.
-  - A frozen member holding a descriptor under `.jj` — a jj process stopped while holding repository locks — fails the post-freeze recheck. It takes verified resume before any jj command is attempted.
+  - A frozen member holding a descriptor under `.jj` (a jj process stopped while holding repository locks) fails the post-freeze recheck. It takes verified resume before any jj command is attempted.
 - **Destroy order.** Destroy runs its steps in this order:
   1. freeze
   2. post-freeze recheck
@@ -356,7 +356,7 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
   - A [workspace holder](appendix-a-glossary.md#holder) outside every listed container is accepted only when the approved plan names that exact identity (see [accepted holder](appendix-a-glossary.md#accepted-holder)). Any other holder is drift.
 - **Two kinds of quiescence.** The process quiescence proof is the `ProcessSupervisor` freeze fixed point.
   - Only close, destroy, and repair use it.
-  - The cascade's boundary is agent quiescence — the harness adapter's `AgentStatus::Quiescent` — and never the process freeze.
+  - The cascade's boundary is agent quiescence, the harness adapter's `AgentStatus::Quiescent`, and never the process freeze.
   - Terminal observations satisfy neither.
 - **Process quiescence proof cases.** These are driven through the `ProcessSupervisor` fake and repeated against real processes at the integration gate:
   - Fixed-point growth:
@@ -536,7 +536,7 @@ A [projection](appendix-a-glossary.md#projection) is a changeable outside thing 
   The cases:
   - A worker that ignores hangup survives a `SIGKILL` of the dedicated server and is absent from every terminal view.
   - The orphan scan runs at daemon start, at the instance change, and before a replacement. It finds the worker by recorded identity and raises `OrphanedProcess`.
-  - The fixture's worker is a recorded identity — the harness itself.
+  - The fixture's worker is a recorded identity: the harness itself.
   - A second fixture uses a tool child that kiki never recorded, and whose `agent` launcher died with the server.
     - It is neither a recorded identity nor a descendant of a live launcher, so it raises no `OrphanedProcess`.
     - Instead the [`restart-terminal`](appendix-a-glossary.md#restart-terminal) plan's holder scan reports it by pid and command.
@@ -556,10 +556,10 @@ A [projection](appendix-a-glossary.md#projection) is a changeable outside thing 
   - In every case `kkd` resubscribes, takes a fresh snapshot, reconciles every binding against the snapshot and the OS, and republishes presentation.
   - No decision is reconstructed from the runtime's event history.
   - A label renamed by another socket peer is republished to its bound terminal group and is never read back as input.
-  - The matching cases for [sidebar tokens](appendix-a-glossary.md#sidebar-token) — overwritten, expired, or lost at restart, then republished — are tested with the later sidebar-token surface, not here.
+  - The matching cases for [sidebar tokens](appendix-a-glossary.md#sidebar-token) (overwritten, expired, or lost at restart, then republished) are tested with the later sidebar-token surface, not here.
 - **Caller-local focus with two attached clients.** [Caller-local focus](appendix-a-glossary.md#caller-local-focus) moves only the viewer who ran the command.
   - With [`client_targeted_focus`](appendix-a-glossary.md#client-targeted-focus) advertised, `kk switch <thread>` moves only the invoking client. The other client's location is unchanged.
-  - A command with no viewer — an agent's tool call, a script, a pane nobody is showing — resolves `NoCallerClient` and moves no one.
+  - A command with no viewer (an agent's tool call, a script, a pane nobody is showing) resolves `NoCallerClient` and moves no one.
   - Without the capability, `kk switch <thread>` fails naming the missing capability and moves no client. It never falls back to the broadcast focus.
   - `kk switch --all-clients <thread>` is the only form that moves every attached client.
   - Capability detection reads the runtime's advertised capabilities. A fake that silently ignores the unknown client parameter must not be mistaken for support.

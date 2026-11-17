@@ -17,7 +17,7 @@
 The proto (the Protocol Buffers file) is partitioned by capability class. A [capability](https://en.wikipedia.org/wiki/Capability-based_security) here is the kind of permission a call needs.
 
 - Every operational method declares its `ThreadScoped<T>` scope. (A [`ThreadScoped<T>` credential](../appendix-a-glossary.md#threadscoped-credential) is bound to one thread.)
-- Every operational method also declares whether it additionally consumes a `HumanApproval`. That [approval](../appendix-a-glossary.md#human-approval) is bound to the method, the target, and the argument digest (a [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the arguments).
+- Every operational method also declares whether it also consumes a `HumanApproval`. That [approval](../appendix-a-glossary.md#human-approval) is bound to the method, the target, and the argument digest (a [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the arguments).
 - Admin is accepted only by bootstrap and approval-presenter enrollment endpoints, and by `BeginApproval` for the approvals of `kk init` and first run, when no thread or registration credential exists yet. It is also accepted by the two user-scoped `replace-terminal-server` calls, `DiagnoseServerRepair` and the `BeginApproval` for that plan, so they work from any directory. It is never ambient operational authority. `kkd` checks the [Admin credential](../appendix-a-glossary.md#bootstrap-admin-credential) against its record in the user-level database, `~/.config/kiki/state.db`, because Admin belongs to no one repo.
 
 | Surface                 | Methods (illustrative)                                                                                                                      | Capability                                                                                                                                                                                                            |
@@ -211,14 +211,14 @@ The terminal target is the session name, the server's peer identity `(pid, start
 - Renderers cannot add fields by querying a more privileged endpoint.
 - Herdr's native sidebar is not a client of this service. `kkd` publishes the label and tokens it shows, one way, through `TerminalRuntime`.
 
-(The MCP transcript surface, when it ships, lives on a separate socket — see [Roadmap](../16-roadmap.md).)
+(The MCP transcript surface, when it ships, lives on a separate socket (see [Roadmap](../16-roadmap.md).)
 
 ## Streaming events
 
 UIs subscribe through server-streaming RPCs rather than polling (asking again and again):
 
-- `StreamThreadEvents(thread_id)` — state transitions, cascade events, and transcript appends for one thread.
-- `RepoThreadSummaries(repo_id)` — one-line summaries for sibling threads in the same repo. It is used by `kk ls`, the overlay, and the optional `ui` pane.
+- `StreamThreadEvents(thread_id)`: state transitions, cascade events, and transcript appends for one thread.
+- `RepoThreadSummaries(repo_id)`: one-line summaries for sibling threads in the same repo. It is used by `kk ls`, the overlay, and the optional `ui` pane.
 
 On disconnect, clients reconnect and re-subscribe. Events carry a monotonic `seq` (a number that only goes up), so clients can detect gaps.
 

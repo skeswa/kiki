@@ -295,10 +295,10 @@ Creation is the one exception. It places the bookmark on the new thread's first 
 
 The [checkpoint relationship](../appendix-a-glossary.md#checkpoint-relationship) shown by status is `current | behind | ahead | diverged`. It is defined purely by comparing `bookmark_expected_commit_id` with the live head, tested on the owned chain:
 
-- `current` — the expected target equals the head, or equals the commit the checkpoint target rule picks. In the second case every commit above the expected target is empty and undescribed, so there is nothing new to checkpoint. It is the state right after `jj commit` and right after `kk reopen`;
-- `behind` — the head is any other descendant of the expected target;
-- `ahead` — the head is an ancestor of the expected target, for example after `jj edit` of an earlier commit;
-- `diverged` — anything else, for example after `jj rebase -r` moved the bookmarked commit somewhere else.
+- `current`: the expected target equals the head, or equals the commit the checkpoint target rule picks. In the second case every commit above the expected target is empty and undescribed, so there is nothing new to checkpoint. It is the state right after `jj commit` and right after `kk reopen`;
+- `behind`: the head is any other descendant of the expected target;
+- `ahead`: the head is an ancestor of the expected target, for example after `jj edit` of an earlier commit;
+- `diverged`: anything else, for example after `jj rebase -r` moved the bookmarked commit somewhere else.
 
 Notes on this test:
 

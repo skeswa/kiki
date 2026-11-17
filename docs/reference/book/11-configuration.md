@@ -1,10 +1,10 @@
 # Configuration
 
-Configuration is how you change kiki's settings. It is written in [TOML](https://toml.io/), a plain-text settings format. It is also layered: several sources stack on top of each other, and higher layers win. Think of a stack of transparency sheets — the topmost sheet with a value written on it is the one you see.
+Configuration is how you change kiki's settings. It is written in [TOML](https://toml.io/), a plain-text settings format. It is also layered: several sources stack on top of each other, and higher layers win. Think of a stack of transparency sheets: the topmost sheet with a value written on it is the one you see.
 
 Configuration must answer two questions clearly: what value is effective, and where did it come from. Anything else is a tax the user pays every time they debug a machine they forgot they configured.
 
-The [acceptance slice](appendix-a-glossary.md#acceptance-slice) is the part of kiki that v1 needs in order to be accepted. It implements only the layers and keys needed to:
+The [acceptance slice](appendix-a-glossary.md#acceptance-slice) is the part of kiki that v1 needs to be accepted. It implements only the layers and keys needed to:
 
 - run the [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>) (kiki's background program, [`kkd`](appendix-a-glossary.md#kkd));
 - select a [harness](appendix-a-glossary.md#harness) (the coding-agent program kiki runs in a thread);
@@ -66,7 +66,7 @@ A changed setting does not always apply right away. This section says when each 
 - **The default harness** takes effect at the next `kk new`. It does not restart live threads.
 - **`workspaces_root`** applies to the next `kk new`. Existing workspaces stay where they are.
 - **`[timeouts]` keys and `[cascade] delivery_attempts`** reload live. A new value applies to the next wait that starts.
-- **Cosmetic keys** may hot-reload — the change applies immediately.
+- **Cosmetic keys** may hot-reload: the change applies immediately.
 - **Some keys** take effect at the next thread-lifecycle event (`kk new` or `kk reopen`) rather than hot-reloading or requiring a daemon restart.
 - **Deferred UI keys** may instead take effect at the next overlay open.
 
@@ -89,25 +89,25 @@ A TOML file groups keys into named sections, written in square brackets.
 
 Acceptance-slice sections:
 
-- `[agent]` — the default harness and harness-specific args.
+- `[agent]`: the default harness and harness-specific args.
   - The key is `default_harness = "claude-code" | "codex"`, initially `claude-code`. These name [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [Codex](https://github.com/openai/codex).
   - Args are keyed per harness, so one repo can default to Claude Code while a thread spawns with `--harness codex`.
-- `[notifications]` — per-event `loud | soft | silent` behavior for acceptance-slice [attention events](appendix-a-glossary.md#attention-event), plus `os_provider` (`auto | notify-rust | osascript | herdr | off`).
+- `[notifications]`: per-event `loud | soft | silent` behavior for acceptance-slice [attention events](appendix-a-glossary.md#attention-event), plus `os_provider` (`auto | notify-rust | osascript | herdr | off`).
   - Per-event keys hot-reload.
   - `os_provider` resolves at the next dispatch.
   - See [Notification keys](#notification-keys) and [Observability](12-observability.md).
-- `[paths]` — overrides for state, socket, generated-Herdr-configuration, and workspace-root paths.
-- `[terminal]` — where the [Herdr](appendix-a-glossary.md#herdr) executable is and which named Herdr server kiki owns. Herdr is the [terminal multiplexer](https://en.wikipedia.org/wiki/Terminal_multiplexer) that hosts kiki's terminals. See [Terminal keys](#terminal-keys).
-- `[timeouts]` — how long kiki waits at each step that has a time limit. See [Timeout keys](#timeout-keys).
-- `[cascade]` — `delivery_attempts`, the limit on delivery retries. See [Timeout keys](#timeout-keys).
+- `[paths]`: overrides for state, socket, generated-Herdr-configuration, and workspace-root paths.
+- `[terminal]`: where the [Herdr](appendix-a-glossary.md#herdr) executable is and which named Herdr server kiki owns. Herdr is the [terminal multiplexer](https://en.wikipedia.org/wiki/Terminal_multiplexer) that hosts kiki's terminals. See [Terminal keys](#terminal-keys).
+- `[timeouts]`: how long kiki waits at each step that has a time limit. See [Timeout keys](#timeout-keys).
+- `[cascade]`: `delivery_attempts`, the limit on delivery retries. See [Timeout keys](#timeout-keys).
 
 Deferred v1.x sections:
 
-- `[github]` — backend selection (initially `gh`, the [GitHub CLI](https://cli.github.com/)) and, once polling ships, poll cadence.
-- `[autorename]` — [auto-describe](appendix-a-glossary.md#auto-describe) and [auto-rename](appendix-a-glossary.md#auto-rename) triggers and cadence. The metadata ledger and execution loop ship together with that feature; they are not acceptance foundations.
-- `[ui]` — personal-preference keys for the [overlay TUI](appendix-a-glossary.md#overlay-tui), the optional [`ui` role pane](appendix-a-glossary.md#ui-role-pane), and the `shell` [role pane](appendix-a-glossary.md#role-pane).
-- `[reopen]` — `catchup_pairs` (default `10`) controls explicitly requested `kk reopen --catch-up` text.
-- `[ai]` — provider, model, and credential-source settings for provider-backed v1.x features.
+- `[github]`: backend selection (initially `gh`, the [GitHub CLI](https://cli.github.com/)) and, once polling ships, poll cadence.
+- `[autorename]`: [auto-describe](appendix-a-glossary.md#auto-describe) and [auto-rename](appendix-a-glossary.md#auto-rename) triggers and cadence. The metadata ledger and execution loop ship together with that feature; they are not acceptance foundations.
+- `[ui]`: personal-preference keys for the [overlay TUI](appendix-a-glossary.md#overlay-tui), the optional [`ui` role pane](appendix-a-glossary.md#ui-role-pane), and the `shell` [role pane](appendix-a-glossary.md#role-pane).
+- `[reopen]`: `catchup_pairs` (default `10`) controls explicitly requested `kk reopen --catch-up` text.
+- `[ai]`: provider, model, and credential-source settings for provider-backed v1.x features.
 
 ### Consent is not configuration
 
@@ -197,14 +197,14 @@ Rules for these keys:
 
 `[paths]` is the central place to relocate kiki's filesystem footprint: the files and directories kiki uses. All keys are optional; defaults are listed below.
 
-| key               | type   | default                             | scope                                                    |
-| ----------------- | ------ | ----------------------------------- | -------------------------------------------------------- |
-| `user_state_dir`  | string | `~/.config/kiki/`                   | structural — daemon restart                              |
-| `user_state_db`   | string | `<user_state_dir>/state.db`         | structural — daemon restart                              |
-| `kkd_socket`      | string | `<user_state_dir>/kkd.sock`         | structural — daemon restart                              |
-| `repo_state_dir`  | string | `<user_state_dir>/repos/<repo_id>/` | structural — daemon restart                              |
-| `herdr_dir`       | string | `<user_state_dir>/herdr/`           | structural — user config only; `replace-terminal-server` |
-| `workspaces_root` | string | `<parent-of-repo>/`                 | applies to the next `kk new`                             |
+| key               | type   | default                             | scope                                                   |
+| ----------------- | ------ | ----------------------------------- | ------------------------------------------------------- |
+| `user_state_dir`  | string | `~/.config/kiki/`                   | structural: daemon restart                              |
+| `user_state_db`   | string | `<user_state_dir>/state.db`         | structural: daemon restart                              |
+| `kkd_socket`      | string | `<user_state_dir>/kkd.sock`         | structural: daemon restart                              |
+| `repo_state_dir`  | string | `<user_state_dir>/repos/<repo_id>/` | structural: daemon restart                              |
+| `herdr_dir`       | string | `<user_state_dir>/herdr/`           | structural: user config only; `replace-terminal-server` |
+| `workspaces_root` | string | `<parent-of-repo>/`                 | applies to the next `kk new`                            |
 
 ### The MCP socket and audit tables
 
@@ -248,22 +248,22 @@ The source repo's own filesystem carries no kiki state. The one exception is the
 
 Kiki does not redirect `XDG_CONFIG_HOME` or `XDG_STATE_HOME` to change that. (These are the [XDG base directory](https://specifications.freedesktop.org/basedir-spec/latest/) variables that tell programs where to keep settings and state.) The reason is that every pane inherits the server's environment. jj, git, gh, and shells in every thread would then read their configuration from the wrong place.
 
-What separates kiki's server from the user's default Herdr server is therefore a separate server process, socket, saved session, and configuration file — not a separate directory tree.
+What separates kiki's server from the user's default Herdr server is therefore a separate server process, socket, saved session, and configuration file, not a separate directory tree.
 
 ## Terminal keys
 
 `[terminal]` selects the terminal runtime kiki drives. Both keys are structural to the daemon, so only the user config file counts for them. `KIKI_*` environment variables and `--config` flags from the terminal that invoked `kk` are ignored for them, with a warning. So is repo-local config. The same holds for `[paths] herdr_dir`. (See [Keys that only the user config file can set](#keys-that-only-the-user-config-file-can-set).)
 
-| key         | type   | default           | scope                                                    |
-| ----------- | ------ | ----------------- | -------------------------------------------------------- |
-| `herdr_bin` | string | `herdr` on `PATH` | structural — user config only; `replace-terminal-server` |
-| `session`   | string | `kiki`            | structural — user config only; `replace-terminal-server` |
+| key         | type   | default           | scope                                                   |
+| ----------- | ------ | ----------------- | ------------------------------------------------------- |
+| `herdr_bin` | string | `herdr` on `PATH` | structural: user config only; `replace-terminal-server` |
+| `session`   | string | `kiki`            | structural: user config only; `replace-terminal-server` |
 
 "`herdr` on `PATH`" means the `PATH` of the constructed environment described under [Who starts the server](#who-starts-the-server), not the `PATH` of the terminal that invoked `kk`.
 
 ### Changing a terminal key while a server is running
 
-A change to `session`, `herdr_bin`, or `[paths] herdr_dir` cannot simply be applied, because the server that is running was started with the old values.
+A change to `session`, `herdr_bin`, or `[paths] herdr_dir` cannot just be applied, because the server that is running was started with the old values.
 
 - If a [server instance](appendix-a-glossary.md#server-instance) is open, `kkd` does not start a second server. It keeps the old one and keeps using the old values for it.
 - `kkd` reports that a change is pending. `kk repair --server` shows it.
@@ -322,7 +322,7 @@ Kiki generates the dedicated server's Herdr configuration file and owns it. Thes
 - Herdr's update, version, and manifest checks are off;
 - toast delivery is set to Herdr's own [toasts](appendix-a-glossary.md#toast) (`[ui.toast] delivery = "herdr"`), which Herdr leaves off by default;
 - sidebar rows and width are sized for kiki's label;
-- the sidebar row layout that displays the tokens kiki publishes — a v1.x surface; the generated file declares no [sidebar tokens](appendix-a-glossary.md#sidebar-token) until it ships;
+- the sidebar row layout that displays the tokens kiki publishes. This is a v1.x surface; the generated file declares no [sidebar tokens](appendix-a-glossary.md#sidebar-token) until it ships;
 - the keybinding that opens the overlay and the plugin or command entries it invokes (v1.x);
 - Herdr's agent-integration installer is never invoked against a managed harness's settings.
 
@@ -343,21 +343,21 @@ The user's default Herdr server and its configuration file are never read or cha
 
 This entire section is deferred until the v1.x UI surfaces ship.
 
-"Next terminal-group provisioning" below means the next `kk new`, `kk reopen`, or terminal-restart repair. `mouse_enabled` and `theme` apply to kiki's own surfaces — the [overlay](appendix-a-glossary.md#overlay-tui) and the [`ui` pane](appendix-a-glossary.md#ui-role-pane) — not to Herdr.
+"Next terminal-group provisioning" below means the next `kk new`, `kk reopen`, or terminal-restart repair. `mouse_enabled` and `theme` apply to kiki's own surfaces, the [overlay](appendix-a-glossary.md#overlay-tui) and the [`ui` pane](appendix-a-glossary.md#ui-role-pane), not to Herdr.
 
 All `[ui]` keys are personal preference. They are valid in user and per-thread config, but invalid in repo-shared config. If set in repo-shared config, kiki warns and ignores them.
 
-| key                   | type   | default       | hot-reload                            |
-| --------------------- | ------ | ------------- | ------------------------------------- |
-| `ui_pane`             | bool   | `false`       | no — next terminal-group provisioning |
-| `ui_pane_width`       | int    | `32`          | no — next terminal-group provisioning |
-| `shell_pane`          | bool   | `true`        | no — next terminal-group provisioning |
-| `shell_pane_position` | string | `"below"`     | no — next terminal-group provisioning |
-| `shell_pane_size_pct` | int    | `25`          | no — next terminal-group provisioning |
-| `mouse_enabled`       | bool   | `true`        | yes                                   |
-| `overlay_min_cols`    | int    | `80`          | no — next overlay open                |
-| `toast_ttl_ms`        | int    | `4000`        | yes                                   |
-| `theme`               | string | `"soft-dark"` | yes                                   |
+| key                   | type   | default       | hot-reload                           |
+| --------------------- | ------ | ------------- | ------------------------------------ |
+| `ui_pane`             | bool   | `false`       | no: next terminal-group provisioning |
+| `ui_pane_width`       | int    | `32`          | no: next terminal-group provisioning |
+| `shell_pane`          | bool   | `true`        | no: next terminal-group provisioning |
+| `shell_pane_position` | string | `"below"`     | no: next terminal-group provisioning |
+| `shell_pane_size_pct` | int    | `25`          | no: next terminal-group provisioning |
+| `mouse_enabled`       | bool   | `true`        | yes                                  |
+| `overlay_min_cols`    | int    | `80`          | no: next overlay open                |
+| `toast_ttl_ms`        | int    | `4000`        | yes                                  |
+| `theme`               | string | `"soft-dark"` | yes                                  |
 
 ### `theme`
 

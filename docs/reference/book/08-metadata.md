@@ -14,7 +14,7 @@ The ownership ledger exists so that kiki does not overwrite words a human wrote.
 
 kiki tracks ownership in sqlite ([SQLite](https://www.sqlite.org/), its local database). It does not infer ownership by guessing from content, and it does not depend on jj trailers.
 
-The ledger works like a sign-out sheet: kiki may only edit prose it can prove it wrote last. For every kiki-authored revision description or bookmark name, kiki records a content [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) — a fingerprint of the text — in `metadata_writes`. On the next read:
+The ledger works like a sign-out sheet: kiki may only edit prose it can prove it wrote last. For every kiki-authored revision description or bookmark name, kiki records a content [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function), a fingerprint of the text, in `metadata_writes`. On the next read:
 
 - if the current content still matches the stored hash, kiki may update it;
 - if the current content differs, the artifact becomes human-owned;
@@ -29,7 +29,7 @@ This conservative rule applies to human edits and to agent-authored edits alike.
 Auto-describe, when enabled, may run after:
 
 - thread creation;
-- a quiet window — a stretch with no agent tool calls — defaulting to 30 seconds;
+- a quiet window, a stretch with no agent tool calls, defaulting to 30 seconds;
 - `jj split`;
 - `jj squash`;
 - explicit `kk thread describe --refresh`.
@@ -49,7 +49,7 @@ It must not read the [thread transcript](appendix-a-glossary.md#thread-transcrip
 
 [Auto-rename](appendix-a-glossary.md#auto-rename) is the feature that suggests a name for a thread's bookmark. This section says what it may rename and what happens when a human renames the bookmark instead.
 
-Auto-rename, when enabled, may propose slugs — short, dash-separated names — for kiki-owned thread bookmarks. (A jj [bookmark](https://docs.jj-vcs.dev/latest/bookmarks/) is roughly a git branch name.) The prompt includes sibling bookmark names so the model can choose a distinct slug.
+Auto-rename, when enabled, may propose slugs (short, dash-separated names) for kiki-owned thread bookmarks. (A jj [bookmark](https://docs.jj-vcs.dev/latest/bookmarks/) is roughly a git branch name.) The prompt includes sibling bookmark names so the model can choose a distinct slug.
 
 An external `jj bookmark rename` marks the bookmark human-owned for the rest of the thread's life.
 
@@ -101,7 +101,7 @@ Cost management remains outside v1. kiki does not cap model spend, concurrent ag
 
 The provider is the AI service that writes the text. This section says how kiki picks one and where it finds the key.
 
-[Auto-describe](appendix-a-glossary.md#auto-describe) and [auto-rename](appendix-a-glossary.md#auto-rename) call the model through `AICompose`, a provider-agnostic seam — an interface that hides which AI vendor is in use. `[ai]` selects the backend:
+[Auto-describe](appendix-a-glossary.md#auto-describe) and [auto-rename](appendix-a-glossary.md#auto-rename) call the model through `AICompose`, a provider-agnostic seam: an interface that hides which AI vendor is in use. `[ai]` selects the backend:
 
 - `provider`: `anthropic | openai | local-ollama | ...`
 - `model`: provider-specific model identifier (defaults to a Haiku-class model for Anthropic).

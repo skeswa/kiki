@@ -50,7 +50,7 @@ Deferred MCP behavior includes:
 
 ## MCP identity
 
-MCP uses a separate [unix socket](https://en.wikipedia.org/wiki/Unix_domain_socket). URL paths route requests; credentials supply identity. Think of the URL as the address on an envelope and the credential as the ID you show at the door — only the ID grants access.
+MCP uses a separate [unix socket](https://en.wikipedia.org/wiki/Unix_domain_socket). URL paths route requests; credentials supply identity. Think of the URL as the address on an envelope and the credential as the ID you show at the door: only the ID grants access.
 
 A thread-scoped credential may read its own transcript. A URL such as `/threads/<uuid>` does not authorize the caller to act as that thread. Authorization is always bound to the credential presented on the request.
 
@@ -67,7 +67,7 @@ The [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>) must not silent
 
 The v2 substrate divides tools by how much authority they need:
 
-- Same-thread, low-risk tools may be self-acting — for example, setting status or requesting human attention.
+- Same-thread, low-risk tools may be self-acting, such as setting status or requesting human attention.
 - Publish and close may be requested only as intents. Those intents stop at the foreground one-shot [human-approval](appendix-a-glossary.md#human-approval) boundary.
 - Cross-thread summaries may be auto-allowed only within the minimal summary policy. Sensitive cross-thread reads require a foreground one-shot approval, so they are not autonomous MCP tools.
 - Cross-thread posts and agent-driven spawns are rate-limited and causal-chain tracked.
@@ -99,6 +99,6 @@ Likely later swaps:
 - direct GitHub REST or GraphQL, behind `GitHubBackend`;
 - jj-lib (the [jj](https://docs.jj-vcs.dev/latest/) library), behind `JjBackend`;
 - a native GUI, a web dashboard, or remote clients over the same [gRPC](https://grpc.io/) service;
-- daemon-to-daemon coordination, so one machine's `kk` can observe — and eventually drive — threads whose [workspaces](appendix-a-glossary.md#workspace) live on another machine's `kkd`.
+- daemon-to-daemon coordination, so one machine's `kk` can observe, and eventually drive, threads whose [workspaces](appendix-a-glossary.md#workspace) live on another machine's `kkd`.
 
 Working across machines is part of the product vision, not an accident of scope. The same-host boundary exists for one reason. Peer daemons, like remote clients, wait on the future transport and authentication contract. They do not inherit unix-socket assumptions.

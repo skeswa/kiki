@@ -54,7 +54,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
 
 ### Per-user (`~/.config/kiki/state.db`)
 
-- **`repos`** — the registry of source repositories that kiki knows about.
+- **`repos`**: the registry of source repositories that kiki knows about.
   - Columns: `(repo_id, canonical_path, registered_at, opt_in_metadata)`.
   - `repo_id` is a UUID assigned at `kk init`. It is the key for the per-repo state directory at `~/.config/kiki/repos/<repo_id>/`.
   - `canonical_path` is the realpath (the full path with all symbolic links resolved) of the registered source repo at registration time. It is the only handle kiki has for matching a future invocation back to this row.
@@ -62,10 +62,10 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - `repo_id` is **not** preserved across `kk repo unregister` + `kk init`. That pair is a fresh registration with a new UUID.
   - kiki cannot detect an out-of-band `mv` of the source tree by itself. See the move rules in the section above.
 
-- **`daemon_meta`** — facts about the daemon itself.
+- **`daemon_meta`**: facts about the daemon itself.
   - It holds daemon startup info, the last-known socket path, and the schema version.
 
-- **`terminal_servers`** — one row per lifetime of the [dedicated terminal server](../appendix-a-glossary.md#dedicated-herdr-server), started or observed. Each lifetime is a [server instance](../appendix-a-glossary.md#server-instance).
+- **`terminal_servers`**: one row per lifetime of the [dedicated terminal server](../appendix-a-glossary.md#dedicated-herdr-server), started or observed. Each lifetime is a [server instance](../appendix-a-glossary.md#server-instance).
   - Columns: `(server_instance_id, state: Starting | Open | Unverified | Ended, runtime_kind, session_name, socket_path, peer_pid?, peer_start_time?, runtime_version?, protocol?, capabilities_json?, first_seen_at, ended_at?, ended_reason?)`.
   - **States.**
     - `kkd` writes the row in state `Starting` before it spawns a server. The peer and version columns are still empty.
@@ -87,30 +87,30 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - The [`TerminalRuntime`, `TerminalClient`, and `ProcessSupervisor`](../appendix-a-glossary.md#terminalruntime-terminalclient-processsupervisor) [traits](https://doc.rust-lang.org/book/ch10-02-traits.html) are defined in `kiki-core`. `HerdrRuntime` is the adapter for [Herdr](../appendix-a-glossary.md#herdr). `runtime_kind` names the adapter that observed the row.
   - See [Terminal runtime](terminal-runtime.md#identity).
 
-- **`user_credentials`** — the [bootstrap Admin credential](../appendix-a-glossary.md#bootstrap-admin-credential).
+- **`user_credentials`**: the [bootstrap Admin credential](../appendix-a-glossary.md#bootstrap-admin-credential).
   - Columns: `(cred_id, kind: 'Admin', credential_hash, issued_at, revoked_at?)`.
   - The `Admin` credential belongs to the user, not to a repository. So it lives in this database and never in a per-repo `credentials` table.
   - Admin is accepted only by the bootstrap, presenter-enrollment, and presenter-recovery endpoints, and by `BeginApproval` for the approvals of `kk init` and first run. No thread or registration credential exists yet at that point. It is also accepted by the diagnose call and the `BeginApproval` of the user-scoped `replace-terminal-server` plan, which work from any directory.
   - Operational calls cannot substitute Admin for [human approval](../appendix-a-glossary.md#human-approval).
 
-- **`approval_presenters`** — enrollments of foreground channels. A presenter (an [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter)) is an interactive CLI or TUI through which a human confirms an action.
+- **`approval_presenters`**: enrollments of foreground channels. A presenter (an [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter)) is an interactive CLI or TUI through which a human confirms an action.
   - Columns: `(presenter_id, frontend_kind, credential_hash, channel_binding, enrolled_at, last_seen_at, revoked_at?)`.
   - Enrollment requires the [bootstrap Admin credential](../appendix-a-glossary.md#bootstrap-admin-credential). Enrollment is not approval for an operation.
   - A presenter proves that a confirmation came from a registered interactive CLI or TUI channel.
   - A presenter cannot mint a [capability](https://en.wikipedia.org/wiki/Capability-based_security) without completing a persisted challenge.
 
-- **`user_approval_challenges` and `user_human_approvals`** — approval records for operations that have no repository target.
+- **`user_approval_challenges` and `user_human_approvals`**: approval records for operations that have no repository target.
   - The approvals for `kk init` and first run are stored here. Their requester is the user's Admin bootstrap credential, because the repo has no registration credential yet.
   - They are the same two-phase challenge and one-use-capability records described below for `approval_challenges` and `human_approvals`.
   - Repository-scoped confirmations are stored only in the target repository database.
 
-- **`user_approved_operations` and `user_approved_operation_steps`** — durable records of approved operations whose authority must survive without a repo database.
+- **`user_approved_operations` and `user_approved_operation_steps`**: durable records of approved operations whose authority must survive without a repo database.
   - They are durable claim envelopes and [idempotent](https://en.wikipedia.org/wiki/Idempotence) step journals. An idempotent step is safe to run again.
   - They cover registration, unregister, and `replace-terminal-server`, among others.
   - Their shape matches the per-repo tables below.
   - Unregister completes its user-level journal only after the target repo state is deleted.
 
-- **`user_audit_log`** — an append-only log of attempts that have no valid repository target.
+- **`user_audit_log`**: an append-only log of attempts that have no valid repository target.
   - These attempts include bootstrap, `ListRepos`, registration, malformed repo selectors, and authorization failures that happen before a repo can be resolved.
   - Its row shape matches per-repo `audit_log`.
   - It permits null credential, approval, and presenter identities.
@@ -119,7 +119,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
 
 #### Threads, checkpoints, and lifecycle
 
-- **`threads`** — one row per [thread](../appendix-a-glossary.md#thread). It carries the thread's stable identity and the facts kiki tracks about it.
+- **`threads`**: one row per [thread](../appendix-a-glossary.md#thread). It carries the thread's stable identity and the facts kiki tracks about it.
   - The row carries:
     - the stable identity;
     - references to the thread's [projections](../appendix-a-glossary.md#projection): the [bookmark](../appendix-a-glossary.md#bookmark) name, the [workspace](../appendix-a-glossary.md#workspace), the current [terminal binding](../appendix-a-glossary.md#terminal-binding), and the [harness](../appendix-a-glossary.md#harness);
@@ -150,7 +150,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - **[Owned-stack base](../appendix-a-glossary.md#owned-stack-base).** `owned_stack_base_commit_id` survives the deletion of a [follows](../appendix-a-glossary.md#follows) edge. It advances only with a completed reconciliation. So detach, and later destroy validation, keep an exact structural base for the [owned stack](../appendix-a-glossary.md#owned-stack).
   - Cascade progress is not projected onto this row. It is derived from `sync_intents`.
 
-- **`thread_links`** — the directed [follows](../appendix-a-glossary.md#follows) edges between threads.
+- **`thread_links`**: the directed [follows](../appendix-a-glossary.md#follows) edges between threads.
   - Edges are DAG-validated at insert time. (A [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) is a graph with no cycles, so no thread can end up following itself.)
   - Each edge includes `last_synchronized_parent_commit_id`.
   - The initial parent anchor comes from the parent's exact live head in a pinned, revalidated operation view (a [pinned read](../appendix-a-glossary.md#pinned-read)). It never comes from the parent's bookmark or from a stale cache.
@@ -158,7 +158,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - Merge commits, multiple roots, [conflicts](https://docs.jj-vcs.dev/latest/conflicts/), or foreign commits produce [`TopologyDiverged`](../appendix-a-glossary.md#topologydiverged).
   - kiki never infers a broader source [revset](https://docs.jj-vcs.dev/latest/revsets/) (a jj expression that selects commits). It never trusts a remembered “root” identity in place of validating the path.
 
-- **`thread_checkpoints`** — the append-only history of [checkpoint placements](../appendix-a-glossary.md#checkpoint-placement). Each row is one time kiki explicitly put a thread's bookmark on a commit.
+- **`thread_checkpoints`**: the append-only history of [checkpoint placements](../appendix-a-glossary.md#checkpoint-placement). Each row is one time kiki explicitly put a thread's bookmark on a commit.
   - Columns: `(checkpoint_id, thread_id, seq, lifecycle_op_id, reason: Creation | Publish | Close | Detach | RepairRestore | RepairAdopt | RepairChoose | RepairUnhide | Reanchor, placed_change_id, placed_commit_id, placed_op_id, placed_at)` with `UNIQUE (thread_id, seq)`.
   - Every explicit placement appends one row. The explicit placements are creation, publish, close, detach, and every applied bookmark [repair plan](../appendix-a-glossary.md#repair-plan).
   - The row is appended in the transaction that verifies the bookmark's resulting target and operation.
@@ -181,7 +181,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - Placements are scoped by operation ancestry, exactly like successions. A placement applies to an operation view only when `placed_op_id` is that view's operation or an ancestor of it. The reason: a pinned placement can land beside a concurrent operation.
   - Rows are never updated or deleted while the thread exists. A later rewrite of the placed commit does not change them.
 
-- **`thread_checkpoint_successions`** — the append-only record of [native successors](../appendix-a-glossary.md#native-successor). Each row says that jj itself moved the bookmark after a placement.
+- **`thread_checkpoint_successions`**: the append-only record of [native successors](../appendix-a-glossary.md#native-successor). Each row says that jj itself moved the bookmark after a placement.
   - Columns: `(checkpoint_id, seq, kind: SameChange | PredecessorOtherChange | Reverted, from_commit_id, to_commit_id, to_change_id, op_id, evidence_op_id?, evidence_commit_id?, reverted_to_checkpoint_id?, reverted_to_seq?, observed_at)` with `UNIQUE (checkpoint_id, seq)` and `UNIQUE (checkpoint_id, op_id)`.
   - A row records that jj itself carried the bookmark from `from_commit_id` to `to_commit_id` in operation `op_id`. The classifier in [Op-log watcher](op-log-watcher.md#checkpoint-tracking) decides this.
   - `SameChange` and `PredecessorOtherChange` are proved by an operation [predecessor](https://docs.jj-vcs.dev/latest/glossary/) record.
@@ -199,7 +199,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - The expected target in any operation view is the latest placement that applies to that view, updated by that placement's rows whose `op_id` is an ancestor of that view. When the latest such row is `Reverted`, the expected target is the commit of the earlier row it names.
   - `threads.bookmark_expected_commit_id` caches that value for the agreed frontier.
 
-- **`thread_bookmark_renames`** — the append-only journal of bookmark renames that kiki adopted. Adopting a proven rename is a normalization: it brings kiki's record back in line without changing identity.
+- **`thread_bookmark_renames`**: the append-only journal of bookmark renames that kiki adopted. Adopting a proven rename is a normalization: it brings kiki's record back in line without changing identity.
   - Columns: `(rename_id, thread_id, from_name, to_name, op_id, target_commit_id, observed_at)` with `UNIQUE (thread_id, op_id)`.
   - A row records all of these facts:
     - one exact operation removed the thread's bookmark name;
@@ -209,7 +209,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - The row is written in the transaction that updates the thread row's bookmark name.
   - By itself, it appends no placement and no succession. A succession row is appended only when the target also moved to a proven successor in that operation.
 
-- **`thread_lifecycle_ops`** — the durable [sagas](../appendix-a-glossary.md#saga) for creation, close, reopen, checkpoint, repair, terminal restart, and later destroy. A saga is a multi-step operation that kiki can retry or undo step by step. Together with `thread_lifecycle_steps`, this is the [lifecycle journal](../appendix-a-glossary.md#lifecycle-journal).
+- **`thread_lifecycle_ops`**: the durable [sagas](../appendix-a-glossary.md#saga) for creation, close, reopen, checkpoint, repair, terminal restart, and later destroy. A saga is a multi-step operation that kiki can retry or undo step by step. Together with `thread_lifecycle_steps`, this is the [lifecycle journal](../appendix-a-glossary.md#lifecycle-journal).
   - Columns: `(lifecycle_op_id, thread_id, kind, state, started_at, updated_at, completed_at?, last_error?, context_json)`.
   - `kind` includes `RestartTerminal`. The [`restart-terminal`](../appendix-a-glossary.md#restart-terminal) plan is a journaled lifecycle operation with its own step list (see `thread_lifecycle_steps`).
   - A lifecycle operation holds the thread's [lifecycle lock](../appendix-a-glossary.md#lifecycle-lock) from start to finish. The lifecycle lock is the thread's [reconciliation lock](../appendix-a-glossary.md#reconciliation-lock) held for the length of the operation. [Invariants](../02-invariants.md) defines it.
@@ -223,7 +223,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - **The frozen record.** For every operation that freezes processes, `context_json` also holds the set of roles that had already ended before the freeze. Together with the frozen `process_records` rows, this is the frozen record. [Verified resume](../appendix-a-glossary.md#verified-resume) proves every role that was live at freeze time. A role in the ended set, such as a `shell` pane the user closed earlier, does not fail the resume.
   - A [holder](../appendix-a-glossary.md#holder) outside the listed containers that the plan does not name is drift.
 
-- **`thread_lifecycle_steps`** — the step-by-step journal of each lifecycle operation. kiki appends and updates rows here.
+- **`thread_lifecycle_steps`**: the step-by-step journal of each lifecycle operation. kiki appends and updates rows here.
   - It is keyed by `(lifecycle_op_id, ordinal)`.
   - Columns: `(name, state: Pending | Started | Completed | Compensating | Compensated | Failed, attempt, started_at?, completed_at?, input_fingerprint?, result_json?, error?)`.
   - A step is marked `Started` before its external side effect. It records the stable external identity that kiki needs to detect work that already completed.
@@ -283,7 +283,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
     - Process termination is destroy's first irreversible step.
     - After it, only two things apply: `DestroyFailed`, or finishing the plan. So a failure after an irreversible step cannot masquerade as an intact lifecycle.
 
-- **`thread_projection_issues`** — the repair ledger for one thread. Each row is one observed [projection divergence](../appendix-a-glossary.md#projection-divergence): a mismatch between kiki's record and the outside world.
+- **`thread_projection_issues`**: the repair ledger for one thread. Each row is one observed [projection divergence](../appendix-a-glossary.md#projection-divergence): a mismatch between kiki's record and the outside world.
   - Columns: `(issue_id, thread_id, kind, expected_json, observed_json, detected_at, notified_at?, resolved_at?, resolution?)`.
   - Kinds include `WorkspaceDirectoryMissing | WorkspaceRecordMissing | WorkspacePathMismatch | BookmarkMissing | BookmarkMoved | BookmarkConflicted | CheckpointAbandoned | TerminalMissing | OrphanedProcess`.
   - **Bookmark issues.**
@@ -312,7 +312,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
     - Restore, adopt, choose, unhide, recreate, reattach, repoint, restart, and terminate choices require a recorded `kk repair` resolution.
     - A recorded native succession is not a resolution and raises no issue.
 
-- **`repo_issues`** — the repair ledger for the whole repo.
+- **`repo_issues`**: the repair ledger for the whole repo.
   - Columns: `(issue_id, kind: OperationHistoryRewritten, expected_json, observed_json, detected_at, notified_at?, resolved_at?, resolution?)`.
   - [`OperationHistoryRewritten`](../appendix-a-glossary.md#operationhistoryrewritten) is raised once per repo when both of these hold:
     - operation history was rewritten: a recorded operation that was an ancestor of the last recorded frontier is no longer reachable from the current frontier (jj's constant root operation is never counted); and
@@ -327,7 +327,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
 
 #### Terminals and processes
 
-- **`terminal_bindings`** — one row per provisioned [terminal group](../appendix-a-glossary.md#terminal-group) for one thread on one [server instance](../appendix-a-glossary.md#server-instance). This is the [terminal binding](../appendix-a-glossary.md#terminal-binding).
+- **`terminal_bindings`**: one row per provisioned [terminal group](../appendix-a-glossary.md#terminal-group) for one thread on one [server instance](../appendix-a-glossary.md#server-instance). This is the [terminal binding](../appendix-a-glossary.md#terminal-binding).
   - Columns: `(terminal_binding_id, thread_id, server_instance_id, provision_id UNIQUE, provision_nonce_hash, lifecycle_op_id, group_ref, state: Provisioning | Bound | Ended, ended_reason?, created_at, ended_at?)`.
   - **`provision_id`.** kiki persists `provision_id` before it asks the runtime to create anything. A [pane launcher](../appendix-a-glossary.md#pane-launcher)'s report names it. So a lost reply or a duplicate group resolves to one accepted binding.
   - **The provision nonce.** `provision_nonce_hash` is the [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the [provision nonce](../appendix-a-glossary.md#provision-nonce) (a secret random value; see [nonce](https://en.wikipedia.org/wiki/Cryptographic_nonce)).
@@ -353,7 +353,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
     - A different process that presents for a consumed role is refused and must exit.
   - A binding is `Ended` when it is closed, when it is replaced, when its server instance ends, or when its `agent` launcher dies. An ended binding is never revived.
 
-- **`terminal_panes`** — the [role panes](../appendix-a-glossary.md#role-pane) of a binding. A role pane is a pane kiki created for a declared job.
+- **`terminal_panes`**: the [role panes](../appendix-a-glossary.md#role-pane) of a binding. A role pane is a pane kiki created for a declared job.
   - Columns: `(terminal_binding_id, role: agent | shell | ui, tab_ref, pane_ref, terminal_ref?, launcher_pid, launcher_start_time, nonce_consumed_at, claimed_at, ended_at?)`.
   - A row exists only because a pane launcher claimed `(provision_id, role)` through the gate. Pane position, label, and title never assign a role.
   - `nonce_consumed_at` records that this role's claim consumed the provision nonce. The nonce admits one claim per `(provision_id, role)`. A second presentation for a consumed role from a different process is refused, and that process must exit. A repeat from the accepted process identity gets the same answer again and writes nothing.
@@ -365,7 +365,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - `terminal_ref` holds Herdr's `terminal_id`. It is a change hint only.
   - `user` is not a role; it is the absence of one. So [`user` panes](../appendix-a-glossary.md#user-pane) are observed in runtime snapshots and never stored here.
 
-- **`process_records`** — the OS process identities kiki recorded for a thread.
+- **`process_records`**: the OS process identities kiki recorded for a thread.
   - Columns: `(record_id, thread_id, terminal_binding_id?, agent_session_id?, pid, start_time, os_session_id, process_group_id, source: Launcher | Harness | HarnessTree | FreezeDiscovery, recorded_at, prior_stop_state?, freeze_lifecycle_op_id?, exit_verified_at?)`.
   - These are the identities the [orphan](../appendix-a-glossary.md#orphan) scan looks for, and the identities [verified exit](../appendix-a-glossary.md#verified-exit) checks.
   - A process is the recorded one only when both `pid` and `start_time` match.
@@ -375,7 +375,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - `exit_verified_at` is written only by `ProcessSupervisor`, after it observed that exact identity gone. A runtime reply never sets it.
   - kiki signals only identities present in this table. It terminates one only after the process is stopped and its identity has been re-read. This is why `terminate-orphans` records a remnant before it signals it.
 
-- **`agent_sessions`** — one row per runtime process [incarnation](../appendix-a-glossary.md#runtime-agent-incarnation). An incarnation is one run of a harness process that kiki manages.
+- **`agent_sessions`**: one row per runtime process [incarnation](../appendix-a-glossary.md#runtime-agent-incarnation). An incarnation is one run of a harness process that kiki manages.
   - Columns: `(agent_session_id, thread_id, harness_session_id, terminal_binding_id, launcher_pid, launcher_start_time, harness_pid?, harness_start_time?, started_at, retired_at?, launch_gate_id?, gate_activated_at?, harness_started_at?, pause_state: None | Stopping | Stopped | Killed, ready_fingerprint?, exclusive_hook_fingerprint?, exclusive_hook_proven_at?, delivered_intent_id?, startup_intent_id?, startup_intent_epoch?, startup_delivery_id?, startup_payload_sha256?, startup_proven_at?)`.
   - **Identity of an incarnation.**
     - `agent_session_id` changes on every process start, even when `--resume` reuses `harness_session_id`.
@@ -412,9 +412,9 @@ Each entry below has the same shape: what the table stores, its columns, and the
 
 #### Metadata and cascade
 
-- **`metadata_writes`** — a ledger of content hashes that shows which descriptions and bookmark names kk wrote (kk-ownership).
+- **`metadata_writes`**: a ledger of content hashes that shows which descriptions and bookmark names kk wrote (kk-ownership).
 
-- **`sync_intents`** — the sole durable authority for reconciliation, the [embedded outbox](../appendix-a-glossary.md#embedded-cascade-outbox), and delivery. Each row is one [`sync_intent`](../appendix-a-glossary.md#sync-intent): one ordered [cascade reconciliation](../appendix-a-glossary.md#cascade-reconciliation).
+- **`sync_intents`**: the sole durable authority for reconciliation, the [embedded outbox](../appendix-a-glossary.md#embedded-cascade-outbox), and delivery. Each row is one [`sync_intent`](../appendix-a-glossary.md#sync-intent): one ordered [cascade reconciliation](../appendix-a-glossary.md#cascade-reconciliation).
   - Columns: `(intent_id, thread_id, seq, kind, from_base_commit_id, to_base_commit_id, classification_op_id, state, planned_op_id?, result_op_id?, result_workspace_commit_id?, payload?, anchor_change_id?, anchor_commit_id?, anchor_op_id?, prepared_at?, delivery_mode?, delivered_at?, acknowledged_at?, transcript_row_id?, barrier_incarnation_id?, barrier_model_turn_id?, barrier_tool_batch_id?, barrier_bound_at?, batch_completed_at?, soft_redelivery_count, restart_incarnation_id?, restart_startup_delivery_id?, restart_startup_proven_at?, delivery_exhausted_at?, delivery_epoch, delivery_rearmed_at?, recovery_reason?, recovery_bundle_path?, recovery_fingerprint?, recovery_details?, result_has_conflicts, conflicts_cleared_op_id?)`.
   - Enum values:
     - kind is `NativeRewrite | ParentAdvance` (see [`NativeRewrite`](../appendix-a-glossary.md#nativerewrite) and [`ParentAdvance`](../appendix-a-glossary.md#parentadvance));
@@ -436,12 +436,12 @@ Each entry below has the same shape: what the table stores, its columns, and the
     - The human-invoked passthroughs (the body of `kk status` and the overlay's diff for the caller's own thread) are run by `kk`, not by `kkd`. They take none of `kkd`'s locks.
   - See [Cascade](../05-cascade.md) and the [embedded-outbox design note](../17-decisions/cascade-outbox.md).
 
-- **`sync_intent_triggers`** — the operations that triggered each intent, one row per pair.
+- **`sync_intent_triggers`**: the operations that triggered each intent, one row per pair.
   - The rows are normalized `(intent_id, op_id)` rows with `UNIQUE (intent_id, op_id)`.
   - Coalescing (folding several triggers into one intent) adds observed operation ids here. It also updates `classification_op_id` to the exact view used for reclassification. It does both only while the intent remains pre-materialization.
   - Coalescing does not impose a false linear “through” order on jj's operation DAG.
 
-- **`op_attribution`** — every operation id that a kiki-run jj command wrote. kiki uses it to recognize its own operations.
+- **`op_attribution`**: every operation id that a kiki-run jj command wrote. kiki uses it to recognize its own operations.
   - Columns: `(op_id, invocation_id, kind, lifecycle_op_id?, intent_id?, recorded_at)`.
   - One command may write several operations. Each gets a row under the same `invocation_id`.
   - Attribution is by recorded id, and by the per-invocation operation user and host that jj stores on the operation. kiki sets no operation description.
@@ -452,74 +452,74 @@ Each entry below has the same shape: what the table stores, its columns, and the
 
 Four of these tables form the [operation-history cache](../appendix-a-glossary.md#operation-history-cache), kiki's copy of the parts of jj's [operation log](https://docs.jj-vcs.dev/latest/operation-log/) that it needs: `op_history`, `op_history_parents`, `op_workspace_heads`, and `op_watch_frontier`. The fifth, `op_history_anchors`, records [re-anchoring](../appendix-a-glossary.md#re-anchoring) of that cache.
 
-- **`op_history`** — the cache of operation nodes.
+- **`op_history`**: the cache of operation nodes.
   - Columns: `(repo_id, op_id, committed_at, observed_at, processed_at?)` with `UNIQUE (repo_id, op_id)`.
   - A row is processed only after every relevant workspace transition for that node has been classified durably.
 
-- **`op_history_anchors`** — re-anchoring records. An anchor is a new starting point for kiki's view of operation history.
+- **`op_history_anchors`**: re-anchoring records. An anchor is a new starting point for kiki's view of operation history.
   - Columns: `(repo_id, anchor_id, head_op_ids_json, reason: Silent | Repair, repo_issue_id?, recorded_at)`.
   - A row is written when operation history was rewritten: a recorded operation that was an ancestor of the last recorded frontier is no longer reachable from the current frontier. jj's constant root operation is never counted.
   - `Silent` is written when no thread's bookmark or head differs from its cached value. `Repair` is written when the approved `reanchor-history` plan is applied, and it names the repo issue. Between detection and that approval, no anchor row exists: bookmark classification is paused in that repo, and it resumes from the anchor recorded on approval.
   - Placements and successions recorded before an anchor are evaluated through the cached expected targets as of that anchor.
   - Operation ancestry is computed only from the anchor forward.
 
-- **`op_history_parents`** — the edges of the operation DAG, one row per parent link.
+- **`op_history_parents`**: the edges of the operation DAG, one row per parent link.
   - Columns: `(repo_id, op_id, parent_op_id)` with `UNIQUE (repo_id, op_id, parent_op_id)`.
   - No code path may collapse an operation with multiple parents to one cursor predecessor.
 
-- **`op_workspace_heads`** — for each operation view, where each workspace's `@` was.
+- **`op_workspace_heads`**: for each operation view, where each workspace's `@` was.
   - Columns: `(repo_id, op_id, workspace_id, change_id, commit_id)` with `UNIQUE (repo_id, op_id, workspace_id)`.
   - The workspace key is load-bearing, because `@` is workspace-local.
 
-- **`op_watch_frontier`** — the current known set of operation heads (the [operation frontier](../appendix-a-glossary.md#operation-frontier)).
+- **`op_watch_frontier`**: the current known set of operation heads (the [operation frontier](../appendix-a-glossary.md#operation-frontier)).
   - Columns: `(repo_id, op_id, observed_at)` with `UNIQUE (repo_id, op_id)`.
   - Restart catch-up walks every not-yet-processed ancestor reachable from this frontier, in [topological order](https://en.wikipedia.org/wiki/Topological_sorting) (parents before children).
   - It is not a singular “last cursor to head” scan.
 
 #### Publishing, config, credentials, and approvals
 
-- **`pr_links`** — links each thread to its [pull request](https://docs.github.com/en/pull-requests) (thread → PR).
+- **`pr_links`**: links each thread to its [pull request](https://docs.github.com/en/pull-requests) (thread → PR).
 
-- **`thread_config`** — the per-thread config layer: key/value/updated_at.
+- **`thread_config`**: the per-thread config layer: key/value/updated_at.
 
-- **`credentials`** — the repo-scoped credentials kiki has issued.
+- **`credentials`**: the repo-scoped credentials kiki has issued.
   - Columns: `(cred_id, kind: 'ThreadScoped' | 'RegistrationScoped', thread_id?, repo_id?, issued_at, revoked_at?)`.
   - The `Admin` credential is not stored here. It lives in the user-level database, in `user_credentials`.
   - Operational calls cannot substitute Admin for [human approval](../appendix-a-glossary.md#human-approval).
 
-- **`approval_challenges`** — foreground confirmations that are still pending.
+- **`approval_challenges`**: foreground confirmations that are still pending.
   - Columns: `(challenge_id, requester_cred_id, presenter_id?, method, repo_id, thread_id?, args_digest, rendered_plan, nonce, created_at, expires_at, confirmed_at?, confirmed_foreground_tty?, cancelled_at?)`.
   - `BeginApproval` persists the exact plan before returning it for display.
   - Only an enrolled foreground presenter may bind itself and confirm the nonce and digest.
   - Presenter binding, confirmation evidence, and capability issuance occur in one target-database [transaction](https://en.wikipedia.org/wiki/Database_transaction).
 
-- **`human_approvals`** — one-use capabilities. Each row is one [human approval](../appendix-a-glossary.md#human-approval).
+- **`human_approvals`**: one-use capabilities. Each row is one [human approval](../appendix-a-glossary.md#human-approval).
   - Columns: `(approval_id, challenge_id, requesting_cred_id, approving_presenter_id, method, repo_id?, thread_id?, args_digest, issued_at, expires_at, claimed_at?, operation_id?, consumed_at?, consuming_audit_id?)`.
   - Claim and creation of the exact `approved_operations` envelope occur atomically, before external effects.
   - A claimed approval can resume only that operation id. It cannot authorize another plan.
   - Completion marks it consumed.
   - Approvals fail closed (kiki refuses them) when they are expired, replayed, method-mismatched, target-mismatched, argument-drifted, unconfirmed, or channel-mismatched.
 
-- **`approved_operations`** — the generic approval-claim envelope. It ties one approval to the one operation it authorized.
+- **`approved_operations`**: the generic approval-claim envelope. It ties one approval to the one operation it authorized.
   - Columns: `(operation_id, approval_id UNIQUE, kind, thread_id?, plan_digest, state: Claimed | Running | Completed | Failed | OutcomeUnknown, claimed_at, updated_at, completed_at?, result_digest?, last_error?)`.
   - Lifecycle operations link their envelope to `thread_lifecycle_ops`.
   - Publish, parent-merge remote updates, sensitive snapshots, and other consequential methods use this envelope directly.
   - One approval creates one immutable envelope. Recovery may resume only its stored plan.
 
-- **`approved_operation_steps`** — the idempotent journal of external effects for an approved operation.
+- **`approved_operation_steps`**: the idempotent journal of external effects for an approved operation.
   - Columns: `(operation_id, ordinal, name, state, input_fingerprint, result_json?, error?)`, unique by `(operation_id, ordinal)`.
   - Remote push and PR-base mutation are separate steps.
   - An unknown remote result becomes `OutcomeUnknown` until observation proves success or failure.
   - Read-only approved snapshots record their repository observation and result digest as one completed step. They do not leave an unjournaled reusable capability.
 
-- **`audit_log`** — the append-only log of attempts against this repo.
+- **`audit_log`**: the append-only log of attempts against this repo.
   - Columns: `(audit_id, timestamp, cred_id?, approval_id?, presenter_id?, transport_peer, declared_scope?, method, args_summary, outcome)`.
   - Null identities explicitly represent unidentified or rejected callers.
   - Parseable attempts with a resolved repo go here. Attempts without a resolvable repo go to per-user `user_audit_log`. So there is exactly one authoritative row per attempt.
 
 #### Thread events
 
-- **`thread_events`** — the append-only event log behind `StreamThreadEvents`.
+- **`thread_events`**: the append-only event log behind `StreamThreadEvents`.
   - Columns: `(thread_id, seq, kind, payload_json, recorded_at)` with `UNIQUE (thread_id, seq)`.
   - Each row is one event for one thread: a state transition, a cascade event, or a transcript append.
   - `seq` is the monotonic number that `StreamThreadEvents` carries. It only goes up, per thread. `kkd` allocates it and inserts the row in the same transaction as the change the event reports. So `seq` survives a `kkd` restart and never repeats or goes backward.
@@ -528,25 +528,25 @@ Four of these tables form the [operation-history cache](../appendix-a-glossary.m
 
 #### Transcript
 
-- **`thread_messages`** — per-thread transcript rows (the [thread transcript](../appendix-a-glossary.md#thread-transcript)).
+- **`thread_messages`**: per-thread transcript rows (the [thread transcript](../appendix-a-glossary.md#thread-transcript)).
   - Columns: `(thread_id, change_id?, commit_id?, op_id?, session_id, seq, captured_at, author, direction, text, dedup_key, synthesized, anchor_unknown)` with `UNIQUE (thread_id, dedup_key)`.
   - There is an [FTS5](https://www.sqlite.org/fts5.html) virtual table over `text`. FTS5 is SQLite's full-text search.
   - A CHECK constraint binds `anchor_unknown` to the nullability of the `(change_id, commit_id, op_id)` triple. (See [`anchor_unknown=TRUE`](../appendix-a-glossary.md#anchor-unknown-true).)
   - See [Transcript](../06-transcript.md).
 
-- **`thread_changes`** — one row per (thread, change_id) pair.
+- **`thread_changes`**: one row per (thread, change_id) pair.
   - It carries `tombstoned_at?` (abandon) and `redirected_to?` (squash).
 
-- **`transcript_offsets`** — where transcript capture last stopped, per (thread, session_id).
+- **`transcript_offsets`**: where transcript capture last stopped, per (thread, session_id).
   - Columns: `(byte_offset, last_row_uuid)`. They let tailing resume safely after a crash.
   - Both fields advance in the same transaction as the corresponding `thread_messages` insert.
 
-- **`pending_kkd_prepends`** — a short-lived table of messages that kiki prepended (see [`pending_kkd_prepends`](../appendix-a-glossary.md#pending-kkd-prepends)). It is TTL-bounded: rows expire after a time limit.
+- **`pending_kkd_prepends`**: a short-lived table of messages that kiki prepended (see [`pending_kkd_prepends`](../appendix-a-glossary.md#pending-kkd-prepends)). It is TTL-bounded: rows expire after a time limit.
   - Columns: `(prepend_id PRIMARY KEY, thread_id, text_sha256, inserted_at)`.
   - Duplicate `(thread_id, text_sha256)` rows are allowed. They are consumed FIFO (first in, first out).
   - The match key omits `session_id`, so fresh-session reopens match correctly.
 
-- **`provider_egress_consents`** — remembered, revocable grants that allow transcript text to be sent to a model provider.
+- **`provider_egress_consents`**: remembered, revocable grants that allow transcript text to be sent to a model provider.
   - Columns: `(consent_id, thread_id, provider_identity, purpose: 'catch_up' | 'transcript_mcp', disclosure_version, granted_at, granted_by_presenter_id, revoked_at?)`.
   - Consent is valid only for the exact thread, configured provider identity, purpose, and disclosed policy version.
   - Local preview is not [provider egress](../appendix-a-glossary.md#provider-egress).
@@ -554,7 +554,7 @@ Four of these tables form the [operation-history cache](../appendix-a-glossary.m
 
 ### v2-only
 
-- `causal_chains`, `causal_chain_visits` — deferred until the broader MCP substrate ships. See [Roadmap](../16-roadmap.md) and [causal chain](../appendix-a-glossary.md#causal-chain).
+- `causal_chains`, `causal_chain_visits`: deferred until the broader MCP substrate ships. See [Roadmap](../16-roadmap.md) and [causal chain](../appendix-a-glossary.md#causal-chain).
 
 ## Constraints and transactional invariants worth calling out
 

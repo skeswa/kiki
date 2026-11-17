@@ -162,7 +162,7 @@ When a command runs, kiki has to answer "Which thread am I in?". `ContextDiscove
   - It reports that a change is pending.
   - It requires `replace-terminal-server` before the new value takes effect.
 - **Verify.** On every connection `kkd` reads the ping reply. The reply returns Herdr's version, its protocol number, and an object of named boolean (true/false) capability flags. `kkd` checks them against the supported range it pins.
-  - An unsupported server is not used. Terminal lifecycle operations fail with an actionable error, and existing threads keep their recorded state.
+  - An unsupported server is not used. Terminal lifecycle operations fail with an error that says what to do, and existing threads keep their recorded state.
   - The adapter derives `RuntimeCapabilities` from the version and protocol plus those flags.
   - [`client_targeted_focus`](../appendix-a-glossary.md#client-targeted-focus) **must** arrive as a new upstream flag.
   - Herdr already reports `live_handoff` as true. That flag is not a gate signal, and kiki does not treat handoff as supported because of it.

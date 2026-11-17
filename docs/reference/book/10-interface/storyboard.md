@@ -2,11 +2,11 @@
 
 The earlier chapters describe what kiki does one verb at a time. This chapter describes what kiki feels like across one work-week. It follows a single developer through a porting project. The project crosses three repos. It tests every branching, merging, and abandoning pattern the rest of the book commits to.
 
-The protagonist is unnamed. The work is to port the iOS Kestrel app to Android. Product is still iterating on the spec while the port happens. Two other repos — the user-facing docs and the marketing site — also need attention along the way. The three repos are:
+The protagonist is unnamed. The work is to port the iOS Kestrel app to Android. Product is still iterating on the spec while the port happens. Two other repos, the user-facing docs and the marketing site, also need attention along the way. The three repos are:
 
-- `kestrel-mobile` — the iOS/Android codebase, where the port lives.
-- `kestrel-docs` — the user-facing product documentation.
-- `kestrel-www` — the marketing site, where one copyright year is wrong.
+- `kestrel-mobile`: the iOS/Android codebase, where the port lives.
+- `kestrel-docs`: the user-facing product documentation.
+- `kestrel-www`: the marketing site, where one copyright year is wrong.
 
 The storyboard introduces no new commands, flags, glyphs, or screen elements. Every beat in it grounds out in the normative (binding) chapters:
 
@@ -24,9 +24,9 @@ Acts are time-stamped (`Day · HH:MM — <repo>`) so the order of events is easy
 - a laptop reboots overnight;
 - the week closes with a stack of merged PRs and a quiet TUI.
 
-## Act 1 — Bootstrapping
+## Act 1: Bootstrapping
 
-### Mon 09:14 — kestrel-mobile, kestrel-docs, kestrel-www
+### Mon 09:14, kestrel-mobile, kestrel-docs, kestrel-www
 
 `kestrel-mobile` is already kiki-registered. The developer brought it under management on a prior project, and no [threads](../appendix-a-glossary.md#thread) are in flight from that work. (A thread is kiki's unit of work: one line of changes with its own files, terminals, and agent.)
 
@@ -80,9 +80,9 @@ The developer returns to `kestrel-mobile` and types bare `kk`. The repo is regis
 >
 > Nothing is written inside the source repo's filesystem.
 
-## Act 2 — The skeleton thread
+## Act 2: The skeleton thread
 
-### Mon 10:42 — kestrel-mobile
+### Mon 10:42, kestrel-mobile
 
 The first [thread](../appendix-a-glossary.md#thread) will scaffold Android navigation: the gradle module, a top-level `NavHost`, and a Material 3 theme that mirrors the iOS app's tab structure.
 
@@ -168,11 +168,11 @@ The sidebar is Herdr's. Kiki publishes the thread's label and tokens into it and
 >
 > Herdr's reply to the create call, the pane appearing, and Herdr's own agent detection are not evidence of any of it (see [Terminal runtime · provisioning](../13-architecture/terminal-runtime.md#provisioning)).
 
-## Act 3 — Branching off for auth
+## Act 3: Branching off for auth
 
-### Mon 14:20 — kestrel-mobile
+### Mon 14:20, kestrel-mobile
 
-The skeleton thread is partway through wiring the `NavHost` and theme. The auth flow needs a parallel [thread](../appendix-a-glossary.md#thread) to start on. Auth depends on the navigation skeleton — the `login` destination, the back-stack rules. But it doesn't need to wait for the skeleton to finish.
+The skeleton thread is partway through wiring the `NavHost` and theme. The auth flow needs a parallel [thread](../appendix-a-glossary.md#thread) to start on. Auth depends on the navigation skeleton: the `login` destination, the back-stack rules. But it doesn't need to wait for the skeleton to finish.
 
 The developer spawns a child thread that [follows](../appendix-a-glossary.md#follows) the skeleton. Following is a live link from a child thread to a parent thread. Two things come from it (see [Cascade · classification](../05-cascade.md#classification)):
 
@@ -216,9 +216,9 @@ Both threads are working concurrently. The Stack section orders them by `kk log`
 
 The follows [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) (a graph with no loops) is, for now, two hops deep: `main → android-skel → auth`. Each active thread follows its parent's persisted workspace head. It does not assume that jj automatically advances bookmarks. jj may evolve several descendant commits in one operation. Kiki still materializes and explains each affected workspace independently.
 
-## Act 4 — Product changes their mind (small)
+## Act 4: Product changes their mind (small)
 
-### Tue 11:00 — kestrel-mobile
+### Tue 11:00, kestrel-mobile
 
 Overnight, the navigation skeleton settled into a clean shape. Product responded with a small correction: the bottom-bar tab order should put `Library` left of `Discover`, not right.
 
@@ -250,9 +250,9 @@ No toast fires for this cascade. The toast trigger for coalesced child materiali
 
 The agent's view of the change is a single synthetic turn explaining what evolved and which files were materialized. The developer's view is a momentary glyph flip on one row. Neither has to coordinate further. The act is intentionally undramatic. That is what an [ambient coordinator](../appendix-a-glossary.md#ambient-coordinator) looks like when it's working.
 
-## Act 5 — Cross-repo interlude: the copyright bump
+## Act 5: Cross-repo interlude: the copyright bump
 
-### Tue 16:45 — kestrel-www
+### Tue 16:45, kestrel-www
 
 In the middle of the auth work, the developer remembers that the marketing site's footer still says "© 2025". They do not interrupt either of the kestrel-mobile [threads](../appendix-a-glossary.md#thread). They open a separate terminal window, change directory, and spawn a third thread in a different repo:
 
@@ -265,7 +265,7 @@ $ kk new copyright-2026 -m "Bump copyright year in the footer to 2026.
 
 After approval, the thread is created. The new thread has no [follows](../appendix-a-glossary.md#follows) link. `kestrel-www` has no other kiki threads, and no parent makes sense. That window is not a [Herdr client](../appendix-a-glossary.md#herdr-client), so again nobody's view moves.
 
-The new thread gets its own [terminal group](../appendix-a-glossary.md#terminal-group) on the same server. Herdr's sidebar in the developer's client now lists three entries from two repos in one list. The developer selects the new entry there — Herdr's own navigation — and works from that thread's shell pane.
+The new thread gets its own [terminal group](../appendix-a-glossary.md#terminal-group) on the same server. Herdr's sidebar in the developer's client now lists three entries from two repos in one list. The developer selects the new entry there, Herdr's own navigation, and works from that thread's shell pane.
 
 The agent edits one line. A minute later, the developer reviews the diff in the overlay's [preview pane](../appendix-a-glossary.md#preview-pane) (`d`), is satisfied, and publishes:
 
@@ -286,7 +286,7 @@ $ kk publish --ready -m "Bump copyright year to 2026"
 
 Publishing is visible outside the machine, so it needs a one-shot approval. This is the first `kk publish` of the week, so the card is shown above. Before it builds the plan, publish checks that every commit it would push has a description; the agent described its one commit, so the check passes. The developer presses `enter`.
 
-`--ready` opens the PR ([pull request](https://docs.github.com/en/pull-requests)) ready for review rather than as a draft (see [Publishing · defaults](../07-publishing.md#defaults)). The base branch resolves to `main` because the thread has no follows ancestor (see [Publishing · PR base](../07-publishing.md#defaults)). CI is green within a minute. Marketing's reviewer approves. The developer merges via `gh pr merge` directly — kiki does not gate that — and closes the thread:
+`--ready` opens the PR ([pull request](https://docs.github.com/en/pull-requests)) ready for review rather than as a draft (see [Publishing · defaults](../07-publishing.md#defaults)). The base branch resolves to `main` because the thread has no follows ancestor (see [Publishing · PR base](../07-publishing.md#defaults)). CI is green within a minute. Marketing's reviewer approves. The developer merges via `gh pr merge` directly (kiki does not gate that) and closes the thread:
 
 ```console
 $ kk close
@@ -308,9 +308,9 @@ The developer typed `kk close` in the thread's own shell pane, so that `kk` proc
 
 Total wall time on the copyright bump: about twelve minutes. Nothing in `kestrel-mobile` was perturbed. The two `kestrel-mobile` threads remain active. `kestrel-www` now has one closed thread.
 
-## Act 6 — The docs thread, started in parallel
+## Act 6: The docs thread, started in parallel
 
-### Wed 09:14 — kestrel-docs
+### Wed 09:14, kestrel-docs
 
 Wednesday morning, product asks for first-pass documentation of the Android setup story. Beta testers should have something to read alongside the build they are about to receive. The docs live in their own repo. The developer spawns a [thread](../appendix-a-glossary.md#thread) there:
 
@@ -336,13 +336,13 @@ Later that morning the developer runs `kk attach android-docs` in a second termi
 
 That depends on the Herdr capability [`client_targeted_focus`](../appendix-a-glossary.md#client-targeted-focus). On a server without it, `kk switch` would refuse and name the capability rather than move both windows. The daemon is not "in" any thread; it is watching all of them.
 
-## Act 7 — Product changes their mind (big)
+## Act 7: Product changes their mind (big)
 
-### Wed 15:30 — kestrel-mobile
+### Wed 15:30, kestrel-mobile
 
 Mid-afternoon, product Slacks: scrap the password-first auth flow. Sales has been hearing repeated requests for biometric-first login from enterprise pilots. The team wants to ship the Android beta with that posture from day one. Password is now a fallback, not the front door.
 
-The auth [thread](../appendix-a-glossary.md#thread)'s direction is wrong. Not in detail — fully. Closing it and starting a new one is cleaner than re-prompting the agent and watching it patch its way to a different posture.
+The auth [thread](../appendix-a-glossary.md#thread)'s direction is wrong. Not in detail, but fully. Closing it and starting a new one is cleaner than re-prompting the agent and watching it patch its way to a different posture.
 
 The `auth` agent is mid-task, and close needs a quiet agent. So the developer first stops it in its own pane with the harness's `esc`. Then they open the [overlay](../appendix-a-glossary.md#overlay-tui), cursor to `auth` in the Stack, and press `x`. The overlay requests a daemon-canonical close challenge and displays its approval card (see [Interface · forms](spec.md#forms)):
 
@@ -389,9 +389,9 @@ $ kk new auth-biometric --follows android-skel -m "Biometric-first login,
 
 After approval, the thread is created. The Stack tree's shape is unchanged: there is still one thread following `android-skel`. But the slot now holds `auth-biometric`. The `auth` thread is gone from the active list. `kk ls --all` would still show it, marked closed (see [Commands · `kk ls`](../09-commands.md#kk-ls)).
 
-## Act 8 — A cascade conflict
+## Act 8: A cascade conflict
 
-### Thu 10:08 — kestrel-mobile
+### Thu 10:08, kestrel-mobile
 
 Thursday morning, the `android-skel` [thread](../appendix-a-glossary.md#thread)'s agent adds a new navigation-refactor revision. It moves the auth-related destinations out of the root `NavHost` into a nested `loginGraph`.
 
@@ -429,9 +429,9 @@ $ jj resolve
 
 The cascade glyph on `auth-biometric` returns to `──`. The conflict cost the developer about eight minutes of focused attention and zero corrupted state.
 
-## Act 9 — Publishing the stack
+## Act 9: Publishing the stack
 
-### Thu 16:00 — kestrel-mobile
+### Thu 16:00, kestrel-mobile
 
 By late Thursday, the navigation skeleton is complete and the biometric-first auth flow works end-to-end against staging. The developer wants both [threads](../appendix-a-glossary.md#thread) in front of reviewers as a stack: skeleton at the bottom, auth-biometric on top. From the skeleton thread, they invoke a downstack publish:
 
@@ -476,9 +476,9 @@ Without approval, the child remains locally reconciled with `remote update pendi
 
 The `auth-biometric` row in the Stack updates after the parent-merge transition. The follows arrow `←●` disappears, since auth-biometric no longer follows anything. Shortly after, reviewers approve `auth-biometric` and that PR merges too. The week's port has landed on `main` as two clean commits.
 
-## Act 10 — Closing out
+## Act 10: Closing out
 
-### Fri 09:00 — across repos
+### Fri 09:00, across repos
 
 The laptop installed an update and rebooted overnight. No process survives a reboot: the Herdr server, every agent, and every shell are gone.
 
@@ -505,7 +505,7 @@ The rows look like Thursday's, minus kiki's tokens. They are not [threads](../ap
 
 > kkd: the server it now talks to has a different `server_instance_id`. Every [binding](../appendix-a-glossary.md#terminal-binding) from the old instance is ended, and every incarnation is retired without acknowledgement.
 >
-> The [orphan](../appendix-a-glossary.md#orphan) scan finds none of the recorded process identities alive — a reboot leaves nothing — and no stray holder of any workspace. It does find the restored shells, whose working directories are inside the jj workspaces. Those are [remnant panes](../appendix-a-glossary.md#remnant-pane). The current snapshot names each one's pane and root process, so they are accounted terminal members, not orphans.
+> The [orphan](../appendix-a-glossary.md#orphan) scan finds none of the recorded process identities alive (a reboot leaves nothing) and no stray holder of any workspace. It does find the restored shells, whose working directories are inside the jj workspaces. Those are [remnant panes](../appendix-a-glossary.md#remnant-pane). The current snapshot names each one's pane and root process, so they are accounted terminal members, not orphans.
 >
 > No [`OrphanedProcess`](../appendix-a-glossary.md#orphanedprocess) issue is raised. Each thread gets `TerminalMissing` (see [Terminal runtime · runtime changes are reconciliation](../13-architecture/terminal-runtime.md#runtime-changes-are-reconciliation)).
 
@@ -548,11 +548,11 @@ Had a thread still been in flight, the developer would have applied the `restart
 
 A final `kk ls --all-repos --all` shows the week as a flat list across the three repos. The `--all` flag includes closed threads, and the `--all-repos` flag widens repo scope. They are independent (see [Commands · `kk ls`](../09-commands.md#kk-ls)).
 
-- `kestrel-mobile/android-skel` — closed
-- `kestrel-mobile/auth` — closed (the password-first version, abandoned mid-week)
-- `kestrel-mobile/auth-biometric` — closed (the biometric-first replacement, merged)
-- `kestrel-docs/android-docs` — closed (not yet published; its revisions are kept under its bookmark)
-- `kestrel-www/copyright-2026` — closed
+- `kestrel-mobile/android-skel`: closed
+- `kestrel-mobile/auth`: closed (the password-first version, abandoned mid-week)
+- `kestrel-mobile/auth-biometric`: closed (the biometric-first replacement, merged)
+- `kestrel-docs/android-docs`: closed (not yet published; its revisions are kept under its bookmark)
+- `kestrel-www/copyright-2026`: closed
 
 Bare `kk` from `kestrel-mobile` opens the overlay with no active work remaining. The closed threads are reachable if anything from the week needs revisiting: through `kk ls --all` and `kk reopen <thread>`, or in the overlay by pressing `a` to show closed rows and then `r`.
 
@@ -562,22 +562,22 @@ Five threads were spawned, one was abandoned, three merged, and one was archived
 
 The patterns this storyboard demonstrates and the chapters that authorize them:
 
-- **Branching** — acts 3 and 7. `kk new --follows <parent>` records a live cascade edge plus exact synchronization anchors (see [Threads · creation](../03-threads.md#creation), [Cascade · classification](../05-cascade.md#classification)).
-- **Merging back** — acts 5 and 9 (see [Publishing](../07-publishing.md), [Cascade · parent merged](../05-cascade.md#parent-merged)).
+- **Branching**: acts 3 and 7. `kk new --follows <parent>` records a live cascade edge plus exact synchronization anchors (see [Threads · creation](../03-threads.md#creation), [Cascade · classification](../05-cascade.md#classification)).
+- **Merging back**: acts 5 and 9 (see [Publishing](../07-publishing.md), [Cascade · parent merged](../05-cascade.md#parent-merged)).
   - Act 5 is a single thread merging direct to `main`.
   - Act 9 is a stacked publish. There the parent merge reconciles the child onto the exact merged `main` commit at its safe boundary.
-- **Abandoning** — act 7's `kk close` of the wrong-direction `auth` thread (see [Threads · close](../03-threads.md#close), [Threads · destroy](../03-threads.md#destroy)).
+- **Abandoning**: act 7's `kk close` of the wrong-direction `auth` thread (see [Threads · close](../03-threads.md#close), [Threads · destroy](../03-threads.md#destroy)).
   - Close retains the thread's transcript and kiki record for possible reuse.
   - That is in contrast to approved `kk thread destroy`. Destroy removes that record but preserves jj revisions unless a separately approved abandonment plan is requested.
-- **Cross-repo** — acts 1 (registration), 5 (`kestrel-www` copyright bump), 6 (`kestrel-docs` parallel work). One daemon, per-repo registration, `kk ls --all-repos` for the global view (see [Commands · `kk ls`](../09-commands.md#kk-ls)).
-- **Cascade in motion** — acts 4 and 8 (see [Cascade](../05-cascade.md), [Invariants](../02-invariants.md)).
+- **Cross-repo**: acts 1 (registration), 5 (`kestrel-www` copyright bump), 6 (`kestrel-docs` parallel work). One daemon, per-repo registration, `kk ls --all-repos` for the global view (see [Commands · `kk ls`](../09-commands.md#kk-ls)).
+- **Cascade in motion**: acts 4 and 8 (see [Cascade](../05-cascade.md), [Invariants](../02-invariants.md)).
   - Act 4 shows jj-native ancestor evolution followed by safe materialization.
   - Act 8 shows an explicit parent advance with conflict and human resolution.
   - Both demonstrate that direct `jj` operations are first-class inputs to the coordinator, not gated by it.
-- **Terminal runtime as projection** — acts 2, 6, and 10 (see [Commands · `kk attach`](../09-commands.md#kk-attach), [Terminal runtime](../13-architecture/terminal-runtime.md), [Invariants](../02-invariants.md#the-terminal-runtime-is-a-projection-not-an-authority)).
+- **Terminal runtime as projection**: acts 2, 6, and 10 (see [Commands · `kk attach`](../09-commands.md#kk-attach), [Terminal runtime](../13-architecture/terminal-runtime.md), [Invariants](../02-invariants.md#the-terminal-runtime-is-a-projection-not-an-authority)).
   - Acts 2 and 6: `kk attach` opens a view; `kk switch` moves only the caller's client.
   - Act 10: a reboot restores remnant Herdr containers. No thread is `Active` until `kk repair`'s `restart-terminal` plan restarts it. No workspace is deleted until every process holding it is closed with verified exit.
-- **Stacked publish** — act 9 (see [Commands · `kk publish`](../09-commands.md#kk-publish), [Cascade · parent merged](../05-cascade.md#parent-merged)).
+- **Stacked publish**: act 9 (see [Commands · `kk publish`](../09-commands.md#kk-publish), [Cascade · parent merged](../05-cascade.md#parent-merged)).
   - `kk publish --downstack` publishes ancestors first.
   - A parent merge then reconciles descendants locally onto the repo default branch.
   - It leaves force-push/PR-base changes behind an exact foreground-approved remote plan.

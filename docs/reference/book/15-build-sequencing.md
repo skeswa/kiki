@@ -7,7 +7,7 @@ The riskiest v1 assumption is the cascade path. (The cascade is how kiki carries
 - [jj](https://docs.jj-vcs.dev/latest/)'s native descendant evolution: jj rewrites a child commit by itself when its ancestor changes;
 - stale-workspace [materialization](appendix-a-glossary.md#materialization): updating a [workspace](appendix-a-glossary.md#workspace)'s files after its commit changed;
 - explicit parent-tip advance;
-- each [harness](appendix-a-glossary.md#harness)'s tool boundary — [Claude Code](https://docs.claude.com/en/docs/claude-code/overview)'s parallel batch and [Codex](https://github.com/openai/codex)'s proven-serial hook coverage. (A harness is the coding-agent program.)
+- each [harness](appendix-a-glossary.md#harness)'s tool boundary: [Claude Code](https://docs.claude.com/en/docs/claude-code/overview)'s parallel batch and [Codex](https://github.com/openai/codex)'s proven-serial hook coverage. (A harness is the coding-agent program.)
 
 Validate that path before investing in the full [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>). A sequential single-hook demo is not sufficient evidence for Claude Code. And Claude Code's proofs are not evidence for Codex.
 
@@ -131,7 +131,7 @@ Every stage runs against one explicitly pinned [Herdr](appendix-a-glossary.md#he
 - So the [acceptance gate](appendix-a-glossary.md#acceptance-gate) re-runs every stage gate on the build that carries the client-targeted focus extension. A stage gate passed on an earlier build does not count there.
 - The deadline for deciding what to do if the extension has not landed is the Stage 2 exit. See [Upstream dependencies](#upstream-dependencies).
 
-### Stage 1 — one managed thread
+### Stage 1: one managed thread
 
 Build the smallest end-to-end path: `kk init`, `kk new <name>`, `kk attach`, and the read-only `kk ls`. That path needs more than it looks like, and all of it belongs to this stage:
 
@@ -217,7 +217,7 @@ Stage 1 gate:
   - The only unpinned commands are the closed list in [Invariants](02-invariants.md#operation-history-is-a-dag). Each runs under the per-repo [repo jj lock](appendix-a-glossary.md#repo-jj-lock), and the working-copy commands run only after a single-head sample.
   - A test that counts operations shows `kk ls` and the watcher create none, snapshot nothing, and never merge operation heads.
 
-### Stage 2 — restart, reconciliation, and safe close
+### Stage 2: restart, reconciliation, and safe close
 
 Add `kk switch`, `kk close`, `kk reopen`, `kk repair`, the rest of the projection audit, and the freeze, resume, and termination halves of [`ProcessSupervisor`](appendix-a-glossary.md#processsupervisor).
 
@@ -331,7 +331,7 @@ Stage 2 gate:
 - **Unregister.** `kk repo unregister` runs only after a one-shot foreground approval, and refuses when run non-interactively. Once it succeeds, the repo's registry row and its centralized state directory are gone, the source repo's files and jj history are untouched, `kk ls --all-repos` no longer lists the repo, and `kk init` registers it again with a new `repo_id`.
 - **Attention notifications.** Each of these fires exactly one notification at its configured level: a blocked agent, a crashed agent, a failed lifecycle operation, and a projection issue. Setting an event's key to `silent` stops the notification and leaves the status mark.
 
-### Stage 3 — follows and cascade
+### Stage 3: follows and cascade
 
 Promote the cascade proof of concept into the daemon: the rest of `OpLogWatcher`, `OpAttribution`, and `AncestryQuery`; `CascadeOrchestrator`; [`WorkspaceProbe`](appendix-a-glossary.md#workspaceprobe); [`WorkspaceRecovery`](appendix-a-glossary.md#workspacerecovery); the cascade half of `kk-hook`; and then `kk thread detach`, `kk log`, `kk status`, `kk config get|show`, and the audit reads.
 
@@ -415,7 +415,7 @@ One thing must exist in [Herdr](appendix-a-glossary.md#herdr) before the [accept
 
 - a real jj repo,
 - a real [dedicated Herdr server](appendix-a-glossary.md#dedicated-herdr-server) at the pinned candidate build, and
-- each shipped harness — Claude Code and Codex, on each supported platform.
+- each shipped harness: Claude Code and Codex, on each supported platform.
 
 The gate runs on the build that carries the client-targeted focus extension. It re-runs every stage gate above on that build, because results from an earlier build are not evidence for it.
 

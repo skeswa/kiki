@@ -95,7 +95,7 @@ If the proof fails for a harness, `restart_startup_delivery` is false for it. Th
 
 `ReportHarnessStarted` is [idempotent](https://en.wikipedia.org/wiki/Idempotence) (safe to repeat).
 
-- A repeat from the same launcher, for the same incarnation and the same child identity, is accepted as a no-op and gets the same answer. So a launcher whose reply was lost can simply send the report again.
+- A repeat from the same launcher, for the same incarnation and the same child identity, is accepted as a no-op and gets the same answer. So a launcher whose reply was lost can send the report again.
 - A launcher that already holds a recorded child ignores a re-delivered gate specification. It does not create a second child. It reports the existing child again.
 - A report that names a different child for an incarnation that already has one is refused.
 

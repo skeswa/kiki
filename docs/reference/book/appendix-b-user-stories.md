@@ -268,7 +268,7 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
 
 64. As a developer, I want a close to leave each client's view in the right place, so that I keep working without manual switching and nobody else's view is moved on my behalf.
     - A `kk close` run from outside the closed thread moves my own client to the parent thread, when that thread is active with a bound terminal group.
-    - A `kk close` typed inside the thread simply ends with it and leaves the result in `kk ls`.
+    - A `kk close` typed inside the thread ends with it and leaves the result in `kk ls`.
     - Otherwise, Herdr places any client that was showing the closed terminal group.
 65. As a developer, I want `kk reopen <thread>` to restore an archived thread through a restart-recoverable [journal](appendix-a-glossary.md#lifecycle-journal), so that a crash during workspace, credential, terminal-group, or harness recreation leaves an honest repairable state.
     - The launcher must report ready before the thread becomes Active.
@@ -501,7 +501,7 @@ The [overlay](appendix-a-glossary.md#overlay-tui) is kiki's interactive screen. 
 133. As a developer, I want the UI pane restricted to navigation-only keys, so that accidental focus on the UI pane cannot mutate state. (v1.x.)
      - The keys are j/k/arrows/enter/?, plus mouse click-to-focus and scroll.
      - Destructive/creative verbs are not bound.
-134. As a developer, I want the [role panes](appendix-a-glossary.md#role-pane) — agent, shell, and UI — to be provisioned with the terminal group during `kk new`'s recoverable creation [saga](appendix-a-glossary.md#saga), so that the panes are reliably present. (v1.x.)
+134. As a developer, I want the [role panes](appendix-a-glossary.md#role-pane) (agent, shell, and UI) to be provisioned with the terminal group during `kk new`'s recoverable creation [saga](appendix-a-glossary.md#saga), so that the panes are reliably present. (v1.x.)
      - This does not pretend that the terminal runtime participates in a database transaction.
      - Navigation does not mutate my layout.
      - Each pane is launched by direct argv with an explicit working directory and environment.
