@@ -35,3 +35,4 @@ Current behavior and scope remain in the [reference book](../../docs/reference/R
 ## Remote access
 
 - 2026-11-17 — [How can I pick up my threads from another machine and keep accounts separate?](2026/2026-11-17-multi-machine-access.md)
+- 2026-11-17 — [What can kiki learn from Rex and T3 Code about remote work?](2026/2026-11-17-rex-t3-remote-access.md)

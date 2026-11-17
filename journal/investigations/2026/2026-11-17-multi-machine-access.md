@@ -175,3 +175,7 @@ already running thread is a separate design problem. It would need a way
 to prove the old host has surrendered ownership, preserve unpublished work
 and pending operations, and establish a fresh account-bound incarnation at
 the destination. Losing contact with the old host proves none of that.
+
+The [Rex and T3 Code comparison](2026-11-17-rex-t3-remote-access.md)
+refines this proposal with evidence about route changes, account-specific
+conversation history, and what happens when a client loses access.
