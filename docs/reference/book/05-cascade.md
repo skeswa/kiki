@@ -74,7 +74,7 @@ A direct human `jj` command is an explicit escape hatch. It may reconcile a stal
 - The same update in a [colocated repository](https://docs.jj-vcs.dev/latest/git-compatibility/) (jj 0.46's default) records one. A [colocated repository](appendix-a-glossary.md#ext-colocated-repository) is one where jj and Git share the same folder.
 - A dirty update records several.
 
-So an operation, or its absence, is not freshness evidence. kiki discovers actual workspace freshness at the next managed boundary. It does not pretend every [materialization](appendix-a-glossary.md#materialization), every actual change to on-disk files, shows up in the op log, jj's record of repository operations.
+An operation, or its absence, is not freshness evidence. Kiki checks workspace freshness at the next managed boundary. A [materialization](appendix-a-glossary.md#materialization) changes files on disk but does not always appear in the op log, jj's record of repository operations.
 
 ### What counts as a safe boundary
 
@@ -346,7 +346,7 @@ Success is therefore not an edit-preservation proof. A [bookmark](appendix-a-glo
 
 ### Recovery steps
 
-Recovery is deliberately loud:
+Recovery pauses the agent and preserves the files at risk:
 
 1. [Hard-pause](appendix-a-glossary.md#hard-pause) the agent before materialization.
 2. Create a loss-safe [recovery bundle](appendix-a-glossary.md#recovery-bundle) through [`WorkspaceRecovery`](appendix-a-glossary.md#workspacerecovery) at `~/.config/kiki/repos/<repo_id>/recovery/<intent_id>/`, outside the source workspace. A recovery bundle is a saved copy of the files at risk.
@@ -428,7 +428,7 @@ sequenceDiagram
     K->>K: intent Acknowledged, next intent may proceed
 ```
 
-Everything below exists to keep that sequence honest when batches are concurrent, hooks crash, harnesses differ, or the workspace holds unsnapshotted edits.
+The rules below preserve that sequence when batches run concurrently, hooks crash, harnesses differ, or the workspace holds unsnapshotted edits.
 
 A few words used throughout this section:
 
@@ -655,7 +655,7 @@ The human path out is `kk repair`. It diagnoses an exhausted intent to exactly t
 - increments the intent's [delivery epoch](appendix-a-glossary.md#delivery-epoch) (a counter that marks each fresh round of attempts); and
 - resets the soft-redelivery count.
 
-After that, one fresh bounded `RestartStartup` cycle is permitted. Every attempt is stamped with the epoch it was created under. Bounds count only current-epoch attempts, by exact id match, never by timestamp comparison. So clock skew cannot smuggle a stale attempt into the fresh cycle, or a fresh one out of it. A re-armed intent that exhausts again returns here.
+After that, one fresh bounded `RestartStartup` cycle is permitted. Every attempt is stamped with the epoch it was created under. Bounds count only current-epoch attempts, by exact id match, never by timestamp comparison. Clock skew therefore cannot change which cycle an attempt belongs to. A re-armed intent that exhausts again returns here.
 
 **`discard-delivery`** acknowledges the intent without delivery proof, under a one-shot [approval](appendix-a-glossary.md#human-approval) bound to the plan.
 

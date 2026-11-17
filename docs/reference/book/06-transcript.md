@@ -1,6 +1,6 @@
 # Transcript
 
-The [thread transcript](appendix-a-glossary.md#thread-transcript) is a local recall surface. It is a searchable record of conversational text written by the human, by the agent, and by kiki itself. (A [thread](appendix-a-glossary.md#thread) is kiki's unit of work.)
+The [thread transcript](appendix-a-glossary.md#thread-transcript) is a local, searchable record of conversational text written by the human, the agent, and kiki. (A [thread](appendix-a-glossary.md#thread) is kiki's unit of work.)
 
 It is a memory aid for the human. After explicit [provider-egress consent](appendix-a-glossary.md#provider-egress-consent), permission to send text to the model provider, it also serves the same thread's resumed agent. Code truth stays in [jj](https://docs.jj-vcs.dev/latest/) (the Jujutsu version-control system) and the filesystem.
 

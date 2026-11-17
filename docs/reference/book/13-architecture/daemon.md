@@ -58,7 +58,7 @@ Terminals live in a separate, [dedicated Herdr server](../appendix-a-glossary.md
   - The per-repo [repo jj lock](../appendix-a-glossary.md#repo-jj-lock) is held around every unpinned working-copy command and every operation-head integration, from the frontier sample that the step depends on until the re-sample. It is short and innermost. It is never held across a wait.
   - The order is always the same: the parent thread's lock, then the child thread's lock, then the repo jj lock.
   - The human-invoked passthroughs (the body of `kk status` and the overlay's diff for the caller's own thread) are run by `kk`, not by `kkd`. They take none of `kkd`'s locks. See [Invariants](../02-invariants.md#operation-history-is-a-dag).
-- **[Projection](../appendix-a-glossary.md#projection) reconciliation** for workspace records, paths, bookmarks, and terminal bindings. Reconciliation means comparing kiki's records with what really exists.
+- **[Projection](../appendix-a-glossary.md#projection) reconciliation** for workspace records, paths, bookmarks, and terminal bindings. Reconciliation means comparing kiki's records with the observed resources.
   - Only unique identity-preserving normalization is automatic.
   - Ambiguous changes become named `kk repair` plans.
 - **The dedicated Herdr server.** `kkd` owns three things here:

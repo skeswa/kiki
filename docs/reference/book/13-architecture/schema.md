@@ -556,7 +556,7 @@ Four of these tables form the [operation-history cache](../appendix-a-glossary.m
 
 - `causal_chains`, `causal_chain_visits`: deferred until the broader MCP substrate ships. See [Roadmap](../16-roadmap.md) and [causal chain](../appendix-a-glossary.md#causal-chain).
 
-## Constraints and transactional invariants worth calling out
+## Constraints and transactional invariants {#constraints-and-transactional-invariants-worth-calling-out}
 
 This section lists rules that must hold across columns and tables. Several of them say that two changes must happen in the same [transaction](https://en.wikipedia.org/wiki/Database_transaction): either both are saved or neither is.
 
