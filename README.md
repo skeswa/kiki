@@ -20,7 +20,7 @@
 
 </div>
 
-Start an auth refactor. Hand the tests to another coding agent, then chase an unrelated bug while both agents run. That should feel normal, not like a bookkeeping stunt.
+Start an auth refactor. Hand the tests to another coding agent, then investigate an unrelated bug while both agents run. Kiki tracks these lines of work and their dependencies.
 
 kiki (`kk`) gives each line of work a **[thread](docs/reference/book/appendix-a-glossary.md#thread)**. A thread combines four things:
 
@@ -55,7 +55,7 @@ Read the spec. If a design choice looks wrong or incomplete, [open an issue](htt
 
 ## Documentation site
 
-The reference book is also a [VitePress](https://vitepress.dev/) site (VitePress turns Markdown files into a website). The site deploys to GitHub Pages from `main`. [Pull requests](https://docs.github.com/en/pull-requests) run the same strict docs and production-build checks without deploying.
+[VitePress](https://vitepress.dev/) builds the reference website from Markdown files. The site deploys to GitHub Pages from `main`. [Pull requests](https://docs.github.com/en/pull-requests) run the same strict docs and production-build checks without deploying.
 
 ```sh
 mise install         # install the pinned tooling

@@ -2,7 +2,7 @@
 
 This chapter explains the shape of the implementation: which programs exist, what each one owns, and how they talk to each other.
 
-Behavioral truth lives in the earlier chapters. Architecture exists to make that behavior implementable without smuggling privileged paths through the side door. In plain words: no part of the system gets a hidden shortcut around the rules.
+The earlier chapters define behavior. This architecture must enforce those rules across every program, including privileged operations.
 
 Read in this order:
 

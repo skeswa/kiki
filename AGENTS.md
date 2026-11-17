@@ -30,15 +30,41 @@ unnecessary jargon and complicated wording. Keep technical names and details
 precise; make the explanation easier to read without weakening the contract.
 Review new and edited documentation for this reading level before handoff.
 
-## What kiki is, in one paragraph
+## What kiki coordinates
 
-kiki (binary `kk`) is a daemon-backed coordinator that ties jujutsu (jj), the Herdr terminal multiplexer, agent harnesses (Claude Code and Codex in v1), and eventually the GitHub CLI (`gh`) into a workflow for multi-threaded agentic coding. The atom is a **thread** — a themed sequence of jj revisions whose live head is its managed workspace's `@`; its bookmark is an explicit checkpoint/publication projection that kiki tracks through jj's native rewrite successors. Each thread's terminals live in a terminal group — one Herdr workspace on a dedicated kiki Herdr server; Herdr owns the terminal, and its ids, labels, and replies are never authority for identity, readiness, or deletion. Threads can follow other threads. A managed session reserves the pre-tool hook boundary exclusively for kiki, blocks the entire triggering tool batch during reconciliation (Claude Code's parallel batch; a proven-serial Codex version's single-call batch), and acknowledges delivery only from a later model turn. kiki remains an **ambient coordinator** for direct `jj`, `gh`, and native Herdr operations, but ambiguous external projection changes fail loud into repair rather than being guessed through.
+kiki (binary `kk`) coordinates jujutsu (jj), Herdr terminals, and coding agents
+(Claude Code and Codex in v1). GitHub CLI (`gh`) support comes later. Each
+thread is a named line of work with a managed jj workspace. Its live head is
+that workspace's `@`. Its bookmark records a checkpoint for publication, and
+kiki tracks that checkpoint through jj's native rewrite successors.
 
-The planned cargo workspace has four crates: `kiki-core` (library — shared types/traits/proto/migrations, no I/O), `kkd` (daemon binary), `kk` (CLI binary that also hosts the TUI as a subcommand), and `kk-hook` (harness hook sidecar). `kkd` is the gRPC server over `~/.config/kiki/kkd.sock`; local clients share that contract. State lives in `~/.config/kiki/state.db` (cross-repo registry) plus `~/.config/kiki/repos/<repo_id>/state.db` (per-repo runtime). Remote clients require a future transport and authentication contract rather than inheriting unix-socket assumptions.
+Each thread has one Herdr workspace, called a terminal group, on a dedicated
+kiki server. Herdr owns the terminals. Kiki owns thread identity and decides
+when an agent is ready or files are safe to delete; Herdr ids, labels, and
+replies cannot establish those facts.
 
-## Implementation-stack tension to be aware of
+Threads can follow other threads. Managed sessions reserve the pre-tool hook
+boundary exclusively for kiki. During reconciliation, kiki blocks the whole
+triggering tool batch: Claude Code's parallel batch or a proven-serial Codex
+version's single-call batch. Only a later model turn can acknowledge delivery.
+Users can still run `jj`, `gh`, and native Herdr operations directly. Ambiguous
+external changes to thread projections require repair.
 
-The architecture decision is **Rust** for `kkd` and friends (`docs/reference/book/13-architecture/crates.md`). The repo is currently bootstrapped as a **Bun + TypeScript** project (`package.json`, `tsconfig.json`, `index.ts` placeholder). This is a real divergence pending the first real `kkd` commit. If you are about to write or modify implementation code, surface this to the user before picking a language — do not silently default to either side.
+The planned Cargo workspace has four crates: `kiki-core` (shared types,
+traits, protocol definitions, and migrations, with no I/O), `kkd` (the daemon),
+`kk` (the CLI and TUI), and `kk-hook` (the harness hook sidecar). Local clients
+call `kkd` through gRPC over `~/.config/kiki/kkd.sock`. State lives in
+`~/.config/kiki/state.db` for the cross-repo registry and
+`~/.config/kiki/repos/<repo_id>/state.db` for each repo's runtime. Remote
+clients will need a separate transport and authentication contract.
+
+## Implementation language
+
+The [architecture](docs/reference/book/13-architecture/crates.md) calls for
+Rust. The current bootstrap is Bun and TypeScript (`package.json`,
+`tsconfig.json`, and the placeholder `index.ts`). Before writing application
+code, point out this difference to the user and state which language you plan
+to use. Do not choose a language without explaining that choice.
 
 ## Version control
 

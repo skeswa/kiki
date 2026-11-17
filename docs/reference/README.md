@@ -2,21 +2,17 @@
 
 This directory is the implementation reference for kiki (`kk`). kiki is a tool that coordinates coding agents, the version-control tool [jj](book/appendix-a-glossary.md#ext-jj), and terminals.
 
-Read it as a small spec book, a book that states exactly what the tool must do. It goes in this order: first the reason for the tool, then the model, then the safety rules, then the user surfaces and machinery.
+The book starts with the reason for the tool, then defines its model, safety rules, user interface, and implementation.
 
-The book is normative: it sets rules, and does not only describe. It defines kiki's permitted behavior, prohibited behavior, and v1 boundaries. Ambiguity should be treated as a documentation bug to fix.
+The book defines what kiki must do, what it must not do, and what belongs in v1. Report unclear requirements as documentation bugs.
 
-New readers should start with the [Abstract](book/00-abstract.md) and [Orientation](book/01-orientation.md). Together they carry the narrative, before the contract chapters tighten the screws:
-
-- the hand-built workflow that kiki automates, with one [workspace](book/appendix-a-glossary.md#workspace) per line of work;
-- the frictions of that workflow;
-- the mechanism that answers each friction.
+Start with the [Abstract](book/00-abstract.md) and [Orientation](book/01-orientation.md). They describe the manual workflow kiki automates: one [workspace](book/appendix-a-glossary.md#workspace) per line of work. They explain the bookkeeping this requires and how kiki handles it.
 
 If you meet a term you do not know, look it up in the [Glossary](book/appendix-a-glossary.md). The chapters link to it the first time they use a special term.
 
 ## Reading order
 
-The chapters tell the story in order. The appendices hold reference material. You dip into them when you need them; you do not read them straight through.
+Read the chapters in order. Use the appendices to look up terms, user stories, and names as needed.
 
 1. [Abstract](book/00-abstract.md)
 2. [Orientation](book/01-orientation.md)
