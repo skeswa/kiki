@@ -30,7 +30,7 @@ const states: ThreadState[] = [
   },
   {
     command: "kk new add-tests --follows payment-refactor",
-    note: "follow edge recorded — related in history",
+    note: "follow edge recorded between the threads",
     payment: "● working",
     tests: "● working",
     bug: "● working",
@@ -49,7 +49,7 @@ const states: ThreadState[] = [
 const principles = [
   [
     "01",
-    "be additive, not invasive",
+    "keep using your tools",
     "Keep using jj, gh, and Herdr as you always have. kiki reacts; it does not intercept or wrap.",
   ],
   [
@@ -60,12 +60,12 @@ const principles = [
   [
     "03",
     "one stable contract; many UIs",
-    "The gRPC service is the product surface. CLI and TUI are clients, not privileged exceptions.",
+    "The CLI and TUI use the same gRPC service and follow the same access rules.",
   ],
   [
     "04",
-    "fail loud, not silent",
-    "When the system cannot determine the right action, it stops and asks rather than guessing.",
+    "report uncertain state",
+    "When kiki cannot determine the next action, it stops and asks for a human decision.",
   ],
   [
     "05",
@@ -83,7 +83,7 @@ const roadmap = [
   [
     "v1",
     "the acceptance slice",
-    "Thread atom, recoverable lifecycle, linear live-follow cascade, batch-safe delivery, and projection repair.",
+    "Create and recover threads, coordinate updates along linear revision chains, deliver context safely, and repair mismatches.",
   ],
   [
     "v1.x",
@@ -92,7 +92,7 @@ const roadmap = [
   ],
   [
     "v2",
-    "the substrate",
+    "more integrations",
     "Cross-thread messaging, further harness adapters, native macOS UI, and direct GitHub APIs.",
   ],
   [
@@ -123,9 +123,9 @@ onBeforeUnmount(() => clearInterval(timer));
         Multi-threaded coding<br />with AI agents,<br />
         <SlotCycle
           :phrases="[
-            'without the stash.',
-            'without the rebase.',
-            'without losing context.',
+            'in separate workspaces.',
+            'with linked threads.',
+            'with tracked dependencies.',
             'in parallel.',
           ]"
         />
@@ -151,7 +151,7 @@ onBeforeUnmount(() => clearInterval(timer));
       <div>
         <dt>harness</dt>
         <dd>
-          <SlotCycle :phrases="['Claude Code', 'Codex', 'bring your own']" :interval="3000" />
+          <SlotCycle :phrases="['Claude Code', 'Codex']" :interval="3000" />
         </dd>
       </div>
       <div>
@@ -173,16 +173,15 @@ onBeforeUnmount(() => clearInterval(timer));
       <header><p id="problem-title" class="eyebrow">01 / the problem</p></header>
       <div class="row-copy">
         <p class="lead">
-          The friction is in the seams. You stash, you switch branches, and three minutes later the
-          original branch is a state you have to reconstruct — and the agent has lost the thread.
+          Several agents can work at once, but you still have to track their workspaces, terminals,
+          and revision chains. Switching tasks means finding where each agent left off.
         </p>
         <p>
-          Multiply that by three or four lines of inquiry in flight and the cost of opening another
-          becomes prohibitive. But refactoring a function and migrating its callers is not a
-          sequential task; it is a tree of work. The right tool lets those branches exist in
-          parallel without worktrees colliding or people manually rebasing the world.
+          A refactor may have separate tasks for tests and callers. When the shared code changes,
+          those tasks need updated files and an explanation of what moved. Kiki tracks the
+          dependencies and coordinates those updates.
         </p>
-        <p>kiki is an attempt to build that tool.</p>
+        <p>The design is written. Implementation has not started.</p>
       </div>
     </section>
 
@@ -190,8 +189,8 @@ onBeforeUnmount(() => clearInterval(timer));
       <header>
         <p id="thread-title" class="eyebrow">02 / the thread</p>
         <p>
-          A themed sequence of jj revisions with a live head, one workspace, one terminal group, and
-          one agent. Isolated on disk, related in history.
+          A named line of work with a live jj head, a workspace, a terminal group, and an agent.
+          Each thread edits its own files and can follow related threads.
         </p>
       </header>
       <div class="thread-demo">
@@ -233,8 +232,8 @@ onBeforeUnmount(() => clearInterval(timer));
         <p class="thread-explainer">
           When an ancestor is amended, jj evolves descendants in repository state. kiki waits for a
           <strong>safe boundary</strong> before materializing that state in the thread’s files and
-          telling the agent. Never mid-edit. Ambiguous topology stops for a human instead of
-          guessing.
+          telling the agent. It does not change files mid-edit. If the revision relationships are
+          ambiguous, kiki stops for a human decision.
         </p>
       </div>
     </section>
@@ -242,7 +241,7 @@ onBeforeUnmount(() => clearInterval(timer));
     <section class="ledger-row" aria-labelledby="example-title">
       <header>
         <p id="example-title" class="eyebrow">03 / worked example</p>
-        <p>Spawn, relate, inspect, switch, publish, close. Six verbs.</p>
+        <p>Create two related threads, inspect them, switch to one, and close it.</p>
       </header>
       <div class="terminal" aria-label="Example kiki terminal session">
         <span># opt a repository in</span>
@@ -263,7 +262,7 @@ onBeforeUnmount(() => clearInterval(timer));
     <section class="ledger-row" aria-labelledby="principles-title">
       <header>
         <p id="principles-title" class="eyebrow">04 / principles, explicit</p>
-        <p>Stated up front, because the reference book’s coherence depends on them.</p>
+        <p>These rules guide the implementation.</p>
       </header>
       <div class="principle-grid">
         <article v-for="principle in principles" :key="principle[0]">
@@ -278,7 +277,7 @@ onBeforeUnmount(() => clearInterval(timer));
     <section id="roadmap" class="ledger-row" aria-labelledby="roadmap-title">
       <header>
         <p id="roadmap-title" class="eyebrow">05 / roadmap</p>
-        <p>The canonical scope ledger lives in the book’s Orientation chapter.</p>
+        <p>The Orientation chapter defines what ships in each release.</p>
       </header>
       <div class="roadmap-list">
         <article v-for="item in roadmap" :key="item[0]">
@@ -293,14 +292,14 @@ onBeforeUnmount(() => clearInterval(timer));
       <div>
         <p class="eyebrow">on the name</p>
         <p>
-          <strong>kk</strong> sits on the home row immediately beside <strong>jj</strong>, a quiet
-          acknowledgement that one tool works underneath the other. And a kiki is a gathering where
-          everyone shows up as themselves and the room is richer for the multiplicity. 💅🏾
+          <strong>kk</strong> sits beside <strong>jj</strong> on the keyboard’s home row. The names
+          reflect how the tools work together. A kiki is a gathering, which fits a project about
+          several agents and a person working together. 💅🏾
         </p>
       </div>
       <div>
         <p class="closing-lead">
-          The spec is settled; the code is not. Feedback filed now changes the design.
+          Implementation has not started. Feedback can still change the design.
         </p>
         <div class="hero-actions">
           <a class="button primary" :href="withBase('/reference/')">read the book →</a>

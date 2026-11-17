@@ -1,8 +1,8 @@
 # Configuration
 
-Configuration is how you change kiki's settings. It is written in [TOML](https://toml.io/), a plain-text settings format. It is also layered: several sources stack on top of each other, and higher layers win. Think of a stack of transparency sheets: the topmost sheet with a value written on it is the one you see.
+Configuration is how you change kiki's settings. It is written in [TOML](https://toml.io/), a plain-text settings format. Settings can come from several sources. For each key, the highest-priority source that sets it determines the value.
 
-Configuration must answer two questions clearly: what value is effective, and where did it come from. Anything else is a tax the user pays every time they debug a machine they forgot they configured.
+Configuration inspection must show each effective value and the source that set it. This lets users trace an unexpected setting.
 
 The [acceptance slice](appendix-a-glossary.md#acceptance-slice) is the part of kiki that v1 needs to be accepted. It implements only the layers and keys needed to:
 

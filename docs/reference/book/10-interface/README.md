@@ -11,7 +11,7 @@ Some of these surfaces belong to the [acceptance slice](../appendix-a-glossary.m
 
 The two documents here are the v1 contract for each surface when it ships:
 
-1. [Specification](spec.md) — the rules for every surface. It covers:
+1. [Specification](spec.md) defines the rules for each part of the interface. It covers:
    - the vocabulary;
    - the split between native Herdr UI and custom kiki UI;
    - glyphs (the small symbols on screen) and wireframes (sketches of each screen);
@@ -20,11 +20,11 @@ The two documents here are the v1 contract for each surface when it ships:
    - mouse behavior;
    - fallbacks;
    - the configuration the surfaces read.
-2. [Storyboard](storyboard.md) — one developer's end-to-end story. The developer ports an iOS app to Android, with a docs repo and a marketing-site fix along the way. The story exercises every branching, merging, and abandoning pattern the rest of the book commits to.
+2. [Storyboard](storyboard.md) follows one developer through a project. The developer ports an iOS app to Android, with a docs repo and a marketing-site fix along the way. The story exercises every branching, merging, and abandoning pattern the rest of the book commits to.
 
-The specification is the rulebook; the storyboard is the movie. When they disagree, the specification wins, and the storyboard has the bug.
+If the storyboard disagrees with the specification, correct the storyboard. The specification is authoritative.
 
-The storyboard invents nothing: no new commands, flags, output strings, glyphs, or screen elements. Every beat in it (every step of the story) traces back to one of these:
+Every command, flag, output string, glyph, and screen element in the storyboard must come from these chapters:
 
 - [Threads](../03-threads.md)
 - [Cascade](../05-cascade.md)
@@ -34,4 +34,4 @@ The storyboard invents nothing: no new commands, flags, output strings, glyphs, 
 - [Terminal runtime](../13-architecture/terminal-runtime.md)
 - [Invariants](../02-invariants.md)
 
-If a beat seems to need behavior the rest of the book does not authorize, that is a bug to report. It is not permission to extend the interface.
+Report any step that requires behavior the rest of the book does not authorize. Do not extend the interface to make the example work.

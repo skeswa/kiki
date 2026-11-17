@@ -2,16 +2,16 @@
 
 The earlier chapters describe what kiki does one verb at a time. This chapter describes what kiki feels like across one work-week. It follows a single developer through a porting project. The project crosses three repos. It tests every branching, merging, and abandoning pattern the rest of the book commits to.
 
-The protagonist is unnamed. The work is to port the iOS Kestrel app to Android. Product is still iterating on the spec while the port happens. Two other repos, the user-facing docs and the marketing site, also need attention along the way. The three repos are:
+The developer is porting the iOS Kestrel app to Android. Product is still iterating on the spec while the port happens. Two other repos, the user-facing docs and the marketing site, also need attention along the way. The three repos are:
 
 - `kestrel-mobile`: the iOS/Android codebase, where the port lives.
 - `kestrel-docs`: the user-facing product documentation.
 - `kestrel-www`: the marketing site, where one copyright year is wrong.
 
-The storyboard introduces no new commands, flags, glyphs, or screen elements. Every beat in it grounds out in the normative (binding) chapters:
+The storyboard introduces no new commands, flags, glyphs, or screen elements. Every step must follow the chapters that define behavior:
 
-- Where a beat is load-bearing, it cites the chapter that authorizes it.
-- Where a beat would require behavior the rest of the book does not authorize, that gap is a finding. It is not a license to extend the surface here.
+- Each step that depends on a specific rule cites the chapter that defines it.
+- Report steps that require behavior outside the specification. Do not add interface behavior to make the example work.
 
 Transcripts and wireframes in this chapter render the fields the spec commits to in a plausible terminal shape. Exact spacing, column ordering, and any output text the spec does not pin are illustrative. They show what kiki _might_ look like in motion, not what an implementation must emit byte-for-byte. Three things do follow the spec: the glyphs, the committed cascade-state words (`in sync`, `pending`, `conflicted`), and the empty-state placeholder. What kiki says to an agent is defined by [Cascade](../05-cascade.md) and is not quoted here.
 
@@ -86,7 +86,7 @@ The developer returns to `kestrel-mobile` and types bare `kk`. The repo is regis
 
 The first [thread](../appendix-a-glossary.md#thread) will scaffold Android navigation: the gradle module, a top-level `NavHost`, and a Material 3 theme that mirrors the iOS app's tab structure.
 
-Kiki runs its terminals in [Herdr](../appendix-a-glossary.md#herdr), a terminal multiplexer. Herdr's sidebar already gives a list of threads. With one thread there is no tree worth pinning. So the developer leaves the optional UI pane off for now (see [Interface · spec](spec.md#ui-pane)).
+Kiki runs its terminals in [Herdr](../appendix-a-glossary.md#herdr), a terminal multiplexer. Herdr's sidebar already gives a list of threads. With only one thread, the sidebar is enough, so the developer leaves the optional UI pane off for now (see [Interface · spec](spec.md#ui-pane)).
 
 ```console
 $ kk new android-skel -m "Scaffold Android navigation: gradle module,
@@ -573,7 +573,7 @@ The patterns this storyboard demonstrates and the chapters that authorize them:
 - **Cascade in motion**: acts 4 and 8 (see [Cascade](../05-cascade.md), [Invariants](../02-invariants.md)).
   - Act 4 shows jj-native ancestor evolution followed by safe materialization.
   - Act 8 shows an explicit parent advance with conflict and human resolution.
-  - Both demonstrate that direct `jj` operations are first-class inputs to the coordinator, not gated by it.
+  - Both show kiki responding to direct `jj` operations without blocking them.
 - **Terminal runtime as projection**: acts 2, 6, and 10 (see [Commands · `kk attach`](../09-commands.md#kk-attach), [Terminal runtime](../13-architecture/terminal-runtime.md), [Invariants](../02-invariants.md#the-terminal-runtime-is-a-projection-not-an-authority)).
   - Acts 2 and 6: `kk attach` opens a view; `kk switch` moves only the caller's client.
   - Act 10: a reboot restores remnant Herdr containers. No thread is `Active` until `kk repair`'s `restart-terminal` plan restarts it. No workspace is deleted until every process holding it is closed with verified exit.
