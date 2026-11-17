@@ -71,7 +71,7 @@ T3 makes the conversation-sharing choice concrete for each harness.
 Provider names are local to the environment. A T3 mobile regression test
 gives two environments the same provider instance ID and checks that each
 thread gets the settings from its own environment. That is exactly the case
-kiki will face when two hosts both call a profile “work”.
+kiki will face when two hosts both label a local harness account “work”.
 [Thread provider resolution test][t3-test]
 
 T3 also distinguishes a human connecting from a second device from an agent
@@ -90,12 +90,12 @@ powers. [Peer links][t3-architecture]
    stable identity alongside its authenticated routes. Persist the repo and
    thread IDs with that choice. A new network address, an identical repo
    URL, or a familiar profile name cannot redirect a thread. Start with one
-   SSH route. When a second route ships, require the same context grant and
+   SSH route. When a second route ships, require the same profile grant and
    recheck the authenticated peer before sending private data.
 2. **Bind both login and history at creation.** Record the environment,
-   host-local profile ID, expected provider account where verifiable, and
+   portable profile ID, host-local harness configuration ID, expected provider account where verifiable, and
    which session store the adapter may resume from. Check them again on
-   reopen. Use separate histories across Personal, Work, and Friends. If
+   reopen. Keep each user-defined profile’s history separate by default. If
    the provider reports a different login after reauthentication, pause
    before giving it the prompt. A shared-history feature would need its own
    explicit disclosure. Keep kiki's launch-specific hooks and settings
@@ -103,8 +103,8 @@ powers. [Peer links][t3-architecture]
 3. **Make sharing say what the recipient gets.** “View status for this
    repo” and “use terminals as this OS user” describe very different
    grants. Use the first for a friend's status view. Give interactive
-   shared work its own OS account or virtual machine when other contexts
-   must stay private. Show the selected context, host, and harness profile
+   shared work its own OS account or virtual machine when other profiles
+   must stay private. Show the selected profile, host, and harness account
    together when creating or resuming work.
 4. **Test revocation through every way back in.** Revoke a paired laptop
    during an attach. Its stream should close, its unused approvals should
@@ -117,7 +117,7 @@ For the first end-to-end trial, put Work and Personal on one host with
 separate accounts and histories. Give both a repo and thread of the same
 name. From a laptop with a different harness login, attach to Work, lose
 the connection, and reconnect. Check the same thread ID and agent
-incarnation. Then reauthenticate the Work profile to a different account
+incarnation. Then sign the Work profile’s harness in with a different account
 and try a reopen. Verify the host detects the change before disclosing any
 history. Finally revoke the laptop and try each saved route. This exercises
 the distinctions a smooth demo with one user and one account would miss.

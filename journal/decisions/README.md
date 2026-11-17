@@ -48,6 +48,7 @@ chapter that defines the behavior; do not use a journal entry to override it sil
 | [D-0004](0004-use-herdr-as-terminal-runtime.md)              | Host threads in a dedicated Herdr server instead of tmux                 | Terminal runtime ownership and topology       |
 | [D-0005](0005-track-checkpoint-through-native-successors.md) | Track the checkpoint bookmark through jj's native successors             | Checkpoint bookmark and projection audit      |
 | [D-0006](0006-close-repair-and-proof-gaps.md)                | Close the repair, locking, and proof gaps found in the third review      | Repair plans, process safety, and proof gates |
+| [D-0007](0007-use-portable-user-defined-profiles.md)         | Let users define profiles and use them across machines                   | Remote access                                 |
 
 ## Earlier design rationale
 

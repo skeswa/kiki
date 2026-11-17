@@ -102,3 +102,8 @@ Likely later swaps:
 - daemon-to-daemon coordination, so one machine's `kk` can observe, and eventually drive, threads whose [workspaces](appendix-a-glossary.md#workspace) live on another machine's `kkd`.
 
 Working across machines is part of the product vision, not an accident of scope. The same-host boundary exists for one reason. Peer daemons, like remote clients, wait on the future transport and authentication contract. They do not inherit unix-socket assumptions.
+
+In the planned remote system, users create and name their own profiles. The
+same profile can be used from any authorized machine and can run work on
+any host the user adds to it. A machine can participate in several profiles.
+Each host can use a different harness account for the same profile.
