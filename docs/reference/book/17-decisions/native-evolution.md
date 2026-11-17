@@ -37,7 +37,7 @@ The revised model gives each layer one job:
 
 ## Multi-hop consequence
 
-Repository evolution does not pretend to move one [follows edge](../appendix-a-glossary.md#follows-edge) at a time. A single jj operation may logically evolve B and C in A→B→C. Kiki records separate materialization intents for every affected workspace. Each workspace moves on disk only at its own managed-agent boundary.
+A single jj operation may logically evolve B and C in A→B→C, across several [follows edges](../appendix-a-glossary.md#follows-edge) at once. Kiki records separate materialization intents for every affected workspace. Each workspace moves on disk only at its own managed-agent boundary.
 
 An explicit `ParentAdvance` on B may likewise cause jj to evolve C. C receives `NativeRewrite`, not a second explicit rebase.
 
