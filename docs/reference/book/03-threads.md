@@ -109,7 +109,7 @@ The plans themselves are listed in [Bookmark plans](#bookmark-plans) below.
 
 ### What happens to the bookmark between checkpoints
 
-jj does not leave a bookmark alone between checkpoints, and kiki does not pretend otherwise. Five different things can happen, and kiki keeps them apart:
+A bookmark can change between checkpoints. Kiki distinguishes five cases:
 
 | What happened                                                                                                                                                                           | What jj does to the bookmark                 | What kiki records                                                                                                                   |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -257,7 +257,7 @@ Successful creation leaves all required v1 projections and an `Active` row. Unsu
 
 `kk new [<name>]` takes an optional name. In the acceptance slice, a thread created without a name is called `unnamed-<short-hex>`, even when it has an initial prompt. Deriving a placeholder name from the prompt is v1.x work. The placeholder is kiki-owned metadata and follows the metadata ownership rules.
 
-`kk new --harness <name>` selects the harness for the thread. v1 accepts `claude-code` and `codex`. An unsupported harness name returns an error that identifies the rejected name.
+`kk new --harness <name>` selects the harness for the thread. v1 accepts `claude-code` and `codex`. An unsupported harness name returns a clear error.
 
 The follows graph is a DAG: a [graph with no cycles](https://en.wikipedia.org/wiki/Directed_acyclic_graph). kiki rejects a [follows edge](appendix-a-glossary.md#follows-edge) that would introduce a cycle.
 

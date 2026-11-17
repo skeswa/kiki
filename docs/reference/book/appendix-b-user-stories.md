@@ -115,7 +115,7 @@ A cascade is how a change in a parent [thread](appendix-a-glossary.md#thread) re
 26. As a developer, I want the cascade to handle textual conflicts by marking the thread "conflicted" and surfacing a notification, so that I resolve them deliberately instead of corrupting agent state.
 27. As a developer in a child thread B that follows parent A, I want B to pick up A's newly added [live-head](appendix-a-glossary.md#live-head) commits automatically, so that stacked work stays coordinated.
     - B picks them up through an explicit boundary-safe [`ParentAdvance`](appendix-a-glossary.md#parentadvance) reconciliation.
-    - Kiki does not pretend that A's [bookmark](appendix-a-glossary.md#bookmark) automatically followed `jj new`.
+    - Kiki does not assume that A's [bookmark](appendix-a-glossary.md#bookmark) automatically followed `jj new`.
 28. As a developer, I want `kk thread detach` to run its safety steps first and only then break the live-follow link, so that detach cannot silently discard a parent advance.
     - The steps, in order:
       1. synchronously catch up the operation [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) (the graph of jj operations);

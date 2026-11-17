@@ -144,7 +144,7 @@ This guarantee covers kiki-controlled mutations for the managed agent, and only 
 
 Depending on the repository, that command may or may not record a new operation in the op-log (jj's [operation log](https://docs.jj-vcs.dev/latest/operation-log/)). Its success also does not prove that edits were preserved. So kiki probes the workspace again at the next boundary instead of relying on watcher events alone.
 
-kiki is an [ambient coordinator](appendix-a-glossary.md#ambient-coordinator). It does not pretend direct human commands are gated.
+kiki is an [ambient coordinator](appendix-a-glossary.md#ambient-coordinator). It does not gate direct human commands.
 
 ### Unsnapshotted edits must not vanish
 

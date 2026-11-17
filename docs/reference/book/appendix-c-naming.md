@@ -21,7 +21,7 @@ This list gives the exact name of each program, directory, and file that belongs
 
 ## Command style
 
-Daily-driver verbs are the commands you use every day. They should be short and single-word:
+Commands used every day should have short, single-word names:
 
 - `init`
 - `new`
@@ -48,6 +48,6 @@ See [Commands](09-commands.md) for what each command does.
 
 ## Why `kk`
 
-`kk` sits beside `jj` on the home row of the keyboard. [jj](appendix-a-glossary.md#ext-jj) is the version-control tool that kiki works with. The closeness is useful for typing. It is also a symbol: kiki works with jj and does not hide it.
+`kk` sits beside `jj` on the home row of the keyboard. [jj](appendix-a-glossary.md#ext-jj) is the version-control tool that kiki works with. The nearby keys are easy to type, and the paired names reflect how the tools work together.
 
-The name also points at kiki as a gathering: multiple lines of work, multiple agents, and a human engineer sharing a space without stepping on one another. The product should retain that spirit. It can be precise without becoming sterile.
+The name also suggests a gathering: a human engineer working with several agents on separate tasks. Keep that informal tone in the interface and documentation.

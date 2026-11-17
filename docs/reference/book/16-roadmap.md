@@ -1,6 +1,6 @@
 # Roadmap
 
-This chapter records deferred surfaces whose design affects v1 boundaries. Deferred does not mean vague. It means the book draws the boundary now, so v1 does not accidentally grow half of a future substrate.
+This chapter records deferred features whose design affects v1. Defining their scope now helps keep that work out of the first release.
 
 ## v1.x polish
 
@@ -50,7 +50,7 @@ Deferred MCP behavior includes:
 
 ## MCP identity
 
-MCP uses a separate [unix socket](https://en.wikipedia.org/wiki/Unix_domain_socket). URL paths route requests; credentials supply identity. Think of the URL as the address on an envelope and the credential as the ID you show at the door: only the ID grants access.
+MCP uses a separate [unix socket](https://en.wikipedia.org/wiki/Unix_domain_socket). URL paths route requests; credentials supply identity. Only the credential grants access.
 
 A thread-scoped credential may read its own transcript. A URL such as `/threads/<uuid>` does not authorize the caller to act as that thread. Authorization is always bound to the credential presented on the request.
 
