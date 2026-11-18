@@ -57,6 +57,7 @@ chapter that defines the behavior; do not use a journal entry to override it sil
 | [D-0013](0013-prove-admission-and-delivery.md) | Prove tool admission and message delivery | Reference book review |
 | [D-0014](0014-prepare-dirty-checkpoints-separately.md) | Keep checkpoint previews read-only and end follows links on close | Reference book review |
 | [D-0015](0015-create-only-bookmarks-and-preserve-revisions.md) | Create bookmarks only under free names and preserve revisions on destroy | Reference book review |
+| [D-0016](0016-fence-repo-unregister.md) | Fence the registration before unregister removes state | Reference book review |
 
 ## Earlier design rationale
 

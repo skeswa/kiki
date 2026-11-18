@@ -1612,7 +1612,11 @@ By default, `kk repo unregister` removes two things:
 - the row in `~/.config/kiki/state.db`'s `repos` table;
 - the centralized state directory at `~/.config/kiki/repos/<repo_id>/` (threads, optional transcript rows, SQLite audit rows, credentials, per-thread error logs, and any workspace-recovery bundles).
 
-The action is irreversible: there is no kiki-managed undo, matching the shape of `kk thread destroy` (see [Threads · destroy](03-threads.md#destroy)).
+Both modes require a registration with no live work. Preflight reports active threads, launch gates, bound terminals, surviving processes, pending deliveries, and unfinished lifecycle or repair operations. Close or repair the named threads first. `--keep-state` uses the same check.
+
+After approval, the user database claims the plan and fences the old registration in one transaction. Every new request, launch, background worker, and competing `kk init` must observe the fence. Drain previously admitted work, close repo database handles, and repeat the process and journal checks before removing the registry row. If a create already won the race or the inventory has changed, release the fence, report the blocker, and preserve the registration. Once removal begins, recover the exact plan from the user journal before admitting another registration for the path.
+
+The action is irreversible. Approval covers the old registration UUID, canonical source path, exact state directory identity, disposition and loss inventory. Removal disables routing for every old credential even when its file survives.
 
 - It therefore requires a one-shot [approval](#foreground-approval-flow) bound to the canonical repo path, the repo id, and whether state is retained.
 - In a policy rule the operation is `unregister`. Without a terminal and without a rule that allows the plan, the command exits with code 3 and removes nothing.
@@ -1633,6 +1637,6 @@ The action is irreversible: there is no kiki-managed undo, matching the shape of
 Source-repo moves are not auto-detected. kiki leaves no breadcrumb inside the source tree, so a moved repo looks unregistered to `kk` from the new path. v1 offers two recoveries:
 
 - Move the source tree back so its path matches the registered `canonical_path`.
-- Or run `kk repo unregister` (with `--keep-state` first if you want to copy state out before re-init) and then `kk init` at the new location, which starts a fresh registration with a new `repo_id`.
+- For a registration with no live or unfinished work, run `kk repo unregister` and then `kk init` at the new location. If kiki needs the original repo to verify or close a thread, restore the original path first.
 
 A move-aware `kk repo relocate` command is not in v1.

@@ -37,7 +37,7 @@ If the user moves the tree with `mv`:
 v1 offers two ways to recover:
 
 1. Move the source tree back, so the registered `canonical_path` matches again.
-2. Run `kk repo unregister`, then run `kk init` at the new location. This starts a fresh registration with a new `repo_id`.
+2. If the registration passes the live-work and recovery checks, run `kk repo unregister`, then run `kk init` at the new location. This starts a fresh registration with a new `repo_id`.
 
 `kk repo unregister` has two modes:
 
@@ -124,7 +124,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - The approval for `kk init` is stored here. Its requester is the user's Admin bootstrap credential, because the repo has no registration credential yet. When an automation credential begins `kk init`, that credential is the requester instead, and the approval is a `PolicyApproval` from an `init` rule. The same holds for the user-scoped `replace-terminal-server` plan: its requester is Admin, or the automation credential when the caller presents one.
   - The presenter-confirmed approvals for policy activation, credential creation or rotation, and installation changes are stored here too. Their `kind` is always `Human`.
   - They are the same two-phase challenge and one-use-capability records described below for `approval_challenges` and `human_approvals`.
-  - Repository-scoped confirmations are stored only in the target repository database.
+  - Unregister also keeps its challenge and one-shot approval here, bound to the old repo UUID and its authenticated requester. This lets the user database claim the approval, create the unregister journal, and install the registration fence atomically. Other repo-scoped confirmations live in the repo database.
 
 - **`user_approved_operations` and `user_approved_operation_steps`**: durable records of approved operations whose authority must survive without a repo database.
   - They are durable claim envelopes and [idempotent](https://en.wikipedia.org/wiki/Idempotence) step journals. An idempotent step is safe to run again.
@@ -133,7 +133,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - Policy activation needs no journal here. It has no effect outside this database, so its approval is claimed and consumed in the one transaction that swaps the active row.
   - Creating or rotating an automation credential under a presenter approval is journaled here, because it writes a file.
   - Their shape matches the per-repo tables below.
-  - Unregister completes its user-level journal only after the target repo state is deleted.
+  - The pending unregister journal is the persistent fence for the old UUID and canonical source path. It records the state directory's path and filesystem identity, keep/delete choice, approved inventory, drain, final checks, registry removal, credential invalidation and disposition. After restart, honor the fence before opening the repo or admitting requests. Removal succeeds only when the old row is absent and its credentials are unusable. Delete mode additionally verifies absence of the old directory. Keep mode verifies the same directory remains in place. A replaced directory, or a missing directory in keep mode, stops recovery with a diagnostic. Never delete a replacement. Completion and release of the fence share one user-database transaction.
 
 - **`user_audit_log`**: an append-only log of attempts that have no valid repository target.
   - These attempts include bootstrap, `ListRepos`, registration, malformed repo selectors, and authorization failures that happen before a repo can be resolved.

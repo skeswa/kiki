@@ -113,6 +113,7 @@ Some terms used throughout this section:
   - `4` for a refusal by a precondition or a safety proof, including `kk switch` with `NoCallerClient`;
   - `5` for a daemon that is unreachable or not installed;
   - `6` for a timeout.
+- **Unregister races and recovery.** Race unregister with an admitted create and a launch gate. Either live work keeps its registration or unregister fences it first. Crash after registry removal in both modes. Verify old credentials fail, recovery acts only on the old UUID and directory, and keep mode leaves the directory for inspection. Replace the directory before retry and check that the replacement survives.
 - **[`--json`](09-commands.md#output-for-scripts).** Every read command, and the final result of every other command, can be printed as JSON.
   - The flag changes rendering only. The same command with and without it makes the same daemon calls and the same state changes.
   - The output parses as JSON, and it carries every fact the plain rendering shows.
