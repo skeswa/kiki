@@ -3,6 +3,7 @@
 - Recorded: 2026-11-18
 - Decided by: project owner, who accepted the recommendations from the reference book review on 2026-11-18
 - Topic: Reference book review
+- Supersedes: the optional abandonment mode in [Thread head and lifecycle sagas](../../docs/reference/book/17-decisions/thread-head-and-sagas.md) and its risk label in [D-0009](0009-operate-headless-with-a-configurable-automation-policy.md)
 
 ## Decision
 

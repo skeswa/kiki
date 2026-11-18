@@ -3,6 +3,7 @@
 - Recorded: 2026-11-18
 - Decided by: project owner, who accepted the recommendations from the reference book review on 2026-11-18
 - Topic: Reference book review
+- Supersedes: the outage rule in [D-0006](0006-close-repair-and-proof-gaps.md) and the original [soft-delivery recovery rule](../../docs/reference/book/17-decisions/cascade-outbox.md)
 
 ## Decision
 

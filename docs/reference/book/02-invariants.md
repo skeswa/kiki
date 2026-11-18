@@ -171,7 +171,7 @@ A batch is the set of tool calls the harness dispatches together. See [tool batc
 - A managed tool needs an affirmative `PassThrough` decision for its batch. On admission timeout the hook denies the call, even if there is no marker. Before changing files the adapter must also prove that no earlier or overlapping batch can still write.
 - Before binding `Block`, write the thread's durable barrier marker. Every call in the triggering batch stays blocked. Remove the marker when the barrier lifts.
 - Soft delivery requires the exact batch to complete and a harness receipt showing the saved payload reached at least one blocked call. Only a later turn in the conversation that received those bytes can acknowledge.
-- Only a later [model turn](appendix-a-glossary.md#model-turn) may acknowledge the payload.
+- Keep the receipt with the acknowledged intent so a daemon restart preserves the evidence.
 - Another concurrent `PreToolUse` event from the same batch is never acknowledgement evidence.
 
 ### Batches differ by harness

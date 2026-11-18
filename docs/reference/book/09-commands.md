@@ -832,9 +832,17 @@ The first publishing release generates a deterministic template from explicit in
 
 ## `kk thread snapshot`
 
-`kk thread snapshot [<thread>]` records fresh tracked edits before a later close, detach, or publish. An explicit invocation requests one `snapshot` approval, including when the caller owns the thread. `SnapshotWorkspace` binds the workspace identity, exact starting head and operation, file inventory and fingerprint, and caller to the plan. A thread caller targeting another thread also needs the `cross-thread` risk label. The ordinary CLI and JSON approval flow applies.
+`kk thread snapshot [<thread>] [--request-id <id>]` records fresh tracked edits before a later close, detach, or publish. An explicit invocation requests one `snapshot` approval, including when the caller owns the thread. `SnapshotWorkspace` binds the workspace identity, exact starting head and operation, file inventory and fingerprint, and caller to the plan. A thread caller targeting another thread also needs the `cross-thread` risk label. The ordinary CLI and JSON approval flow applies.
 
-After claim, recheck those inputs at a safe boundary under the thread and repo jj locks. A stale, uncertain, or changed workspace stops before the snapshot. Journal the attributed result and report the new pinned head. A retry of the same operation returns that outcome. A later close, detach, or publish starts a separate plan. Declining it leaves the completed snapshot in place. None of these commands requests a snapshot on the caller's behalf.
+For unattended retries, pass `--request-id`. With a generated ID, print it on stderr before submission and include it in the final result. For a retry, the same caller presents the same ID, thread and arguments. Look up the existing journal before requesting a new approval. Return the recorded outcome or current state of that operation. Refuse reuse with changed arguments or a different caller.
+
+When execution needs a future tool batch, return `pending` and the request ID immediately (exit 0 means accepted). This lets an agent's current shell call finish. Poll with the same request ID. Only `completed` reports that the snapshot succeeded. In JSON mode stdout contains one result object.
+
+After claim, recheck those inputs at a safe boundary under the thread and repo jj locks. A stale, uncertain, or changed workspace stops before the snapshot. Write the unique jj invocation identity and starting operation before invoking jj.
+
+After a crash, find the operation attributed to that invocation, verify the exact result contains the approved tracked bytes and record the new head. If other edits raced the snapshot, report the observed operation and drift without authorizing a later checkpoint. Retry the command only if it provably never took effect and the approved inputs still match. An uncertain outcome stops for inspection.
+
+A later close, detach, or publish starts a separate plan. Declining it leaves the completed snapshot in place. None of these commands requests a snapshot on the caller's behalf.
 
 ## `kk close`
 
@@ -850,7 +858,7 @@ In a policy rule the operation is `close`. A close plan can carry these [risk la
 - `outside-holders`, when it accepts a holder outside the listed containers;
 - `work-loss`, when its [loss inventory](appendix-a-glossary.md#loss-inventory) is not empty.
 
-A rule allows the close only when it accepts every label on the plan. Without a terminal and without such a rule, `kk close` exits with code 3 and changes nothing.
+A rule allows the close only when it accepts every label on the plan. With an otherwise valid plan, a caller without a terminal or matching rule gets exit code 3. A dirty workspace can fail the read-only precondition earlier with code 4. Both outcomes leave files and jj history intact.
 
 ### Preflight: a quiet agent
 
@@ -929,7 +937,7 @@ Important flags:
 
 - `--accept-holder <pid>` names one process outside the listed containers that the plan accepts (see [Processes outside the listed containers](#processes-outside-the-listed-containers)). It can be given more than once.
 - `--confirm` asks a person to confirm even when a policy rule allows the plan.
-- `--discard-pending` requests discard of the listed pending transitions or deliveries on the closing thread's incoming or outgoing edges. The approved plan must accept `discard-pending`. Unresolved file recovery still blocks close.
+- `--discard-pending` requests discard of named `Detected` transitions on incoming or outgoing edges before any barrier or change to files. Materialized deliveries must finish delivery or their existing eligible repair first. The approved plan must accept `discard-pending`. Unresolved file recovery still blocks close.
 - `--discard-pr` ships with publishing. It also closes the open PR. Plain close stays local.
 
 Nothing closes a thread without a one-shot approval. The v1.x auto-archive on PR merge only proposes a close plan; see [Publishing](07-publishing.md).
@@ -1613,11 +1621,17 @@ By default, `kk repo unregister` removes two things:
 - the row in `~/.config/kiki/state.db`'s `repos` table;
 - the centralized state directory at `~/.config/kiki/repos/<repo_id>/` (threads, optional transcript rows, SQLite audit rows, credentials, per-thread error logs, and any workspace-recovery bundles).
 
-Both modes require a registration with no live work. Preflight reports active threads, launch gates, bound terminals, surviving processes, pending deliveries, and unfinished lifecycle or repair operations. Close or repair the named threads first. `--keep-state` uses the same check.
+Both modes require a registration with no live work. Preflight reports active threads, launch gates, bound terminals, surviving processes, pending barriers and deliveries, and every unfinished operation that depends on the registration in either database. This includes a stopped worker's unknown publish or prompt outcome and a server-wide job that still needs the repo. Close or repair the named threads first. `--keep-state` uses the same check.
 
-After approval, the user database claims the plan and fences the old registration in one transaction. Every new request, launch, background worker, and competing `kk init` must observe the fence. Drain previously admitted work, close repo database handles, and repeat the process and journal checks before removing the registry row. If a create already won the race or the inventory has changed, release the fence, report the blocker, and preserve the registration. Once removal begins, recover the exact plan from the user journal before admitting another registration for the path.
+After approval, the user database claims the plan and fences the old registration in one transaction. The fence stops new requests, launches, background jobs, and another `kk init` for the same path.
 
-The action is irreversible. Approval covers the old registration UUID, canonical source path, exact state directory identity, disposition and loss inventory. Removal disables routing for every old credential even when its file survives.
+Drain previously admitted workers and recheck the approved logical loss inventory, processes and journals under the fence. Compare the records and user files scheduled for removal. Route this operation's own audit to the user database.
+
+After closing SQLite's last repo handle, record the identities and fingerprints of the actual remaining files in the user journal. SQLite may move data from its write-ahead log into the database as it closes. Verify that the resulting files represent the approved inventory before removing the registry row. If a create already won the race or the inventory has changed, release the fence, report the blocker, and preserve the registration.
+
+Once removal begins, recover the exact plan from the user journal before admitting another registration for the path. Delete only entries in the approved inventory. Before each retry verify the directory identity, journaled removals and remaining entries. Preserve any new or changed entry and report the mismatch from the user journal.
+
+The action is irreversible. Approval covers the old registration UUID, canonical source path, exact state directory identity, disposition and loss inventory. Removal disables the old repo and thread credentials even when their files survive. User-scoped credentials retain their authority for other registrations.
 
 - It therefore requires a one-shot [approval](#foreground-approval-flow) bound to the canonical repo path, the repo id, and whether state is retained.
 - In a policy rule the operation is `unregister`. Without a terminal and without a rule that allows the plan, the command exits with code 3 and removes nothing.

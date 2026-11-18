@@ -501,7 +501,7 @@ Every `PolicyApproval` writes an audit row that also records the rule name, the 
 
 Where the row goes depends on the request:
 
-- Once a valid target repo is resolved, the row belongs to that repo's `audit_log` table.
+- Unregister and attempts against a fenced registration go to `user_audit_log`. For other resolved repos, the row belongs to the repo's `audit_log` table.
 - Some requests belong to the per-user `user_audit_log` table in `~/.config/kiki/state.db` instead. These are bootstrap, approval-presenter enrollment, repo listing, registration attempts before a repo exists, unknown-repo targets, and requests that fail before repo resolution.
 - Automation setup is audited in `user_audit_log` as well: policy activation and revoke, and automation credential create, rotate, and revoke. The user database also keeps every activated policy with its digest, its canonical text, and whether the presenter or Admin activated it.
 - Unauthenticated rows may carry null credential/approval ids and keep only a safe fingerprint of the presented identity. Audit logging must not persist raw credentials.

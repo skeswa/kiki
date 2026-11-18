@@ -472,7 +472,7 @@ Rules for these keys:
 
 There is no `audit_log` path key. The audit record lives in database tables, not in a file:
 
-- Attempts resolved to a repo write to that repo database's SQLite `audit_log`.
+- Unregister and attempts against a fenced registration write to `user_audit_log`. Other attempts resolved to a repo write to that repo database's SQLite `audit_log`.
 - Bootstrap, registry-wide, unknown-repo, and pre-resolution attempts write to the per-user database's SQLite `user_audit_log`.
 - Each attempt has exactly one authoritative row; neither table is mirrored to a file.
 

@@ -113,7 +113,7 @@ Some terms used throughout this section:
   - `4` for a refusal by a precondition or a safety proof, including `kk switch` with `NoCallerClient`;
   - `5` for a daemon that is unreachable or not installed;
   - `6` for a timeout.
-- **Unregister races and recovery.** Race unregister with an admitted create and a launch gate. Either live work keeps its registration or unregister fences it first. Crash after registry removal in both modes. Verify old credentials fail, recovery acts only on the old UUID and directory, and keep mode leaves the directory for inspection. Replace the directory before retry and check that the replacement survives.
+- **Unregister races and recovery.** Race unregister with an admitted create and a launch gate. Either live work keeps its registration or unregister fences it first. Leave an unknown approved operation whose worker has exited and verify each mode refuses. Crash after registry removal in both modes. Verify old credentials fail, recovery acts only on the old UUID and directory, and keep mode leaves the directory for inspection. Replace the directory before retry, then repeat with a new file inside the original directory. Both survive. A call against the fence writes one user audit row without reopening the repo. Force SQLite to checkpoint its write-ahead log on last close. An unchanged logical inventory passes and deletion uses the final physical manifest.
 - **[`--json`](09-commands.md#output-for-scripts).** Every read command, and the final result of every other command, can be printed as JSON.
   - The flag changes rendering only. The same command with and without it makes the same daemon calls and the same state changes.
   - The output parses as JSON, and it carries every fact the plain rendering shows.
@@ -320,7 +320,7 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
 - **Close wants a quiet agent.** [Agent quiescence](appendix-a-glossary.md#agent-quiescence) is the harness adapter's proof that the agent is idle.
   - Where the adapter proves agent quiescence, `kk close` preflight requires it. With a working agent, preflight reports that and exits with no mutation, no freeze, and no approval challenge.
   - For an adapter version with `quiescence_detection: false`, preflight proceeds with a warning. A working agent then produces [approval drift](appendix-a-glossary.md#approval-drift) and a [verified resume](appendix-a-glossary.md#verified-resume), never a loss.
-  - Begin or refuse a dirty close. Verify the workspace bytes, operation frontier, checkpoint and descendants are unchanged. Authorize only `snapshot`, prepare the workspace, then decline close. Verify the new head is recorded and the agent remains active.
+  - Begin or refuse a dirty close. Verify the workspace bytes, operation frontier, checkpoint and descendants are unchanged. Have the agent request a snapshot from a running shell tool while quiescence cannot be proved. Verify `pending` returns immediately and polling its request ID after the next safe batch returns one result. Kill the daemon after jj writes the operation but before result persistence and verify the same request recognizes that operation. Authorize only `snapshot`, prepare the workspace, then decline close. Verify the new head is recorded and the agent remains active.
 - **No quiescence proof.** These hold for an adapter version with `quiescence_detection: false`:
   - `kk ls` shows `working` whenever the harness is alive and not blocked.
   - It never shows `idle` or `finished`.
@@ -758,7 +758,7 @@ jj records every change to a repository as an [operation](https://docs.jj-vcs.de
 - **Pinned mutation.** Bookmark moves, rebases, abandons, pushes, and `jj workspace forget` run at the exact head their plan validated with the working copy ignored.
   - `jj workspace add` runs at that exact head without `--ignore-working-copy`. It writes the workspace and its initial working-copy commit as two operations. Run while the main workspace is dirty, it snapshots nothing there.
   - An external operation injected between validation and mutation yields two heads and never a silent merge. The next sample observes both, and the saga re-validates instead of assuming its view.
-  - A placement that lands beside a concurrent operation applies only to views that descend from it. The journal that made it re-places deterministically at the first integration operation instead of raising an issue.
+  - A placement that lands beside a concurrent operation applies only to views that descend from it. For an existing managed bookmark the journal re-places it at the first integration. Race the first create with a native claim and verify the creation journal refuses to re-place or delete that name.
   - The only unpinned commands are the closed list in [Invariants](02-invariants.md#operation-history-is-a-dag): the working-copy commands, [deliberate integration](appendix-a-glossary.md#deliberate-integration), and the human passthroughs.
   - Each working-copy command `kkd` runs is taken under the repo jj lock only after a single-head sample, is attributed, and is followed by a new sample. The lock is held from that sample to the re-sample.
 - **Attribution.** Kiki sets no operation description.

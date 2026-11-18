@@ -4,7 +4,7 @@
 - Decided by: project owner, 2026-11-17, for the two requirements ("kiki should be able to fully operate headlessly", in both senses, and "automation rules should be fully configurable"); agent, 2026-11-17, for the design that meets them. The owner has not yet ratified the individual design choices.
 - Topic: Headless operation and unattended approval
 - Supersedes: the "No unattended approval" rule in [Authority](../../docs/reference/book/04-authority.md) and every "unavailable non-interactively" line in [Commands](../../docs/reference/book/09-commands.md)
-- Superseded by: —
+- Superseded by: [D-0015](0015-create-only-bookmarks-and-preserve-revisions.md) for the revision-abandonment operation and its risk label.
 
 ## Decision
 

@@ -122,7 +122,7 @@ This chapter is the book's single scope ledger: the one list of what ships when.
 The acceptance slice includes:
 
 - `kk init`, `kk repo unregister`, `kk new`, `kk attach`, `kk switch`, `kk ls`, `kk close`, `kk reopen`, and `kk repair`
-- `kk log`, `kk status`, `kk thread detach`, `kk thread audit`, and approval-gated `kk audit log`
+- `kk log`, `kk status`, [`kk thread snapshot`](09-commands.md#kk-thread-snapshot), `kk thread detach`, `kk thread audit`, and approval-gated `kk audit log`
 - headless operation without a UI, as an [invariant](02-invariants.md#kiki-runs-headless): a full thread lifecycle with zero attached Herdr clients, and no prompt without a terminal
 - the scripting surface: `kk daemon install`, `--json` on every read command and on every command's final result, [`kk events`](09-commands.md#kk-events), and the fixed [exit codes](09-commands.md#exit-codes)
 - [`kk prompt`](09-commands.md#kk-prompt) to submit a later user turn to the same running agent, with a real harness proof for each supported version

@@ -47,6 +47,8 @@ When [transcript](../appendix-a-glossary.md#thread-transcript) capture is instal
 
 A `PreToolUse` carrying a provably later `model_turn_id` may then change a `Delivered` intent to `Acknowledged` and clear the marker and proof atomically.
 
+Historical rule superseded by [the current receipt requirement](../05-cascade.md#recovering-a-lost-delivery-mark) and [D-0013](https://github.com/skeswa/kiki/blob/main/journal/decisions/0013-prove-admission-and-delivery.md).
+
 Suppose stdout reached the harness but `MarkDelivered` was lost. Then the exact completed batch plus that later turn may recover `Materialized → Acknowledged` in one transaction. That transaction records recovered delivery at the completion time before acknowledging. Without both pieces of evidence, `Materialized` is redelivered.
 
 ### Restart fallback

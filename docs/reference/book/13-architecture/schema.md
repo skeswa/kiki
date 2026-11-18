@@ -133,10 +133,11 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - Policy activation needs no journal here. It has no effect outside this database, so its approval is claimed and consumed in the one transaction that swaps the active row.
   - Creating or rotating an automation credential under a presenter approval is journaled here, because it writes a file.
   - Their shape matches the per-repo tables below.
-  - The pending unregister journal is the persistent fence for the old UUID and canonical source path. It records the state directory's path and filesystem identity, keep/delete choice, approved inventory, drain, final checks, registry removal, credential invalidation and disposition. After restart, honor the fence before opening the repo or admitting requests. Removal succeeds only when the old row is absent and its credentials are unusable. Delete mode additionally verifies absence of the old directory. Keep mode verifies the same directory remains in place. A replaced directory, or a missing directory in keep mode, stops recovery with a diagnostic. Never delete a replacement. Completion and release of the fence share one user-database transaction.
+  - An unregister fence also covers all repo-dependent work held in either database, including server-wide jobs and approved operations with unknown outcomes. The final inventory includes journaled work whose worker has already exited.
+  - The pending unregister journal is the persistent fence for the old UUID and canonical source path. It records the state directory's path and filesystem identity, keep/delete choice, approved inventory, drain, final checks, registry removal, credential invalidation and disposition. After restart, honor the fence before opening the repo or admitting requests. Removal succeeds only when the old row is absent and its credentials are unusable. Delete mode additionally verifies absence of the old directory. Keep mode verifies the same directory remains in place. After the final logical inventory check and SQLite shutdown, persist the physical deletion manifest under the fence. Verify each remaining entry against that manifest. Delete mode journals each entry before removal. On retry, check remaining approved entries by identity and fingerprint and recognize completed removals. A new or changed entry, a replaced directory, or a missing directory in keep mode stops recovery with a diagnostic. Never delete a replacement. Completion and release of the fence share one user-database transaction.
 
 - **`user_audit_log`**: an append-only log of attempts that have no valid repository target.
-  - These attempts include bootstrap, `ListRepos`, registration, malformed repo selectors, and authorization failures that happen before a repo can be resolved.
+  - These attempts include unregister, calls blocked by its fence, bootstrap, `ListRepos`, registration, malformed repo selectors, and authorization failures that happen before a repo can be resolved.
   - Every policy activation and policy revoke is logged here. So is every creation, rotation, and revoke of an automation credential.
   - Its row shape matches per-repo `audit_log`.
   - It permits null credential, approval, and presenter identities.
@@ -441,13 +442,14 @@ Each entry below has the same shape: what the table stores, its columns, and the
 - **`metadata_writes`**: a ledger of content hashes that shows which descriptions and bookmark names kk wrote (kk-ownership).
 
 - **`sync_intents`**: the sole durable authority for reconciliation, the [embedded outbox](../appendix-a-glossary.md#embedded-cascade-outbox), and delivery. Each row is one [`sync_intent`](../appendix-a-glossary.md#sync-intent): one ordered [cascade reconciliation](../appendix-a-glossary.md#cascade-reconciliation).
-  - Columns: `(intent_id, thread_id, seq, kind, from_base_commit_id, to_base_commit_id, classification_op_id, state, planned_op_id?, result_op_id?, result_workspace_commit_id?, payload?, anchor_change_id?, anchor_commit_id?, anchor_op_id?, prepared_at?, delivery_mode?, delivered_at?, acknowledged_at?, transcript_row_id?, barrier_incarnation_id?, barrier_model_turn_id?, barrier_tool_batch_id?, barrier_bound_at?, batch_completed_at?, soft_redelivery_count, restart_incarnation_id?, restart_startup_delivery_id?, restart_startup_proven_at?, delivery_exhausted_at?, delivery_epoch, delivery_rearmed_at?, recovery_reason?, recovery_bundle_path?, recovery_fingerprint?, recovery_details?, result_has_conflicts, conflicts_cleared_op_id?)`.
+  - Columns: `(intent_id, thread_id, seq, kind, from_base_commit_id, to_base_commit_id, classification_op_id, state, planned_op_id?, result_op_id?, result_workspace_commit_id?, payload?, anchor_change_id?, anchor_commit_id?, anchor_op_id?, prepared_at?, delivery_mode?, delivered_at?, acknowledged_at?, transcript_row_id?, barrier_incarnation_id?, barrier_model_turn_id?, barrier_tool_batch_id?, barrier_bound_at?, batch_completed_at?, soft_ack_receipt?, soft_redelivery_count, restart_incarnation_id?, restart_startup_delivery_id?, restart_startup_proven_at?, delivery_exhausted_at?, delivery_epoch, delivery_rearmed_at?, recovery_reason?, recovery_bundle_path?, recovery_fingerprint?, recovery_details?, result_has_conflicts, conflicts_cleared_op_id?)`.
   - Enum values:
     - kind is `NativeRewrite | ParentAdvance` (see [`NativeRewrite`](../appendix-a-glossary.md#nativerewrite) and [`ParentAdvance`](../appendix-a-glossary.md#parentadvance));
     - `delivery_mode` is `SoftBatch | RestartStartup` (see the [`SoftBatch`](../appendix-a-glossary.md#softbatch-delivery-proof) and [`RestartStartup`](../appendix-a-glossary.md#restartstartup-delivery-proof) delivery proofs);
     - state is `Detected | Reconciling | Materialized | Delivered | Acknowledged | RecoveryRequired | TopologyDiverged | Superseded`.
   - **Conflicts.** `result_has_conflicts` (default false) records that the reconciliation result contains jj [conflicts](https://docs.jj-vcs.dev/latest/conflicts/). It is a flag, not a state. `conflicts_cleared_op_id` names the operation whose view first showed the thread's chain conflict-free.
   - **Proof fields.** Soft-barrier and restart-startup proof fields are embedded on the intent. They are not stored in another progress table.
+  - `soft_ack_receipt` stores the matched call, batch, incarnation, conversation, payload digest and later turn identity in the acknowledgement transaction. It remains as evidence after kiki clears the active barrier tuple. A notice for a snapshot or a generic denial cannot fill it.
   - **Delivery-attempt bounds** are durable on the same row. The limit is `[cascade] delivery_attempts` (default `3`):
     - `soft_redelivery_count` (default 0) counts barrier rebinds after contrary [delivery receipts](../appendix-a-glossary.md#delivery-receipt).
     - Replacement attempts are counted from the persisted `agent_sessions` rows whose `(startup_intent_id, startup_intent_epoch)` match the intent and its current [`delivery_epoch`](../appendix-a-glossary.md#delivery-epoch).
@@ -542,6 +544,8 @@ Four of these tables form the [operation-history cache](../appendix-a-glossary.m
   - Publish, parent-merge remote updates, sensitive snapshots, and other consequential methods use this envelope directly.
   - One approval creates one immutable envelope. Recovery may resume only its stored plan.
 
+- For `SnapshotWorkspace`, persist the caller, request ID, approved inputs, jj invocation identity, any held batch and its completion, and the attributed result. A request ID identifies one journal across retries and credential rotation.
+
 - **`approved_operation_steps`**: the idempotent journal of external effects for an approved operation.
   - Columns: `(operation_id, ordinal, name, state, input_fingerprint, result_json?, error?)`, unique by `(operation_id, ordinal)`.
   - Remote push and PR-base mutation are separate steps.
@@ -553,7 +557,7 @@ Four of these tables form the [operation-history cache](../appendix-a-glossary.m
   - The five policy columns are filled on the `BeginApproval` row that issues a `PolicyApproval`. `policy_principal` is the principal the rule matched, such as `credential:ci` or `thread:self`. `policy_operation` is the operation name the rule matched, such as `close`.
   - A `BeginApproval` that ends in `RequireHuman` or `NoMatch` fills `risk_labels` and, for `RequireHuman`, `rule_name`.
   - Null identities explicitly represent unidentified or rejected callers.
-  - Parseable attempts with a resolved repo go here. Attempts without a resolvable repo go to per-user `user_audit_log`. So there is exactly one authoritative row per attempt.
+  - Parseable attempts with an open, unfenced target repo go here. Unregister and calls to a fenced registration use the user audit log. Attempts without a resolvable repo go to per-user `user_audit_log`. So there is exactly one authoritative row per attempt.
 
 #### Follow-up prompt requests
 
@@ -743,7 +747,7 @@ This section lists rules that must hold across columns and tables. Several of th
   - acknowledges only at the first pre-tool hook call of a model turn in that replacement incarnation, matched by incarnation id, after the session-start hook reported the one-use id with `ReportHarnessReady`.
 - **Recovery.** `RecoveryRequired` requires `recovery_reason`, `recovery_bundle_path`, and `recovery_fingerprint`. It is entered only in the transaction that records those bundle fields. For an explicit selection, the repair journal records the intent id, exact operation, bundle fingerprint and chosen commit when it claims the approval. On restart, compare the workspace with the recorded before and after states. Finish the same plan if proved, or stop with the bundle intact. Save the chosen commit and journal id on the intent before resuming delivery.
 - **Conflict flag.** `result_has_conflicts` may be set only together with a result workspace commit. `conflicts_cleared_op_id` may be set only when `result_has_conflicts` is set.
-- **Superseding.** Only a pre-materialization intent may become `Superseded`.
+- **Superseding.** Only a pre-materialization intent may become `Superseded`. For a close discard, require `Detected`, no bound barrier, and an approval naming that intent. Commit its disposition with the edge cut. Preserve the prior state and edges in the close journal for verified rollback.
 - **Rebinding and retry bounds.**
   - A barrier tuple may be rebound to a new batch after a contrary delivery receipt only in a transaction that increments `soft_redelivery_count`.
   - Retry bounds are evaluated against that column and the persisted replacement-incarnation rows. They are never evaluated against an in-memory counter.

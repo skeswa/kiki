@@ -269,7 +269,7 @@ So an audit reader can always tell a human's approval from a rule's, and can tel
 
 ### Which table a row goes to
 
-Once a valid target repo is resolved, the authoritative row belongs to that repo database's `audit_log`. Some requests belong to the per-user database's `user_audit_log` instead:
+Unregister and calls blocked by its fence use `user_audit_log`. For other calls, once a valid target repo is resolved, the authoritative row belongs to that repo database's `audit_log`. Some requests belong to the per-user database's `user_audit_log` instead:
 
 - bootstrap and approval-presenter enrollment;
 - automation policy activation (`kk automation apply`) and revoke;

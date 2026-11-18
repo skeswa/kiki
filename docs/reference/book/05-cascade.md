@@ -459,11 +459,19 @@ The adapter supplies stable `model_turn_id` and `tool_batch_id` values to `kk-ho
 
 If the installed harness version cannot provide or support an unambiguous batch-completion boundary, soft delivery is disabled and kiki uses the hard-restart fallback below.
 
+### Holding a batch for approved snapshot preparation
+
+When an explicit snapshot cannot use proven agent quiescence, its claimed operation waits for the next fresh batch without holding a thread or repo lock.
+
+At admission, finish existing delivery work first. Under the thread lock, before granting any sibling `PassThrough`, bind a blocking decision for the whole batch to the snapshot operation in its journal. Require proof that no earlier or overlapping batch can write. Recheck the approved inputs and take the snapshot only while the batch is held.
+
+Deny each sibling with the same preparation notice. This snapshot records edits already visible in the workspace. It creates no sync intent or delivery acknowledgement. Keep the batch decision through exact completion, including across daemon restart. With an uncertain boundary, stop preparation and recover a clean boundary before admitting further work. A caller can also run its own native jj command to record edits and start a new preview.
+
 ### The first call fixes the batch decision
 
 The first `PreToolUse` admitted for a batch fixes that batch's decision under the [reconciliation lock](appendix-a-glossary.md#reconciliation-lock).
 
-- **If no intent is ready,** `kkd` caches [`PassThrough`](appendix-a-glossary.md#batch-admission) for the batch, in memory, keyed by incarnation and batch. Intents detected afterward wait for the next batch. A later sibling hook may not begin reconciliation.
+- **If neither a cascade nor an approved snapshot needs the batch,** `kkd` caches [`PassThrough`](appendix-a-glossary.md#batch-admission) for the batch, in memory, keyed by incarnation and batch. Intents detected afterward wait for the next batch. A later sibling hook may not begin reconciliation.
 - **If work is ready,** record `Block` for the whole batch under the lock. Before changing files prove every sibling is held or denied and no earlier or overlapping batch can still write. If that proof fails, leave the files in place and establish a clean boundary by verified restart.
 
 All sibling calls reuse the fixed decision. This avoids an impossible promise: retracting a tool call that was already admitted before a later hook arrived.
@@ -525,7 +533,7 @@ On every `PreToolUse` call:
 
 1. Claim the per-thread reconciliation lock. Load the active intent proof, the incarnation marker, the batch admission, and the oldest unresolved intent.
    - Handle `RestartStartup` through step 2 before consulting batch admission.
-   - Otherwise, a cached `PassThrough` returns immediately, and newly detected work waits for a later batch.
+   - Otherwise, a batch held by the snapshot journal receives its preparation denial. An eligible waiting snapshot is checked before granting a new batch `PassThrough`. A cached `PassThrough` returns immediately, and newly detected work waits for a later batch.
    - A missing admission cache for an unknown in-flight batch takes the cache-loss restart path above.
 2. If the active intent uses `RestartStartup`, acknowledge only when both of these hold: the session-start hook already reported the exact `startup_delivery_id` with `ReportHarnessReady`, and this call is the first pre-tool hook call of a model turn in the replacement incarnation. `kkd` matches the call by its incarnation id.
    - A match proves this model turn came after the startup payload. Clear that delivery proof and marker atomically, then select the next intent.
@@ -752,7 +760,7 @@ The agent may see the payload twice across processes. The transcript projection 
 3. T1 is blocked and receives the payload.
 4. T2 and T3 may already be waiting or may arrive afterward. Both observe the same proof, are blocked, and receive the same payload.
 5. `PostToolBatch` marks only batch completion.
-6. The first `PreToolUse` from a later assistant response acknowledges the intent. Neither T2 nor T3 can.
+6. Verify a harness receipt for the exact payload on T1, T2, or T3. Only a later turn in that continuing conversation may acknowledge.
 
 Under Codex's proven-serial dispatch this scenario cannot arise:
 

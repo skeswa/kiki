@@ -4,7 +4,7 @@
 - Decided by: agent, 2026-11-16, while carrying out the owner's instruction "Spawn some adversarial review subagents and then address their feedback"; the owner has not yet ratified the individual choices below; source: five independent review reports of the same date, including jj 0.46.0 runs in throwaway repositories
 - Topic: Repair plans, process safety order, locking, and proof gates
 - Supersedes: —
-- Superseded by: —
+- Superseded by: [D-0013](0013-prove-admission-and-delivery.md) for admission when the marker is absent. The marker and slow-path deadline still apply.
 
 ## Decision
 

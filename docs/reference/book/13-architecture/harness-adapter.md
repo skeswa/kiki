@@ -326,7 +326,7 @@ The adapter's obligations for soft delivery ([`SoftBatch`](../appendix-a-glossar
 - The adapter must attach stable runtime-incarnation, model-turn, and tool-batch identities to soft-delivery calls.
 - It durably fixes `Block` before reconciliation may mutate files.
 - Concurrent `PreToolUse` calls in one batch all receive a blocking response when any member triggers reconciliation.
-- Only a matching `PostToolBatch` can complete `SoftBatch`. Only a later [model turn](../appendix-a-glossary.md#model-turn) can acknowledge it.
+- Only a matching `PostToolBatch` can complete `SoftBatch`. Acknowledgement also requires a matching harness-side receipt and a later turn in the conversation that received it.
 
 `RestartStartup` works differently. The session-start hook reports the exact `startup_delivery_id`, and the first pre-tool hook call of a model turn in the replacement incarnation acknowledges it. It never fabricates a tool batch for startup input.
 

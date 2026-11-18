@@ -49,3 +49,7 @@ From the source repo, `kk events --thread B` reads the filtered repo stream. Ins
 The review followed each scenario through the [invariants](../../../docs/reference/book/02-invariants.md), the owning chapters, and the architecture and testing chapters. Kiki is still at the design stage. The failures above describe outcomes allowed by the text.
 
 For findings 5 and 6, a scratch repository with jj 0.46.0 confirmed the underlying bookmark behavior. Create a bookmark on a base commit, create a child with `jj new`, then set that bookmark to the child. jj reports a successful forward move. Create a second bookmark on that child and abandon just the child. jj reports both bookmark names under `Deleted bookmarks`. These checks used no project revisions or bookmarks.
+
+## Outcome on 2026-11-18
+
+The project owner accepted changes for all ten cases. The decisions cover [batch admission and delivery](../../decisions/0013-prove-admission-and-delivery.md), [snapshot preparation, follows and resume](../../decisions/0014-prepare-dirty-checkpoints-separately.md), [bookmark ownership and destroy](../../decisions/0015-create-only-bookmarks-and-preserve-revisions.md), [unregister](../../decisions/0016-fence-repo-unregister.md), and [event cursors](../../decisions/0017-scope-event-cursors.md). The book now calls for acceptance tests for each case. Live harness and jj integration proofs remain implementation work.
