@@ -78,7 +78,7 @@ Before committing to the full architecture, build a one-shot proof of concept (P
    - Prove that exactly one materialization occurs.
    - Prove that concurrent hooks receive a byte-identical payload.
    - Also prove that a first-admission [`PassThrough`](appendix-a-glossary.md#batch-admission) defers work detected later in that batch.
-10. Prove that `PostToolBatch` marks only batch completion, and that acknowledgement occurs only at a `PreToolUse` from a provably later [model turn](appendix-a-glossary.md#model-turn).
+10. For every soft-delivery adapter, prove that all writers have stopped at the boundary and that a receipt for the exact payload belongs to the later model turn's conversation. Test a timeout before admission on one sibling and generic denials on all siblings. Use `RestartStartup` if the installed version fails these proofs.
     - Exercise duplicate, missing, stale, reordered, and crash-interrupted completion events.
     - If the adapter cannot prove model-turn and batch identity, demonstrate the hard-restart fallback before allowing any replacement-process tool.
 11. Prove that one [`sync_intent`](appendix-a-glossary.md#sync-intent) owns reconciliation, the embedded payload, the [delivery barrier](appendix-a-glossary.md#delivery-barrier), and acknowledgement, through crash injection at every transition. (Crash injection means killing a program at a chosen step.) In-memory batch state must be reconstructible and must never be authoritative.
@@ -366,7 +366,7 @@ Promote the cascade proof of concept into the daemon: the rest of `OpLogWatcher`
 Stage 3 gate:
 
 - every numbered proof in the proof of concept, now through the daemon and with the harness running under the pane launcher in a terminal group;
-- **Hook budget.** With `kkd` stopped and no [barrier marker](appendix-a-glossary.md#barrier-marker) present, a tool call passes through after `[timeouts] hook_connect`. With `kkd` stopped while a `Block` is bound, the marker is present and the call gets the generic blocking deny. With a reconciliation held open past `[timeouts] slow_path`, every call in the batch gets the generic blocking deny, and none continues.
+- **Hook budget.** Stop `kkd` and verify the tool is denied at `hook_connect`, with and without a marker. Hold reconciliation past `slow_path` and verify each sibling gets a blocking denial.
 - **Admission cache.** Restart `kkd` while a `PassThrough` batch is in flight. The next pre-tool call from that incarnation is treated as an unknown in-flight batch, unless its payload proves it is the first call of a new model turn. `kkd` blocks it, hard-pauses the incarnation with files untouched, and starts a replacement.
 - **Unknown batch after a freeze.** Start a close while a tool batch is in flight, and force a verified resume. Kiki hard-restarts the incarnation to a clean boundary with files untouched.
 - **Cascade replacement.** Kill a harness while its tool child keeps running, with an intent pending. The cascade's replacement refuses to open a gate until the launcher's process tree is empty, and reports the remnant as `OrphanedProcess`.

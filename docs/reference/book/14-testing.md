@@ -646,14 +646,14 @@ A [projection](appendix-a-glossary.md#projection) is a changeable outside thing 
 ### Hook outages and barriers
 
 - **Daemon unreachable from the hook.** When `kk-hook` cannot connect to `kkd` and be admitted within `[timeouts] hook_connect` (default `1s`), it checks the thread's [barrier marker](appendix-a-glossary.md#barrier-marker). It also writes to `~/.config/kiki/repos/<repo_id>/errors/<thread_id>.log`.
-  - **Marker absent.** The hook returns the harness's non-blocking decision (Claude Code's `continue`, Codex's `allow`). It does not block the agent's tool call.
+  - **Marker absent.** Deny the call. Time out the first sibling, then admit the second on the same daemon with a pending intent. Neither tool may run during the update. Hold an earlier writer open and verify that mutation waits for proof it has stopped.
   - **Marker present.** The hook answers with the generic blocking deny. The tool call does not run.
   - `hook_connect` covers only connecting and being admitted. A test that stalls `kkd` after admission never sees the non-blocking decision.
   - A reconciliation pending during the outage must still be delivered on the next successful PreToolUse round-trip.
   - If the watcher saw the trigger, durable state lives in `sync_intents`.
   - Otherwise, restart catch-up reconstructs it from jj's [op log](https://docs.jj-vcs.dev/latest/operation-log/) (jj's record of every operation run against the repo).
   - If the agent edited the stale tree during the outage, the next probe enters `RecoveryRequired` rather than treating the tree as clean.
-- **Active barrier during an outage.** Once a cascade [delivery barrier](appendix-a-glossary.md#delivery-barrier) is active, a daemon outage no longer lets tools pass through. The hook finds the thread's [barrier marker](appendix-a-glossary.md#barrier-marker) and answers with the generic blocking deny. Every call in that tool batch stays blocked until the barrier lifts. The barrier lifts at exactly two moments: when a later model turn acknowledges the delivery, or when the blocked incarnation is retired and its replacement's gate is recorded.
+- **Active barrier during an outage.** With a durable marker every tool in the batch stays blocked across a restart.
 - **Hook budget after admission.** Once `kkd` has admitted a call into a reconciliation, `kk-hook` waits up to `[timeouts] slow_path` (default `30s`).
   - A reconciliation that finishes inside the bound answers every call in the batch with the saved payload.
   - If the bound expires, the answer is a generic blocking deny ("kiki is reconciling; try again").
@@ -975,7 +975,7 @@ The cascade tests must cover each case below.
   - An active durable `Block` stays [fail-closed](appendix-a-glossary.md#fail-closed).
 - **Barrier marker.**
   - `kkd` writes the marker durably before it binds `Block` and before any workspace file changes. Crash injection between each pair of steps never leaves changed files without a marker.
-  - Stop `kkd` while a `Block` is bound. Every pre-tool call for that thread gets the generic blocking deny. A different thread with no marker passes through.
+  - Stop `kkd` while a `Block` is bound. Hooks on both a marked thread and an unmarked thread deny admission.
   - `kkd` removes the marker when the barrier lifts. After a crash, recovery removes it only after the reconciliation is resolved, never before.
   - `kk-hook` never writes or removes the marker.
 - **Hook process dies before answering.** For each pinned harness version, kill `kk-hook` before it prints an answer. The harness must not run the tool as if the hook had allowed it. A harness version that fails this proof is unsupported for cascade delivery.
@@ -991,7 +991,7 @@ The cascade tests must cover each case below.
   - None of them acknowledges delivery.
 - A new batch in the same [model turn](appendix-a-glossary.md#model-turn) after `PostToolBatch`. It cannot acknowledge merely because its batch id differs.
 - The first `PreToolUse` from a provably later model turn.
-  - It acknowledges the delivered intent.
+  - Require an exact harness receipt from the same conversation before acknowledging. Crash after saving `Materialized` and return generic denials to every sibling. Completion and a later turn must leave the intent unacknowledged. Repeat with a valid receipt from a different conversation.
   - It then evaluates the next ordered intent before deciding whether its tool may run.
   - If `MarkDelivered` was lost, the same exact proof atomically repairs delivery and advances `Materialized -> Acknowledged`.
 - Hook, daemon, and agent crashes before and after durable barrier creation, and before and after `batch_completed_at`. Ambiguous completion always hard-restarts with the saved payload.

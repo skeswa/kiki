@@ -54,6 +54,7 @@ chapter that defines the behavior; do not use a journal entry to override it sil
 | [D-0010](0010-define-headless-setup.md)                                  | Define headless setup and installation changes                           | Headless operation                            |
 | [D-0011](0011-select-a-verified-recovery-successor.md)                   | Select a verified recovery successor by commit id                        | Headless operation                            |
 | [D-0012](0012-submit-follow-up-prompts-as-user-turns.md)                 | Submit follow-up prompts as user turns                                   | Headless operation                            |
+| [D-0013](0013-prove-admission-and-delivery.md) | Prove tool admission and message delivery | Reference book review |
 
 ## Earlier design rationale
 

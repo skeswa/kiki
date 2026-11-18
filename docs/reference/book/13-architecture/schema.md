@@ -737,8 +737,8 @@ This section lists rules that must hold across columns and tables. Several of th
 - **Soft path (`SoftBatch`).**
   - Before any soft-path workspace mutation, the transaction sets `delivery_mode = SoftBatch` and the complete `(barrier_incarnation_id, barrier_model_turn_id, barrier_tool_batch_id, barrier_bound_at)` tuple. Partial tuples are invalid.
   - `batch_completed_at` requires that tuple. It may be written only by an idempotent completion report carrying the same identities.
-  - Soft acknowledgement requires both that completion and a later model-turn identity.
-  - If `MarkDelivered` was lost, that exact later-turn proof may atomically repair `delivered_at` and advance `Materialized -> Acknowledged`. A different batch, or stdout alone, is insufficient.
+  - Soft acknowledgement requires exact completion, a harness result for a blocked call in that batch matching the saved payload, and a later turn that follows the result in the same conversation. Persist the call, receipt digest, incarnation, conversation and turn identities with the outcome.
+  - With all three proofs the transaction may repair a lost `MarkDelivered` and advance `Materialized → Acknowledged`.
 - **Restart path (`RestartStartup`).** `RestartStartup`:
   - clears the retired soft tuple without claiming acknowledgement;
   - requires the complete `(restart_incarnation_id, restart_startup_delivery_id)` pair;

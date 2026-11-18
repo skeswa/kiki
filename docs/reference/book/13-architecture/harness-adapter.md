@@ -46,7 +46,7 @@ The `Harness` trait lives in `kiki-core`. It does no I/O of its own beyond readi
 - **`launch_spec`** turns spawn options into the exact command to run (see the next section).
 - **`audit_exclusivity`** reads the effective settings of one planned launch. It proves that kiki's hook is the only matching pre-tool hook, or it fails. See [Exclusive hook boundary](#exclusive-hook-boundary-and-settings-ownership).
 - **`map_event`** maps one harness hook event onto kiki's protocol terms. It returns the incarnation, the [model turn](../appendix-a-glossary.md#model-turn) identity, and the [tool batch](../appendix-a-glossary.md#tool-batch) identity. It also says which protocol entry point the event is: session start, `PreToolUse`, `PostToolBatch`, or turn completion. An event the adapter cannot map with proof returns an error, and the caller treats the batch as unknown.
-- **`delivery_receipt`** looks up what the model actually received for one blocked batch. It returns matching, contrary, or not yet readable. An adapter whose harness needs no receipt returns "not required". See [The delivery receipt](#the-delivery-receipt).
+- **`delivery_receipt`** reads the harness result for a blocked call. It matches the saved bytes and identifies the conversation that received them. Every soft-delivery adapter must prove this capability.
 - **`status_inputs`** turns a harness event into the facts that feed [`AgentStatus`](../appendix-a-glossary.md#agentstatus) and the display states: a turn started, a turn completed, or an attention event such as a permission prompt.
 
 `HookEvent`, `BoundaryIdentity`, `ExclusivityProof`, `ReceiptOutcome`, and `StatusInput` are this chapter's names for those inputs and results.
@@ -314,7 +314,7 @@ The sidecar stays small for latency reasons:
 
 The hook has two separate time limits:
 
-- **`[timeouts] hook_connect` (default `1s`)** covers only connecting to `kkd` and being admitted. If it expires, the hook checks the thread's [barrier marker](../appendix-a-glossary.md#barrier-marker). With the marker present it answers with the generic blocking deny. With the marker absent it returns the harness's non-blocking decision. See [Hook degradation](#hook-degradation).
+- **`hook_connect` (default `1s`)** covers connection and admission. Expiry denies the tool even when the barrier marker is absent.
 - **`[timeouts] slow_path` (default `30s`)** applies once `kkd` has admitted the call into a reconciliation. The hook waits up to that long. If it expires, or the reconciliation's owner crashes, the answer is a generic blocking deny ("kiki is reconciling; try again"). It is never "continue".
 
 Each adapter pins the harness-side hook timeout in its generated configuration above `slow_path` plus a margin. So the harness cannot time out a healthy hook in the middle of a reconciliation. Because the pin is written at launch, a changed `slow_path` reaches a running harness only with its next incarnation.
@@ -334,12 +334,7 @@ The adapter's obligations for soft delivery ([`SoftBatch`](../appendix-a-glossar
 
 This section says what the hook does when it cannot reach `kkd`.
 
-The hook degrades to pass-through when both of these hold:
-
-- `kkd` is unreachable (socket missing, connection refused, daemon mid-restart); and
-- no [cascade barrier](../appendix-a-glossary.md#delivery-barrier) is bound for the thread.
-
-The hook is stateless and cannot read the database, so it learns the second fact from a file: the [barrier marker](../appendix-a-glossary.md#barrier-marker).
+An admission timeout denies the call. A tool can run only after `kkd` returns `PassThrough` for its batch. Before changing files, the adapter also proves no earlier or overlapping batch can still write. The marker records an existing block for recovery.
 
 - When `kkd` binds a `Block` for a thread, it first writes the marker durably at `~/.config/kiki/repos/<repo_id>/barriers/<thread_id>`. It does this before it changes any workspace file.
 - `kkd` removes the marker when the barrier lifts. After a crash, recovery removes it only after the reconciliation it guards is resolved.
@@ -351,7 +346,7 @@ The limits are:
 - `[timeouts] hook_connect` (default `1s`) covers connecting to `kkd` and being admitted. It covers nothing else.
 - On expiry, the hook checks the marker.
   - **Marker present.** The hook answers with the generic blocking deny ("kiki is reconciling; try again"). The tool call does not run.
-  - **Marker absent.** The hook returns the harness's non-blocking decision (Claude Code's `continue`, Codex's `allow`), so the agent's tool call is not blocked.
+  - **Marker absent.** Deny the tool. A sibling can reach the daemon a moment later.
 - Either way, the hook then appends one structured record to `~/.config/kiki/repos/<repo_id>/errors/<thread_id>.log`.
 
 **A hook process that dies before answering.** The marker cannot cover a `kk-hook` process that is killed or crashes before it prints an answer. That case is covered by a proof for each pinned harness version: the harness must not run the tool as if the hook had allowed it. If the proof fails, that harness version is unsupported for cascade delivery.
@@ -380,13 +375,9 @@ Pass-through ends at admission. Once `kkd` has admitted a call into a reconcilia
 - The hook learns its absolute path at thread-spawn time. At that time `kkd` writes it into the per-thread harness config alongside the credential path.
 - The source repo's filesystem is never touched.
 
-### Why pass-through is safe
+### During a daemon outage
 
-Pass-through is not a violation of the cascade safety invariant. It is the explicit precondition's failure mode.
-
-- The cascade invariant in [Invariants](../02-invariants.md) requires `kkd` to be reachable for kiki to materialize a desired state at a [safe boundary](../appendix-a-glossary.md#safe-boundary).
-- When the daemon is unreachable, jj repository state may already contain native descendant evolution. Even so, kiki leaves the workspace files untouched and preserves or reconstructs the pending intent.
-- Pass-through happens only with the [barrier marker](../appendix-a-glossary.md#barrier-marker) absent. An absent marker means `kkd` has not started changing this thread's files for a reconciliation that is still unresolved.
+Tool admission pauses until the daemon can decide the batch. A pending transition remains recoverable from the intent or from jj history.
 
 Two cases:
 

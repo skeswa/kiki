@@ -168,9 +168,9 @@ For every v1 adapter, [Claude Code](https://docs.claude.com/en/docs/claude-code/
 A batch is the set of tool calls the harness dispatches together. See [tool batch](appendix-a-glossary.md#tool-batch). The rules for a batch are:
 
 - If one tool in a dispatched batch triggers reconciliation, kiki durably binds `Block` and the complete batch identity before it changes the workspace.
-- Before it binds the `Block`, `kkd` writes a durable [barrier marker](appendix-a-glossary.md#barrier-marker) file for the thread. While that file exists, a hook that cannot reach `kkd` blocks the tool call instead of letting it through. `kkd` removes the file when the barrier lifts.
-- Every tool call in that batch is blocked.
-- Batch completion establishes soft-delivery proof: evidence that the payload reached the harness. See [`SoftBatch` delivery proof](appendix-a-glossary.md#softbatch-delivery-proof).
+- A managed tool needs an affirmative `PassThrough` decision for its batch. On admission timeout the hook denies the call, even if there is no marker. Before changing files the adapter must also prove that no earlier or overlapping batch can still write.
+- Before binding `Block`, write the thread's durable barrier marker. Every call in the triggering batch stays blocked. Remove the marker when the barrier lifts.
+- Soft delivery requires the exact batch to complete and a harness receipt showing the saved payload reached at least one blocked call. Only a later turn in the conversation that received those bytes can acknowledge.
 - Only a later [model turn](appendix-a-glossary.md#model-turn) may acknowledge the payload.
 - Another concurrent `PreToolUse` event from the same batch is never acknowledgement evidence.
 
@@ -183,7 +183,7 @@ What counts as a batch, and how its completion is proved, is an adapter/version 
 
 A denied Codex call never runs and fires no post-tool event. The crash-surviving completion report is therefore the next turn-scoped hook event to arrive. The serial proof shows that this event cannot come before the blocked call's resolution.
 
-Codex acknowledgement requires one thing more. The harness session record must contain a byte-identical [delivery receipt](appendix-a-glossary.md#delivery-receipt). The reason is that hook-side write evidence cannot prove the model received the payload rather than a substituted result.
+Each soft-delivery adapter must prove this receipt and turn relationship on the installed harness version. Codex reads the result saved for its single blocked call.
 
 If a safe batch boundary cannot be proved, a replacement process receives the saved payload as its first startup message. It must prove it processed that message before acknowledgement. See [`RestartStartup` delivery proof](appendix-a-glossary.md#restartstartup-delivery-proof).
 

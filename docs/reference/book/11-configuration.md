@@ -449,7 +449,7 @@ Rules for these keys:
 - They reload live. A new value applies to the next wait that starts; a wait already running keeps the limit it started with.
 - Values are durations written as a number and a unit, such as `500ms`, `10s`, or `2m`.
 - A `frozen_step` expiry before termination begins takes [verified resume](appendix-a-glossary.md#verified-resume). Once termination has begun, a failure is `CloseFailed` (or the plan's failed state), never a resume.
-- On a `hook_connect` expiry, `kkd` never admitted the call, so the hook checks the thread's [barrier marker](appendix-a-glossary.md#barrier-marker). With the marker absent, the tool call goes through with the harness's non-blocking decision. With the marker present, the answer is a blocking deny. A `slow_path` expiry is different: `kkd` already admitted the call, so the answer is a blocking deny, never continue.
+- On `hook_connect` expiry, the hook denies the tool. A missing barrier marker cannot authorize execution.
 - Each harness adapter pins the harness's own hook timeout above `slow_path` plus a margin. Raising `slow_path` therefore takes effect for a thread's harness at its next [incarnation](appendix-a-glossary.md#incarnation).
 
 ## Path keys

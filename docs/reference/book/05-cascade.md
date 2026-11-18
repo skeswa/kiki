@@ -467,7 +467,7 @@ If the installed harness version cannot provide or support an unambiguous batch-
 The first `PreToolUse` admitted for a batch fixes that batch's decision under the [reconciliation lock](appendix-a-glossary.md#reconciliation-lock).
 
 - **If no intent is ready,** `kkd` caches [`PassThrough`](appendix-a-glossary.md#batch-admission) for the batch, in memory, keyed by incarnation and batch. Intents detected afterward wait for the next batch. A later sibling hook may not begin reconciliation.
-- **If work is ready,** kiki writes the complete `SoftBatch` proof and durably fixes `Block(intent_id)` before reconciliation may perform any workspace mutation. kiki retains the reconciliation lock through that decision and mutation.
+- **If work is ready,** record `Block` for the whole batch under the lock. Before changing files prove every sibling is held or denied and no earlier or overlapping batch can still write. If that proof fails, leave the files in place and establish a clean boundary by verified restart.
 
 All sibling calls reuse the fixed decision. This avoids an impossible promise: retracting a tool call that was already admitted before a later hook arrived.
 
@@ -513,7 +513,7 @@ So a tool call can never run against changed files just because `kkd` was down w
 
 - **`hook_connect` (default `1s`)** covers only connecting to `kkd` and being admitted. If it expires, the hook checks the thread's [barrier marker](appendix-a-glossary.md#barrier-marker).
   - **Marker present.** A `Block` is bound for this thread. The hook answers with the generic blocking deny.
-  - **Marker absent.** The hook returns the harness's non-blocking decision, and the tool call runs.
+  - **Marker absent.** Deny this call too. Only an affirmative `PassThrough` from `kkd` permits execution. A timeout gives no permission to any sibling.
 - **`slow_path` (default `30s`)** is the [slow-path bound](appendix-a-glossary.md#slow-path-bound). It applies once `kkd` has admitted a call into a reconciliation. The hook then waits up to this long for the answer.
 
 If `slow_path` expires, or the owner of the reconciliation crashes, the answer is a generic blocking deny: "kiki is reconciling; try again". It is never "continue". A call that was admitted into a reconciliation may be facing changed files, so it must not run unexplained.
@@ -539,7 +539,7 @@ On every `PreToolUse` call:
    - If that bound expires or the owner crashes, the call gets the generic blocking deny ("kiki is reconciling; try again"), and kiki enters recovery or hard restart.
    - It never emits a nonexistent payload, and never passes through.
 4. If an active `SoftBatch` names another batch that has not been durably marked complete, fail closed: block the tool and initiate hard-restart recovery. An absent, crashed, or reordered `PostToolBatch` must never turn into acknowledgement by inference.
-5. If the `SoftBatch` is complete, the intent is `Delivered`, and this call's `model_turn_id` is later than the delivered turn: atomically mark the intent `Acknowledged`, clear the incarnation marker and delivery-proof fields, then select the next intent.
+5. Acknowledge a completed `SoftBatch` only when its harness receipt matches the saved bytes for at least one blocked call and this turn follows that result in the same conversation and incarnation. Persist the receipt identity and digest with acknowledgement before clearing the active proof.
    - The exact recovered `Materialized` case is defined below.
    - `Reconciling` and `RecoveryRequired` can never be acknowledged.
    - A different batch id alone is not enough; the adapter must prove a later model turn.
@@ -579,7 +579,7 @@ When v1.x transcript capture is enabled, a separate idempotent projection record
 
 ### Recovering a lost delivery mark
 
-An exact completed `SoftBatch`, plus a `PreToolUse` carrying a provably later `model_turn_id`, is stronger delivery evidence than the best-effort post-stdout RPC (the `MarkDelivered` call). So a lost `MarkDelivered` can be recovered.
+To recover a lost `MarkDelivered`, verify the exact batch completion, a harness-side receipt for the saved payload, and a later turn that follows that result in the same conversation. The receipt identifies the incarnation, batch, blocked call, conversation, and payload digest.
 
 If `MarkDelivered` was lost and the intent is still `Materialized`, the acknowledgement transaction does this, in order:
 
@@ -588,16 +588,16 @@ If `MarkDelivered` was lost and the intent is still `Materialized`, the acknowle
 3. It clears the barrier.
 4. It schedules the same idempotent transcript projection.
 
-Without both the exact completion tuple and the later-turn proof, `Materialized` cannot skip delivery. It is redelivered or hard-restarted instead.
+A generic denial, a result in a different conversation, or an unreadable receipt leaves the intent unacknowledged. Retry the saved bytes within the attempt limit or use `RestartStartup`.
 
-### Single-call batches need a delivery receipt
+### Receipts for every soft delivery
 
-An adapter whose blocked batch has a single call must also prove consumption before recovered delivery. There are two reasons:
+Every supported soft-delivery adapter must read the result the harness made available to the continuing model conversation. A parallel batch needs one matching blocked result. There are two reasons:
 
 - A later arrival alone cannot show whether the model consumed the payload or a substituted result.
 - `MarkDelivered` proves only that the hook wrote stdout, not that the harness applied it.
 
-The Codex adapter therefore reads the [delivery receipt](appendix-a-glossary.md#delivery-receipt) from the harness's own session record. The receipt is the result the harness saved for the blocked call.
+For Codex the receipt comes from the session record for the single blocked call. Claude Code must prove equivalent evidence for a member of its completed batch. A version that cannot supply that proof uses the bounded `RestartStartup` path.
 
 - **Matching receipt.** A byte-identical deny result for the blocked `tool_use_id` acknowledges.
 - **Contrary receipt.** A contrary result redelivers byte-identically on the arriving batch, at most once per intent.

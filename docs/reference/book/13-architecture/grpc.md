@@ -152,7 +152,7 @@ On retry, authenticate the same caller before releasing any recorded result. Che
 - `kkd` owns the [`PassThrough`](../appendix-a-glossary.md#batch-admission) cache. It lives in `kkd`'s memory, keyed by incarnation and batch. So every `PreToolUseDecision` in one [tool batch](../appendix-a-glossary.md#tool-batch) gets the same answer from `kkd` itself.
 - After a `kkd` restart the cache is gone. The first `PreToolUseDecision` from an incarnation that was already running before this `kkd` start is an unknown in-flight batch, unless the hook payload proves it is the first call of a new [model turn](../appendix-a-glossary.md#model-turn).
 - `kkd`, not the hook, performs the [hard pause](../appendix-a-glossary.md#hard-pause) and the replacement that follow. No RPC lets a client ask for either.
-- The hook has two time limits. `[timeouts] hook_connect` (default `1s`) covers connecting and being admitted. If it expires, the hook makes no RPC. It checks the thread's [barrier marker](../appendix-a-glossary.md#barrier-marker) file: present means a generic blocking deny, and absent means the harness's non-blocking decision. Once `kkd` has admitted the call into a reconciliation, the hook waits up to `[timeouts] slow_path` (default `30s`), the [slow-path bound](../appendix-a-glossary.md#slow-path-bound). If that expires, or the owner crashes, the answer is a generic blocking deny, never continue.
+- `hook_connect` bounds connection and admission. On expiry the hook denies the call and records the gap. Only an affirmative `PassThrough` for this exact batch permits the tool.
 
 ### Provider-egress consent
 
