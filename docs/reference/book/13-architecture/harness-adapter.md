@@ -238,11 +238,13 @@ struct Capabilities {
     mcp_client: bool,
     quiescence_detection: bool,
     attention_events: bool,
+    follow_up_prompt: bool,
 }
 ```
 
 These fields describe behavioral proof, not a particular settings mechanism. Each one is true only when the adapter has proved the behavior for the pinned harness version.
 
+- **`follow_up_prompt`** requires a structured harness interface for the exact live incarnation. It accepts literal text as a new user turn only when ready, binds it to a request id, and supplies a receipt that can be checked after a lost reply. `RunningAgent` uses this interface for [`kk prompt`](../09-commands.md#kk-prompt). A pane input API, a screen-idle check, and a session-start hook cannot establish this proof.
 - **`soft_pause`** is true when the harness can be held at a tool boundary without ending its process. The pre-tool hook can block a tool call, return kiki's payload to the model as that call's result, and let the model carry on in the same process.
 - **`session_resume`** is true when a new process can continue an earlier harness conversation from its `harness_session_id`. A replacement incarnation then keeps the conversation. When it is false, every replacement starts a new conversation.
 - **`mcp_client`** is true when the harness can connect to an [MCP](https://modelcontextprotocol.io/) server named in its launch-scoped configuration. Only the v1.x same-thread transcript tools need it. Nothing in the acceptance slice depends on it.

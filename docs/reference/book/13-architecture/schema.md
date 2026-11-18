@@ -556,6 +556,10 @@ Four of these tables form the [operation-history cache](../appendix-a-glossary.m
   - Null identities explicitly represent unidentified or rejected callers.
   - Parseable attempts with a resolved repo go here. Attempts without a resolvable repo go to per-user `user_audit_log`. So there is exactly one authoritative row per attempt.
 
+#### Follow-up prompt requests
+
+Each `prompt_requests` row records the requester credential id, request id, thread id, incarnation id, text digest, approved operation id, outcome, and optional harness turn receipt. The pair of requester and request id is unique. Insert it in the same transaction as the approval claim. Only the first claim may send. A crash between claim and receipt leaves the outcome unknown until the original harness record proves acceptance. The row holds no prompt text.
+
 #### Thread events
 
 - **`thread_events`**: the append-only event log behind `StreamThreadEvents`.

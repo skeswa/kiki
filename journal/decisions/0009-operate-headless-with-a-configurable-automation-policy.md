@@ -86,6 +86,7 @@ Consequences and limits:
 - Open question for the owner: there is no `kk` command to send a later
   prompt to a running agent. The first prompt comes from `kk new -m`. A
   headless caller that wants to send more must use Herdr's own tools today.
+  - Resolved on 2026-11-18 in [D-0012](0012-submit-follow-up-prompts-as-user-turns.md).
 - The rule keys, risk-label names, exit codes, and command names are the
   agent's choices and can change before implementation.
 

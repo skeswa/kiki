@@ -246,6 +246,8 @@ Add a second thread and a second attached client at the start of this stage. The
 
 Stage 2 gate:
 
+- **Follow-up prompt.** For each supported Claude Code and Codex version, prove a later turn in the same running session with no viewer. Race submission with a permission prompt, agent replacement, and a lost reply. See [`kk prompt`](09-commands.md#kk-prompt). A missing proof blocks acceptance for that harness until the interface exists or a new decision changes scope.
+
 - **Client changes.** Detaching a client, killing a client, and attaching a second client change nothing in kiki's state and stop no process.
 - **`kkd` restart.** Killing and restarting `kkd` while agents run leaves every agent running, except an incarnation the unknown-batch rule must restart, once Stage 3 ships.
   - `kkd` verifies the same server instance, reconciles from a snapshot, and continues the same bindings and incarnations, with that one exception.

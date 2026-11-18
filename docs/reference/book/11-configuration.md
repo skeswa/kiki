@@ -321,6 +321,7 @@ An operation is the kind of thing being approved. A rule matches a plan when the
 | `publish`            | `kk publish` (v1.x)                                                                                |
 | `audit-log`          | `kk audit log`                                                                                     |
 | `sensitive-read`     | a read of another thread's transcript, diff, PR comments, or detailed audit arguments              |
+| `prompt`             | submit a later user turn to the target’s live agent                                                |
 | `thread-op`          | any ordinary change to a thread that needs approval only because the caller is not that thread     |
 | `repair:<plan-name>` | one named [repair plan](appendix-a-glossary.md#repair-plan), for example `repair:restart-terminal` |
 | `repair:*`           | every repair plan that has a `repair:` name                                                        |

@@ -532,6 +532,16 @@ See [Terminal runtime](13-architecture/terminal-runtime.md#what-exists-what-kiki
 
 When v1.x [transcript](appendix-a-glossary.md#thread-transcript) capture is enabled, the first-turn prompt is projected as `author=human`, `direction=inbound_to_agent`. Thread creation does not depend on that projection.
 
+## `kk prompt`
+
+Use `kk prompt <thread> -m "Run the unit tests" --request-id <uuid> --json` to start a later user turn in the running conversation. The caller supplies the text with `-m` or standard input, with the same precedence as `kk new`. Empty input is a usage error. The request id is optional for a single submission. A script that might reconnect supplies its own id before the first attempt and reuses it with the same thread and text.
+
+Every submission needs a one-shot approval for the `prompt` operation. The plan shows the target thread and quoted prompt, and binds the exact bytes, request id, and live incarnation. A thread calling across threads also needs the `cross-thread` risk label. The daemon records the claim before submitting. Summary events and audit arguments omit the text.
+
+The harness must accept the text as a fresh user turn in that incarnation while it is ready for one. A busy agent, permission question, pending cascade delivery, repair, or missing adapter proof returns code 4. Kiki sends no keystrokes and queues nothing for later. An expired approval requires a fresh plan. A new submission to a replacement agent needs a fresh plan and request id.
+
+Success returns the request id, thread id, incarnation id, and harness turn receipt. It means the harness accepted the turn. The agent may still be working. If the connection breaks, repeat the request with the same id. The caller gets the recorded outcome or an explicit unknown outcome (code 1) while acceptance cannot be proved. Kiki never resubmits an uncertain request to another incarnation.
+
 ## `kk switch`
 
 `kk switch <thread>` moves your terminal view to another thread. More exactly, it moves the caller's [Herdr client](appendix-a-glossary.md#herdr-client), the terminal view the person who ran the command is attached with, to the target thread's agent pane. It moves that one client and no other.
@@ -1563,7 +1573,7 @@ Scope tiers are recorded in [Orientation](01-orientation.md).
 The headless surface is part of the [acceptance slice](appendix-a-glossary.md#acceptance-slice), because kiki's own end-to-end tests need approvals with no person present. [Build Sequencing](15-build-sequencing.md) stages it:
 
 - **Stage 1:** [`kk daemon install`](#kk-daemon-install), [`kk automation`](#kk-automation) with the policy engine and automation credentials, [`kk events`](#kk-events), [`--json`](#output-for-scripts), and the [exit codes](#exit-codes).
-- **Stage 2:** [`kk wait`](#kk-wait), and the `command` notification provider (see [Configuration](11-configuration.md#the-command-provider)).
+- **Stage 2:** [`kk prompt`](#kk-prompt), [`kk wait`](#kk-wait), and the `command` notification provider (see [Configuration](11-configuration.md#the-command-provider)).
 - **With the features they gate:** `publish` rules arrive with `kk publish`, and `consent:<purpose>` rules arrive with the transcript features.
 
 Two groups of commands are not in the acceptance slice:
