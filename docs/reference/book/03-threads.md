@@ -86,7 +86,7 @@ The reason is that jj leaves an empty, undescribed commit behind after `jj commi
 
 Creation is the one exception. It places the bookmark on the new thread's first commit, which is empty. No earlier commit of the thread exists yet.
 
-**The boundary snapshot.** Close, detach, and publish each take a checkpoint that will be followed by deletion or publication. Before such a checkpoint, preflight takes the **[boundary snapshot](appendix-a-glossary.md#boundary-snapshot)**. Under the thread's [lifecycle lock](appendix-a-glossary.md#lifecycle-lock), with the agent quiescent (idle) wherever that can be proved, kiki snapshots the managed working copy. The pinned head then contains every tracked edit. The checkpoint itself still never snapshots.
+**Preparing a checkpoint.** Close, detach, and publish probe the workspace without writing to jj. They pin a clean head or return the next step. For fresh tracked edits the caller can request [`kk thread snapshot`](09-commands.md#kk-thread-snapshot), then run the original command again. A stale or uncertain workspace takes the ordinary reconciliation or recovery path.
 
 ### Who may move the bookmark where
 
@@ -337,7 +337,7 @@ Kiki surfaces the thread as cascade-pending. It first probes for unsnapshotted e
 2. compares the parent's exact head in that view with the edge's [last synchronized base](appendix-a-glossary.md#synchronized-base), and creates any missing reconciliation intent;
 3. requires every resulting or already-pending transition to be reconciled first. Pending parent work is discarded only with `--discard-pending`, which needs a one-shot approval;
 4. checkpoints the child, in four parts:
-   - it takes the [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) under the same rule as close preflight;
+   - it requires a clean, freshly verified workspace and names any preparation the caller needs;
    - it reads the child's exact live head from the resulting pinned view;
    - it validates the single-parent path from its base;
    - it checkpoints its bookmark to the [checkpoint target](appendix-a-glossary.md#checkpoint-target) for that head, without snapshotting the working copy;
@@ -357,14 +357,13 @@ Close has to be careful because it deletes a directory. A process that is still 
 
 Close runs in two journaled phases.
 
-**1. Preflight** performs no destructive mutation. It does these things:
+**1. Preflight** observes the repo and workspace without changing either. It does these things:
 
-- It synchronously advances the [op-watcher](appendix-a-glossary.md#op-log-watcher) frontier to the repo's current operation heads.
-- It reclassifies every follows child from that pinned view.
-- It waits for selected reconciliations to complete, or records explicit discard choices in the proposed plan.
+- It catches up the watcher using pinned reads of the complete frontier. If the heads need integration, preflight stops and reports it.
+- It classifies the closing thread's link to its own parent and every link from a child. It records the exact frontier, edge identities, and pending intent IDs in the proposed plan. Pending work must finish through its normal protocol, or the caller must explicitly request an eligible discard.
 - It requires [agent quiescence](appendix-a-glossary.md#agent-quiescence) where the harness adapter can prove it. If the agent is working, preflight says so and stops. The caller then waits and runs the close again. A person can also interrupt the agent in its pane, and a script can wait with [`kk wait --for quiescent`](09-commands.md#kk-wait).
 - For a harness version that cannot prove quiescence, preflight proceeds. It warns that a working agent will make the [approval drift](appendix-a-glossary.md#approval-drift).
-- It takes the [boundary snapshot](appendix-a-glossary.md#boundary-snapshot).
+- It requires a clean pinned head for every checkpoint the plan covers. It reports any workspace needing separate preparation.
 - It inventories loss-sensitive files, every process in the terminal group, and every other [holder](appendix-a-glossary.md#holder) of the workspace.
 - It then produces the exact [close-plan fingerprint](appendix-a-glossary.md#close-plan-fingerprint) that is presented for one-shot approval.
 
@@ -374,7 +373,7 @@ Close runs in two journaled phases.
 2. **Post-freeze recheck.** It repeats the frontier refresh and the loss-prevention checks against the frozen workspace (the [post-freeze recheck](appendix-a-glossary.md#post-freeze-recheck)).
 3. **Holder scan.** It scans for [holders](appendix-a-glossary.md#holder) of the workspace outside the frozen set.
 4. **Checkpoint.** It checkpoints the parent bookmark to the exact approved checkpoint target.
-5. **Each child step.** It performs every approved child reconcile, checkpoint, or detach.
+5. **Settle follows links.** Carry out the approved child checkpoints and detaches and end the closing thread's own live subscription. Journal the exact edge and intent outcomes.
 6. **Final proof.** It runs the [final proof](appendix-a-glossary.md#final-proof). Nothing is terminated before it.
 7. **Kiki-side termination with verified exit.** Kiki itself terminates the frozen processes while they are still stopped, and verifies their exit.
 8. **Terminal-container close request.** It asks the runtime to close the terminal group.
@@ -457,7 +456,7 @@ On drift, kiki does the following:
 
 1. It resumes the processes that were running before the freeze. It leaves processes that were already stopped untouched.
 2. It verifies that every member still has its recorded identity, that the terminal group still has every role pane that was live at freeze time, and that the agent launcher answers.
-3. It returns to `Active`.
+3. It returns to `Active` with the original verified binding. Check prior readiness when applicable and preserve `Crashed` if the harness had already exited. A reused PID with a different start time fails the proof.
 4. It presents a fresh plan for a new approval.
 
 The set of roles that had already ended before the freeze is part of the frozen record. Verified resume proves only the roles that were live at freeze time. So a pane the user closed earlier does not fail the resume.
@@ -477,7 +476,7 @@ After the exact post-freeze recheck succeeds, kiki records it and runs the holde
 
 While the parent stays frozen, each automatic child checkpoint/detach applies the approved result of the synchronous protocol in [Detach checkpoint](#detach-checkpoint). Each one verifies the edge deletion.
 
-A child's [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) follows the same rule as close preflight. For a child whose harness cannot prove quiescence, that is the warned rule: the plan warns that the child's agent may be working, and the snapshot is taken under that warning.
+The closing thread and every affected child need a clean pinned head at approval. A new tracked edit invalidates the plan. Release the locks before the caller prepares the affected workspace and begins a fresh close.
 
 Kiki then runs the **[final proof](appendix-a-glossary.md#final-proof)**. It runs immediately before the first step that cannot be resumed from. The final proof checks:
 
@@ -560,7 +559,9 @@ Launch-scoped harness settings live outside the workspace and cannot block close
 
 Plain `kk close` leaves any open PR untouched. `kk close --discard-pr` is the explicit PR-closing path.
 
-Children of a closed thread auto-detach, with notification. Close may not rely on the current intent table alone. Preflight and the post-freeze recheck both do the following before deciding that an edge has no pending transition:
+Close ends every live follows link touching the closing thread. If B follows A, include B's incoming transition and any materialized but unacknowledged delivery in B's close plan. Wait outside the lifecycle lock for normal reconciliation and delivery, or bind an explicit `--discard-pending` choice to the exact eligible intents. Recovery bundles and unresolved edit loss still block close. After the freeze, recheck the frontier under parent-before-child lock order. A new relevant transition requires a fresh plan. Journal the cut at that frontier, retain the owned-stack base and former parent for history and navigation, and delete the settled edge. Recovery replays that cut once. A pre-termination rollback must restore the exact edges and pending outcomes or enter `CloseFailed`.
+
+Children of a closed thread auto-detach, with notification. Preflight and the post-freeze recheck both do the following:
 
 1. synchronously process the complete current op frontier;
 2. compare the parent's exact live head with every edge's [last synchronized base](appendix-a-glossary.md#synchronized-base);
@@ -847,7 +848,7 @@ A projection-diverged active thread cannot enter ordinary close until repair est
 
 The thread stays `Closed` while its `Reopen` lifecycle operation is in progress. Ordinary closed rows are hidden, but this one is not. A `Closed` thread with a `Reopen` operation in progress appears in the default `kk ls` and in the overlay, with the `…` glyph.
 
-The approved plan pins the exact [expected bookmark target](appendix-a-glossary.md#expected-bookmark-target), workspace identity/path, harness, settings strategy, and initial catch-up choice.
+Reopen restores the archived checkpoint as an independent thread. The former parent's later advances create no delivery for it. Native jj rewrites still carry the checkpoint under the ordinary successor rules. The approved plan pins the exact expected bookmark target, workspace identity and path, harness, settings strategy, and catch-up choice.
 
 The normative order is:
 

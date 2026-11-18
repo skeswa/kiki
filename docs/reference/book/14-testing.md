@@ -313,17 +313,18 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
   - It recreates the jj workspace at that exact commit.
   - The reopened head is the new empty working-copy commit on top of it, and the relationship reads `current`.
   - A closed thread whose checkpointed commit was natively rewritten since close reopens at the successor without repair.
-  - Crash injection at every step either adopts the exact resource, [compensates](appendix-a-glossary.md#compensation) back to `Closed`, or records a stable repair plan.
+  - Close a follower with an incoming pending intent. Verify deferral or exact approved discard, then advance its parent while it is closed. Reopen independently with no stale delivery. Repeat with a late transition at the post-freeze check and with a crash after edge removal.
+  - Crash injection at every step either adopts the exact resource, compensates back to `Closed`, or records a stable repair plan.
   - It never exposes `Active` before a matching ready handshake.
   - Every new incarnation independently re-proves exclusive hook control.
 - **Close wants a quiet agent.** [Agent quiescence](appendix-a-glossary.md#agent-quiescence) is the harness adapter's proof that the agent is idle.
   - Where the adapter proves agent quiescence, `kk close` preflight requires it. With a working agent, preflight reports that and exits with no mutation, no freeze, and no approval challenge.
   - For an adapter version with `quiescence_detection: false`, preflight proceeds with a warning. A working agent then produces [approval drift](appendix-a-glossary.md#approval-drift) and a [verified resume](appendix-a-glossary.md#verified-resume), never a loss.
-  - In both cases preflight takes the [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) so that the pinned head contains every tracked edit.
+  - Begin or refuse a dirty close. Verify the workspace bytes, operation frontier, checkpoint and descendants are unchanged. Authorize only `snapshot`, prepare the workspace, then decline close. Verify the new head is recorded and the agent remains active.
 - **No quiescence proof.** These hold for an adapter version with `quiescence_detection: false`:
   - `kk ls` shows `working` whenever the harness is alive and not blocked.
   - It never shows `idle` or `finished`.
-  - When a parent closes, an idle child's snapshot uses the warned rule, the same as close preflight.
+  - A child with fresh tracked edits needs a separate snapshot approval before the parent can close. The snapshot waits for a proven boundary.
 - **Codex permissions without a desktop.** With an empty workspace config and different settings in the real Codex home, launch with the documented user-config arguments. Verify a permitted workspace edit and a denied request outside the sandbox without a prompt. Repeat after reopen and replacement. Check that a conflicting launch argument cannot replace the generated home or hooks.
 - **Follow-up prompt.** On each real supported harness, submit a multiline prompt with command-like text and no attached viewer. Verify one literal user turn with the expected request id in the original conversation. Try a permission prompt between preflight and submission, a busy agent, a pending barrier, an incarnation change, and an unauthorized caller. None receives input. Lose the reply, restart the daemon, then retry concurrently with the same request id. Prove at most one turn and return its receipt when available. Refuse changed text under the same id. No prompt body appears in summaries or audit arguments.
   - Run `kk prompt B` from unrelated thread A with only a `thread:self` allow rule. Verify refusal, then allow the cross-thread plan explicitly. After credential replacement, retry the old request id and verify refusal without a second turn.
@@ -440,7 +441,7 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
     - Resume proves every role that was live at freeze time. It requires those role-launcher identities and the terminal group, and the `agent` launcher must answer.
     - The set of roles that had already ended is part of the frozen record. A `shell` or `ui` pane the user closed before the freeze does not fail the resume.
     - A `user`-pane process that exited during the freeze is reported and is not a failure.
-    - Only then may the thread return to `Active`.
+    - Only then may the thread return to `Active`. Resume the same incarnation without a new handshake, then repeat with a reused PID or missing launcher. Both failures preserve the workspace.
     - An unprovable resume is `CloseFailed` with the workspace present.
     - If a tool batch was in flight when the freeze began, the incarnation's batch state is unknown after resume. The unknown-batch rule then applies: hard restart to a clean boundary with files untouched.
   - Verified exit:
@@ -785,9 +786,9 @@ jj records every change to a repository as an [operation](https://docs.jj-vcs.de
   - A `Reanchor` placement is exempt from nothing. A fixture with one thread's bookmark off the owned chain gets `BookmarkMoved`, never a placement.
   - `kk repair --all` covers every thread in the caller's repo and never crosses repos.
 - **Boundary snapshot.** A [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) is a snapshot of the working copy that kiki itself runs at a safe moment.
-  - It is taken at agent quiescence or a held harness boundary. For a harness that cannot prove quiescence, it is taken at a lifecycle preflight.
+  - A snapshot requires a proven safe boundary, including a passed remnant scan when there is no live incarnation.
   - It is taken under the thread lock and, inside it, the repo jj lock, after a single-head sample. It is attributed and followed by a new sample.
-  - Close, detach, and publish preflight take it so the pinned head contains every tracked edit.
+  - Close, detach, and publish preflight are observational. Repeat the refusal case with a dirty child and with a frontier that needs integration.
   - A `ParentAdvance` whose probe returns `FreshDirty` takes it and proceeds only when the second probe returns `FreshClean`.
   - `StaleDirty` and `Unknown` never take it and go to recovery.
   - The probe itself never snapshots.

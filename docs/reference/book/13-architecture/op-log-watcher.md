@@ -401,7 +401,7 @@ A closed thread has no workspace. Its checkpointed commit can still be rewritten
 
 - **A dirty stale update can conflict the bookmark.** Sometimes `jj workspace update-stale` leaves a workspace's unsnapshotted edits in a second divergent successor. Then a bookmark on that workspace's commit becomes conflicted across both successors. That is `BookmarkConflicted`. It is evidence for the edit-recovery path in [Cascade](../05-cascade.md#unsnapshotted-edit-recovery), not a reason to pick a successor.
 
-A checkpoint placed without snapshotting names the commit jj currently records. If the working copy holds unsnapshotted edits, the next snapshot rewrites that commit and the bookmark follows. That is rule 5, not drift. Close, detach, and publish avoid the gap by taking the boundary snapshot in preflight. So the pinned head already contains every tracked edit.
+A checkpoint placement names the commit jj already records. Close, detach, and publish probe every affected workspace and require a clean pinned head. The caller prepares dirty tracked files in a separate approved snapshot operation.
 
 ### Operation history rewritten
 

@@ -58,7 +58,7 @@ A one-shot approval is how a consequential operation gets permission to run. It 
 
 - **`BeginApproval`** does six things:
   - It authenticates the operation requester. The requester is a thread credential, a registration credential, an automation credential, or, for the cases listed above, Admin.
-  - It performs a non-mutating preflight (a check that changes nothing). The preflight computes the plan's [risk labels](../appendix-a-glossary.md#risk-label). A risk label names one kind of harm the plan carries, such as `work-loss`. [Authority](../04-authority.md#risk-labels) owns the closed set.
+  - It performs an observational preflight. It may persist challenges and audit records. It does not snapshot a workspace, integrate jj heads, or start reconciliation to build a plan. `SnapshotWorkspace` is a separate thread mutation with its own claimed approval and journal. Preflight computes the risk labels.
   - It stores a pending challenge.
   - It evaluates the active automation policy against the caller’s principal, the repo, the operation, and the plan’s risk labels. Consent plans also require the normalized provider identity and current disclosure version. `kkd` evaluates only its stored copy of the policy. It never reads the configuration file here. See [Authority](../04-authority.md#automation-policy).
   - It returns the daemon-canonical display plan, its digest, and its risk labels.

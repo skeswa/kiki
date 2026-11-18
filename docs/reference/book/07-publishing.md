@@ -28,7 +28,7 @@ Publishing is manual by default. Configurable eager modes may later push or open
 
 Before presenting the publish plan for approval, kiki does two things in order:
 
-1. It takes the [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) under the same rule as close preflight. The boundary snapshot records the workspace's tracked edits in [jj](https://docs.jj-vcs.dev/latest/), the version-control tool kiki drives.
+1. It probes each workspace whose checkpoint the stack needs. If tracked edits need preparation, it names the workspace and stops. The caller can run `kk thread snapshot` separately and request a new publish plan.
 2. It then pins the current [operation](https://docs.jj-vcs.dev/latest/operation-log/) view and the exact `thread_head_commit_id`, the commit at the thread's [live head](appendix-a-glossary.md#live-head).
 
 It validates the v1 linear [owned stack](appendix-a-glossary.md#owned-stack). It includes that head in the [plan digest](appendix-a-glossary.md#plan-digest) (a [hash](https://en.wikipedia.org/wiki/Cryptographic_hash_function) of the plan).

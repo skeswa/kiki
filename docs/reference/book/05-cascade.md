@@ -276,20 +276,17 @@ Sometimes kiki needs the agent's unrecorded edits to be recorded in jj before it
 
 The probe never snapshots. One kiki-run command does: the **boundary snapshot**. It is a jj [snapshot](https://docs.jj-vcs.dev/latest/working-copy/) of one managed workspace that [`kkd`](appendix-a-glossary.md#kkd) (the kiki daemon) takes on purpose, and only under all of these conditions:
 
-- one of these holds:
-  - the agent is at [agent quiescence](appendix-a-glossary.md#agent-quiescence); or
-  - its tool batch is held at a harness boundary; or
-  - in a lifecycle preflight for a harness that cannot prove quiescence, the preflight plan warns the caller that the agent may be working. This warned rule also covers an idle child's snapshot during a parent's close;
+- the agent is at proven quiescence, its batch is held at a proven boundary, or there is no live incarnation and the remnant scan passed;
 - the thread's [reconciliation lock](appendix-a-glossary.md#reconciliation-lock) is held;
 - the [repo jj lock](appendix-a-glossary.md#repo-jj-lock) is held, from the frontier sample until the fresh sample afterward;
 - a frontier sample shows exactly one operation head (the [operation frontier](appendix-a-glossary.md#operation-frontier) is the set of newest operations); and
 - the resulting operation is attributed.
 
-Kiki samples the frontier again afterward and reads the result from the exact resulting operation. The boundary snapshot is one of the working-copy commands listed in [Invariants](02-invariants.md). Outside the warned lifecycle preflight above, it is never taken while a tool may be writing.
+Kiki samples the frontier again afterward and reads the exact result. The lifecycle preview itself is read-only.
 
 A boundary snapshot records the workspace's tracked edits in its working-copy commit. It rewrites that commit, so a checkpoint bookmark on it follows under [checkpoint tracking](13-architecture/op-log-watcher.md#checkpoint-tracking). It is used in two places:
 
-- **Lifecycle preflight.** Close, detach, and publish take it in preflight, so the head they pin already contains every tracked edit.
+- **Explicit snapshot preparation.** On a separate one-shot approval, `kk thread snapshot` records fresh tracked edits and reports the resulting head. Close, detach, and publish then start a new read-only preflight.
 - **`ParentAdvance` with fresh edits.** An explicit rebase must not run over unsnapshotted edits. When the probe returns `FreshDirty` at a held boundary, kiki takes the boundary snapshot, probes again, and proceeds only on `FreshClean`.
 
 It is not used for `NativeRewrite`, for two reasons:

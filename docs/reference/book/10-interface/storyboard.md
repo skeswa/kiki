@@ -296,7 +296,7 @@ $ kk close
 
 `kk close` needs a quiet agent; this one finished minutes ago. The close runs in this order (see [Threads · close](../03-threads.md#close)):
 
-1. Preflight takes its [boundary snapshot](../appendix-a-glossary.md#boundary-snapshot) and builds the plan.
+1. Preflight checks that the workspace is clean and builds the plan. If preparation is needed, the developer approves a separate workspace snapshot first.
 2. Kiki shows the plan in an approval card. The card lists the terminal group's processes. It says the approval covers every process in that group at freeze time.
 3. On the developer's `enter`, kiki [freezes](../appendix-a-glossary.md#freeze) every process in the terminal group: the agent, the shell, anything else running in its panes.
 4. It repeats its loss check (the [post-freeze recheck](../appendix-a-glossary.md#post-freeze-recheck)) and scans for [holders](../appendix-a-glossary.md#holder) of the workspace outside the frozen set.

@@ -622,10 +622,10 @@ This section lists rules that must hold across columns and tables. Several of th
   - Entering `Closed` sets the archived `thread_head_commit_id` to the close checkpoint's target. So it requires `bookmark_expected_commit_id == thread_head_commit_id`.
   - The equality must keep holding while `Closed`. A `SameChange` or `Reverted` succession for a closed thread moves the archived `thread_head_commit_id` in the transaction that appends it. No other succession kind is valid there.
   - A reopened thread's live head is the new empty working-copy commit that `jj workspace add` creates on the checkpoint. So it reads `current`.
-  - `Closed` may have one unfinished or failed `Reopen` operation. The reason: reopen does not expose an active thread until its ready handshake commits. Other lifecycle kinds are disallowed there.
+  - `Closed` may have one unfinished or failed `Reopen` operation. An archived thread has no live follows edge. The close journal retains the former links, their cut frontier and the resolution of every pending intent.
 - **`Active`.**
-  - Entering `Active` requires the [ready-handshake](../appendix-a-glossary.md#ready-handshake) transaction.
-  - The ready-handshake commit re-reads the launcher's OS identity and the `Open` `terminal_servers` row before it enters `Active`.
+  - Starting a new incarnation requires a ready handshake. Cancelling preflight preserves the existing binding. Returning after a freeze requires a journaled verified resume of the same binding, prior ready evidence where applicable, server instance, launcher, and original process identities and stop states. Restore affected edges and verify every role that was live at freeze. A previously crashed harness may return to `Active` with `Crashed` agent status. Identity drift, failed compensation, or failure to verify resume stays `CloseFailed`. Once termination begins this route is closed.
+  - A fresh handshake rechecks the launcher's OS identity and the `Open` server row. Verified resume checks PID and start time and treats any in-flight batch as unknown.
   - Staying `Active` requires all of these:
     - no unresolved `thread_projection_issues`;
     - no unfinished lifecycle operation other than a checkpoint operation (publish and detach run on `Active` threads);

@@ -829,6 +829,12 @@ Important flags:
 
 The first publishing release generates a deterministic template from explicit input and non-transcript metadata. AI drafting flags are deferred along with the metadata execution loop and are not part of that release.
 
+## `kk thread snapshot`
+
+`kk thread snapshot [<thread>]` records fresh tracked edits before a later close, detach, or publish. An explicit invocation requests one `snapshot` approval, including when the caller owns the thread. `SnapshotWorkspace` binds the workspace identity, exact starting head and operation, file inventory and fingerprint, and caller to the plan. A thread caller targeting another thread also needs the `cross-thread` risk label. The ordinary CLI and JSON approval flow applies.
+
+After claim, recheck those inputs at a safe boundary under the thread and repo jj locks. A stale, uncertain, or changed workspace stops before the snapshot. Journal the attributed result and report the new pinned head. A retry of the same operation returns that outcome. A later close, detach, or publish starts a separate plan. Declining it leaves the completed snapshot in place. None of these commands requests a snapshot on the caller's behalf.
+
 ## `kk close`
 
 `kk close [<thread>]` archives a thread without deleting tracked jj work; see [Threads](03-threads.md#close). It stops the thread's processes, removes its terminals and workspace directory, and keeps its revisions.
@@ -852,7 +858,7 @@ Close wants a quiet agent. [Agent quiescence](appendix-a-glossary.md#agent-quies
 - Where the harness adapter can prove agent quiescence, preflight requires it. If the agent is working, preflight reports that and exits with code 4 and no mutation. The caller waits and runs `kk close` again. A person can also interrupt the agent in its pane first. A script can wait with [`kk wait --for quiescent`](#kk-wait).
 - For a harness version that cannot prove quiescence, preflight proceeds and warns that a working agent will make the [approval drift](appendix-a-glossary.md#approval-drift).
 
-Preflight then takes the [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) so the pinned head contains every tracked edit, then builds the plan.
+Preflight probes files without snapshotting, integrating operation heads, or starting reconciliation. If tracked edits need preparation, exit with code 4 and identify the workspace and `kk thread snapshot` command. A clean workspace gives the exact head for the plan.
 
 ### What the plan covers
 
@@ -867,7 +873,7 @@ The approval's [fingerprint](appendix-a-glossary.md#close-plan-fingerprint) cove
 - the set of [holders](appendix-a-glossary.md#holder) outside those containers;
 - the workspace state;
 - the [checkpoint target](appendix-a-glossary.md#checkpoint-target);
-- the child threads.
+- incoming and outgoing follows links, their frontier, and any exact pending intents to discard.
 
 It does not cover the list of processes inside each container. Those processes are covered by the container-scope statement and are recorded at freeze. So a process that joins a listed container between preflight and freeze is covered: it is terminated under that statement, and it is not [drift](appendix-a-glossary.md#drift). A "membership change" that counts as drift means a change in the container set, in a role launcher's identity, or in the holders outside the listed containers.
 
@@ -922,7 +928,8 @@ Important flags:
 
 - `--accept-holder <pid>` names one process outside the listed containers that the plan accepts (see [Processes outside the listed containers](#processes-outside-the-listed-containers)). It can be given more than once.
 - `--confirm` asks a person to confirm even when a policy rule allows the plan.
-- `--discard-pr` becomes available with the v1.x publishing integration; it also closes the open PR. Plain acceptance-slice `kk close` is local. It never requires `gh` and never changes remote state.
+- `--discard-pending` requests discard of the listed pending transitions or deliveries on the closing thread's incoming or outgoing edges. The approved plan must accept `discard-pending`. Unresolved file recovery still blocks close.
+- `--discard-pr` ships with publishing. It also closes the open PR. Plain close stays local.
 
 Nothing closes a thread without a one-shot approval. The v1.x auto-archive on PR merge only proposes a close plan; see [Publishing](07-publishing.md).
 

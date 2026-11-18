@@ -215,7 +215,7 @@ So kiki follows two rules:
 
 A closed list of commands is not pinned that way:
 
-- **The [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) and `jj workspace update-stale` in a managed workspace.** Both act on a working copy. The boundary snapshot is a kiki-run snapshot of a managed workspace. Kiki takes it at [agent quiescence](appendix-a-glossary.md#agent-quiescence) or a held harness boundary. For a harness that cannot prove quiescence, kiki may also take it at a lifecycle preflight, after recording a warning in the preflight plan that the agent may be working. The same warned rule covers a child's snapshot during a parent's close. Its purpose is that a pinned head contains every tracked edit before a checkpoint that precedes deletion or publication.
+- **The [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) and `jj workspace update-stale` in a managed workspace.** Both act on the working copy. A lifecycle preview only probes files and pins an existing clean head. Dirty tracked edits require a separate, explicitly requested and approved snapshot at a safe boundary before close, detach, or publish can build a fresh plan. A cascade may also snapshot `FreshDirty` during `ParentAdvance` at its held boundary.
 - **[Deliberate integration](appendix-a-glossary.md#deliberate-integration) of divergent operation heads.** This is what kiki does when a step needs one view and there are several.
 - **The human-invoked passthroughs.** These are the body of `kk status`, and the overlay's diff preview for the caller's own thread. The `kk` CLI runs these in the caller's own workspace as an explicit human request, exactly as if the human had typed the jj command.
 

@@ -179,7 +179,7 @@ A harness version with `quiescence_detection: false` never reports `Quiescent`. 
 
 - `kk ls` shows `working` whenever the harness is alive and not `blocked`.
 - It never shows `idle` or `finished`.
-- When a parent thread closes, an idle child's [boundary snapshot](../appendix-a-glossary.md#boundary-snapshot) uses the warned rule, the same as close preflight: the snapshot is taken with a warning, and a working agent shows up later as [approval drift](../appendix-a-glossary.md#approval-drift).
+- A child with tracked edits needs separately approved preparation before a parent's close. A snapshot needs a proven safe boundary.
 
 ### The permission-prompt signal
 
