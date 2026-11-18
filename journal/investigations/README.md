@@ -32,6 +32,7 @@ Current behavior and scope remain in the [reference book](../../docs/reference/R
 | ---------- | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | 2026-11-17 | Which writing patterns needed revision across the docs? | [Documentation writing review](2026/2026-11-17-documentation-writing-review.md) |
 | 2026-11-18 | Can a script complete the headless workflow?            | [Headless contract review](2026/2026-11-18-headless-contract-review.md)         |
+| 2026-11-18 | Which failure cases does the book leave unresolved?     | [Reference book failure cases](2026/2026-11-18-reference-book-failure-cases.md) |
 
 ## Remote access
 
