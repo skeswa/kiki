@@ -686,6 +686,7 @@ A cascade carries a parent thread's changes into the threads that [follow](appen
 - **Coalescing.** Coalescing updates one pre-materialization intent's base transition and its normalized trigger rows. Once payload preparation begins, later work receives a new ordered intent and cannot mutate the saved delivery.
 - **Stale workspace with hidden edits.** A stale workspace with unsnapshotted edits, or an `Unknown` probe result, enters `RecoveryRequired`.
   - Recovery hard-pauses the agent and enumerates [divergent](https://docs.jj-vcs.dev/latest/glossary/) successors outside the workspace (see [`WorkspaceRecovery`](appendix-a-glossary.md#workspacerecovery)).
+  - With two edit-preserving successors, diagnose in JSON and apply one full commit id without a terminal under a `repair:choose-recovery-successor` rule. Check the chosen tree, retained bundle, and audit record. A missing target returns 2, missing approval returns 3, and a stale or non-preserving target returns 4. Each leaves recovery paused. Crash after selection and after the jj write, and verify one repair completes.
   - It never resumes on a clean successor that hides those edits.
   - The `JjBackend` fake and real jj both return success from a dirty `jj workspace update-stale` while the edited file is gone from disk and present only in the other divergent successor.
   - The test fails any implementation that treats that exit status as preservation.
@@ -1015,7 +1016,7 @@ The cascade tests must cover each case below.
   - with direct materialization that creates no new operation
   - with direct materialization in a [colocated](https://docs.jj-vcs.dev/latest/git-compatibility/) repository that creates one
   - with a concurrently advanced [base transition](appendix-a-glossary.md#base-transition)
-- Recovery verifies edit-bearing divergent successors before choosing the visible result. Ambiguous recovery requires a human to choose.
+- Recovery verifies edit-bearing divergent successors before choosing the visible result. Ambiguous recovery waits for the caller to name a verified successor.
 - `--no-integrate-operation` plus `jj op integrate` feasibility for a planned [`ParentAdvance`](appendix-a-glossary.md#parentadvance), including concurrent external operations.
 
 ### Worked scenarios

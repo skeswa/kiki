@@ -738,7 +738,7 @@ This section lists rules that must hold across columns and tables. Several of th
   - clears the retired soft tuple without claiming acknowledgement;
   - requires the complete `(restart_incarnation_id, restart_startup_delivery_id)` pair;
   - acknowledges only at the first pre-tool hook call of a model turn in that replacement incarnation, matched by incarnation id, after the session-start hook reported the one-use id with `ReportHarnessReady`.
-- **Recovery.** `RecoveryRequired` requires `recovery_reason`, `recovery_bundle_path`, and `recovery_fingerprint`. It is entered only in the transaction that records those bundle fields.
+- **Recovery.** `RecoveryRequired` requires `recovery_reason`, `recovery_bundle_path`, and `recovery_fingerprint`. It is entered only in the transaction that records those bundle fields. For an explicit selection, the repair journal records the intent id, exact operation, bundle fingerprint and chosen commit when it claims the approval. On restart, compare the workspace with the recorded before and after states. Finish the same plan if proved, or stop with the bundle intact. Save the chosen commit and journal id on the intent before resuming delivery.
 - **Conflict flag.** `result_has_conflicts` may be set only together with a result workspace commit. `conflicts_cleared_op_id` may be set only when `result_has_conflicts` is set.
 - **Superseding.** Only a pre-materialization intent may become `Superseded`.
 - **Rebinding and retry bounds.**

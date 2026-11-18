@@ -189,6 +189,7 @@ Every question `kk` can ask for a choice or a value has a flag or an argument th
 | install and start the daemon?                     | run [`kk daemon install`](#kk-daemon-install)           |
 | enroll the approval presenter?                    | `kk init --enroll-presenter` or `--no-enroll-presenter` |
 | which commit should `choose-bookmark-target` use? | `--target <commit>`                                     |
+| which recovery successor should become visible?   | `--target <full-commit-id>`                             |
 | which path should `repoint-workspace` record?     | `--path <path>`                                         |
 | which outside holder does a deleting plan accept? | `--accept-holder <pid>`                                 |
 | which plan should `kk repair` apply?              | `--apply <repair-id>`                                   |
@@ -1111,11 +1112,12 @@ Kiki may repair provably idempotent projection drift automatically in the backgr
 
 Some plans need the caller to choose something. Each such choice is an argument to `--apply`, and it is part of the plan digest:
 
-| Plan                                                                      | Argument                | What it names                                                 |
-| ------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------- |
-| [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target) | `--target <commit>`     | the commit the bookmark is placed on                          |
-| [`repoint-workspace`](appendix-a-glossary.md#repoint-workspace)           | `--path <path>`         | the workspace path kiki records                               |
-| any plan that deletes the workspace                                       | `--accept-holder <pid>` | one outside [holder](appendix-a-glossary.md#holder) to accept |
+| Plan                                                                      | Argument                    | What it names                                                 |
+| ------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------- |
+| [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target) | `--target <commit>`         | the commit the bookmark is placed on                          |
+| [`repoint-workspace`](appendix-a-glossary.md#repoint-workspace)           | `--path <path>`             | the workspace path kiki records                               |
+| `choose-recovery-successor`                                               | `--target <full-commit-id>` | one edit-preserving candidate from the recovery diagnosis     |
+| any plan that deletes the workspace                                       | `--accept-holder <pid>`     | one outside [holder](appendix-a-glossary.md#holder) to accept |
 
 On a terminal, `kk` may ask for a missing choice. Without a terminal it does not ask: the apply exits with code 2 and names the missing argument. No other plan in v1 needs a choice. Where an issue has more than one plan, the caller chooses by plan id.
 
@@ -1148,6 +1150,7 @@ This table is the full list. It names the plan for each issue or failed state an
 | [`WorkspaceDirectoryMissing`][i-wdm]              | [`recreate-workspace`][p-rw]                                                                                                 | none in the thread's own context; one-shot from anywhere else                                                      |
 | [`WorkspaceRecordMissing`][i-wrm]                 | [`reattach-workspace`][p-raw]                                                                                                | none in the thread's own context; one-shot from anywhere else                                                      |
 | [`WorkspacePathMismatch`][i-wpm]                  | [`repoint-workspace`][p-rpw]                                                                                                 | none in the thread's own context; one-shot from anywhere else                                                      |
+| `RecoveryRequired` with ambiguous successors      | [`choose-recovery-successor`](05-cascade.md#recovery-steps)                                                                  | one-shot, bound to intent, operation, bundle fingerprint and selected commit                                       |
 | [exhausted intent][i-ei]                          | [`retry-delivery`][p-rdl], or [`discard-delivery`][p-dd]                                                                     | none in the thread's own context for retry; one-shot for discard                                                   |
 | [`BookmarkMissing`][i-bm]                         | [`restore-bookmark`][p-rb] while the expected target is visible; [`choose-bookmark-target`][p-cbt]                           | restore: none in the thread's own context; one-shot when applied to a different thread; choose: one-shot           |
 | [`BookmarkMoved`][i-bmv]                          | [`restore-bookmark`][p-rb] while the expected target is visible; [`adopt-bookmark`][p-ab]; [`choose-bookmark-target`][p-cbt] | restore: none in the thread's own context; one-shot when applied to a different thread; adopt and choose: one-shot |

@@ -133,6 +133,8 @@ Repair has a diagnose step and an apply step at each of three scopes. Diagnose c
 - The three diagnose methods also accept an automation credential, for any registered repo or thread. They change nothing. An apply from that credential needs a `PolicyApproval`. For a plan that needs a one-shot approval in every context, the rule must name `repair:<plan-name>` or `repair:*`. For a plan that needs none in the thread's own context, such as `restart-agent`, the rule must name `thread-op`. See [Authority](../04-authority.md#the-thread-op-operation).
 - A repair plan never asks a question during apply. A choice a plan needs, such as the target of a bookmark plan, is an argument of the apply call and part of the plan digest.
 
+For a `RecoveryRequired` intent, `DiagnoseRepair` returns the plan id, intent id, operation id, and candidate commit ids with their edit-preservation results. Omit file paths and contents from this diagnosis. `BeginApproval` binds the selected full commit id and recovery-bundle fingerprint into the plan. `ApplyRepair` rechecks the candidate set, selected commit, and workspace under the reconciliation lock and the repo jj lock before materializing. Drift requires fresh diagnosis and approval.
+
 ### Cascade hook
 
 [`kk-hook`](../appendix-a-glossary.md#kk-hook) is a stateless client. Each run makes one call and exits. There is no separate hook-side process.

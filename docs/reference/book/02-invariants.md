@@ -155,7 +155,7 @@ Immediately before reconciliation, kiki proves the stale workspace is clean. If 
 - It runs outside the source workspace.
 - It preserves and lists [divergent](https://docs.jj-vcs.dev/latest/glossary/) successors.
 - It verifies where the edits landed.
-- It resumes only after selecting a result that retains the edits, or after obtaining human direction.
+- It resumes only after verifying that the selected result retains the edits. When several successors qualify, the caller names one in the [recovery plan](05-cascade.md#recovery-steps).
 
 See [`WorkspaceRecovery`](appendix-a-glossary.md#workspacerecovery).
 

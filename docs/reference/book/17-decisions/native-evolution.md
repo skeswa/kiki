@@ -69,7 +69,7 @@ Recovery runs these steps:
 4. It verifies where the edits landed.
 5. It selects a conflict-bearing result only when edit preservation can be proved.
 
-Ambiguity requires human selection. Kiki never resumes the agent in a clean working tree that merely makes the edits harder to find.
+The original design required a person to choose. The current [recovery steps](../05-cascade.md#recovery-steps) also let an authorized script select a verified successor. Kiki never resumes the agent in a clean working tree that merely makes the edits harder to find.
 
 ## Later records
 

@@ -389,7 +389,7 @@ Stage 3 gate:
   - When a lifecycle step needs a single view, kiki integrates deliberately and attributes that operation.
   - A run of `kk ls`, `kk status --no-jj`, and watcher polling during the divergence creates no operation.
 - **Dirty stale update.** `jj workspace update-stale` over unsnapshotted edits exits successfully while the edits live only in a divergent successor. Kiki never treats that success as preservation:
-  - recovery enumerates successors at exact operations,
+  - recovery enumerates successors at exact operations, and a headless caller selects a verified result through the Stage 3 `choose-recovery-successor` repair,
   - verifies where the edits are, and
   - does not resume on the tree that hides them.
 - **Terminal signals are not boundaries.** The agent's screen is idle, Herdr reports the agent idle, and text is queued in the pane. Even so, no reconciliation runs and no intent is acknowledged until the harness boundary proofs in [Cascade](05-cascade.md) hold.
