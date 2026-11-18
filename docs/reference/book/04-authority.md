@@ -85,11 +85,12 @@ A [`PolicyApproval`](appendix-a-glossary.md#policy-approval) capability is the s
 
 This book uses **one-shot approval** to mean either capability. The rule that connects them is stated once, in [Operations that require human approval](#operations-that-require-human-approval): wherever the book asks for a `HumanApproval`, a `PolicyApproval` for the same plan satisfies it.
 
-Three actions can never be approved by a `PolicyApproval`:
+These setup operations can never be approved by a `PolicyApproval`:
 
 - activating a policy;
 - creating or rotating an automation credential;
-- enrolling or recovering the approval presenter.
+- enrolling or recovering the approval presenter with Admin;
+- changing an existing daemon installation.
 
 Each of those needs the presenter or Admin. Otherwise a policy could be used to widen itself.
 
@@ -118,7 +119,7 @@ A host that never has a human does not need an enrolled presenter. On such a hos
 
   This is the path for a machine that never has a human. On a machine with a person, the enrolled presenter can confirm the same actions at a foreground terminal instead.
 
-- There is one more use. When a human runs `kk init` or first run, the approval is begun under the user's Admin bootstrap credential, because no thread credential or registration credential exists yet. So `kk init` calls `BeginApproval` for a repo registration with Admin. The user-scoped `replace-terminal-server` plan (`kk repair --server`) is begun the same way, because it belongs to no repo. Admin can only begin these challenges. Admin is not a policy principal, so no rule matches a challenge begun under Admin. The enrolled presenter must still confirm it, and the registration still consumes the resulting `HumanApproval`.
+- There is one more use. When a human runs `kk init`, the approval is begun under the user's Admin bootstrap credential, because no thread credential or registration credential exists yet. So `kk init` calls `BeginApproval` for a repo registration with Admin. The user-scoped `replace-terminal-server` plan (`kk repair --server`) is begun the same way, because it belongs to no repo. Admin can only begin these challenges. Admin is not a policy principal, so no rule matches a challenge begun under Admin. The enrolled presenter must still confirm it, and the registration still consumes the resulting `HumanApproval`.
 - A caller that presents an automation credential does not use Admin for these. It begins `kk init` and `replace-terminal-server` with the automation credential, and the active policy must have a rule that allows the plan.
 - After enrollment, the daemon authorizes a consequential operation by validating and claiming its one-shot approval. It never accepts Admin in place of that capability.
 
@@ -136,7 +137,7 @@ After a crash, kiki resumes or reconciles that same operation id. It cannot reus
 
 Consequential commands all use one protocol. A confirmation prompt by itself is not authority:
 
-1. **Begin.** The operational client authenticates with its `ThreadScoped`, registration, or automation credential. The exceptions are `kk init`, first run, and the user-scoped `replace-terminal-server` plan when the caller has no automation credential: no thread or registration credential applies, so that approval is begun under the user's [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential). It calls `BeginApproval` with the complete proposed method, target, and security-relevant arguments. The daemon then:
+1. **Begin.** The operational client authenticates with its `ThreadScoped`, registration, or automation credential. For a setup change the requester may also begin under explicit Admin and have the enrolled presenter confirm. The other exceptions are `kk init` and the user-scoped `replace-terminal-server` plan when the caller has no automation credential: no thread or registration credential applies, so that approval is begun under the user's [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential). It calls `BeginApproval` with the complete proposed method, target, and security-relevant arguments. The daemon then:
    - runs a non-mutating preflight;
    - canonicalizes the plan into one fixed form;
    - computes the plan's [risk labels](#risk-labels) and shows them in the rendered plan;

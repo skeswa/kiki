@@ -199,7 +199,7 @@ On a [headless](../appendix-a-glossary.md#headless) host, where no human is pres
 - The operator sets the harness's own permission settings ahead of time, so that the agent does not stop to ask. Those settings stay the harness's, and kiki writes none of them.
   - The settings must reach the managed process through a source that kiki's launch isolation leaves in place. See [Exclusive hook boundary and settings ownership](#exclusive-hook-boundary-and-settings-ownership).
   - For Claude Code, the isolation excludes other `PreToolUse` hooks. It does not exclude the harness's permission settings.
-  - For Codex, the generated `CODEX_HOME` replaces the user layer. So permission settings in the user's real `~/.codex/` do not apply. They must come from the workspace's `.codex/` configuration or from the harness arguments passed at launch.
+  - For Codex, the generated `CODEX_HOME` replaces the user layer. So permission settings in the user's real `~/.codex/` do not apply. The operator can set [Codex launch arguments](../11-configuration.md#sections) in the kiki user config. This works with an empty workspace. Prove on each supported version that the saved arguments take effect on create, reopen, and replacement, with exactly kiki’s hooks active. A conflicting or unsupported setting fails launch before the first prompt.
 - If a prompt appears anyway, the agent waits. Where `attention_events` is proved, the `agent_blocked` event still fires, the thread shows `blocked`, and the event appears in [`kk events`](../09-commands.md#kk-events).
 - A human can answer later. They connect over Secure Shell (SSH), run `kk attach`, and answer in the agent's pane.
 - See [Observability](../12-observability.md).

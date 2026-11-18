@@ -101,7 +101,14 @@ Acceptance-slice sections:
 
 - `[agent]`: the default harness and harness-specific args.
   - The key is `default_harness = "claude-code" | "codex"`, initially `claude-code`. These name [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and [Codex](https://github.com/openai/codex).
-  - Args are keyed per harness, so one repo can default to Claude Code while a thread spawns with `--harness codex`.
+  - Set `[agent.args] codex` to a list of arguments, one string per argument. For example, in `~/.config/kiki/config.toml`:
+
+    ```toml
+    [agent.args]
+    codex = ["--ask-for-approval", "never", "--sandbox", "workspace-write"]
+    ```
+
+    This asks Codex to return a failure when a command needs extra permission. Set the list before creating the thread. Kiki records its resolved launch arguments with the thread and uses them on reopen and replacement. A repeated `--harness-arg` supplies a replacement list for that launch configuration. The adapter refuses settings that defeat its hook isolation or conflict with enforced host restrictions before releasing the launch gate.
 - `[notifications]`: per-event `loud | soft | silent` behavior for acceptance-slice [attention events](appendix-a-glossary.md#attention-event), plus `os_provider` (`auto | notify-rust | osascript | herdr | command | off`) and `command`.
   - Per-event keys hot-reload.
   - `os_provider` and `command` resolve at the next dispatch.
@@ -326,7 +333,7 @@ An operation is the kind of thing being approved. A rule matches a plan when the
 
 Repair plans follow the same split. `repair:<plan-name>` names a plan that needs an approval whoever applies it, such as `restart-terminal` or `terminate-orphans`. A plan that needs no approval in the thread's own context, such as `restart-agent` or `restore-bookmark`, has no `repair:` name. When a caller that is not the thread applies it, the operation is `thread-op`. The [repair table](09-commands.md#every-issue-and-its-plan) in Commands shows which plans need which approval, and [Authority](04-authority.md#the-thread-op-operation) owns the rule.
 
-Three operations are never on this list, because no rule can approve them: activating a policy, creating or rotating an automation credential, and enrolling or recovering the approval presenter. Those need the presenter or the Admin credential.
+Policy activation, credential creation or rotation, and changes to an existing daemon installation need Admin or the enrolled presenter. Only Admin can enroll or recover the presenter. None of these setup actions accepts a policy approval.
 
 #### `accept`
 

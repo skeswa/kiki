@@ -51,6 +51,7 @@ chapter that defines the behavior; do not use a journal entry to override it sil
 | [D-0007](0007-use-portable-user-defined-profiles.md)                     | Let users define profiles and use them across machines                   | Remote access                                 |
 | [D-0008](0008-keep-execution-and-remote-grants-on-the-host.md)           | Keep execution and remote grants on the thread’s host                    | Remote architecture                           |
 | [D-0009](0009-operate-headless-with-a-configurable-automation-policy.md) | Operate fully headless, with a configurable automation policy            | Headless operation and unattended approval    |
+| [D-0010](0010-define-headless-setup.md)                                  | Define headless setup and installation changes                           | Headless operation                            |
 
 ## Earlier design rationale
 

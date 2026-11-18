@@ -90,8 +90,8 @@ Each entry below has the same shape: what the table stores, its columns, and the
 - **`user_credentials`**: the [bootstrap Admin credential](../appendix-a-glossary.md#bootstrap-admin-credential).
   - Columns: `(cred_id, kind: 'Admin', credential_hash, issued_at, revoked_at?)`.
   - The `Admin` credential belongs to the user, not to a repository. So it lives in this database and never in a per-repo `credentials` table.
-  - Admin is accepted only by the bootstrap, presenter-enrollment, and presenter-recovery endpoints, and by `BeginApproval` for the approvals of `kk init` and first run. No thread or registration credential exists yet at that point. It is also accepted by the diagnose call and the `BeginApproval` of the user-scoped `replace-terminal-server` plan, which work from any directory.
-  - Admin is also accepted for three automation steps: activating a policy, and creating or rotating an automation credential. See `automation_policies` and `automation_credentials` below.
+  - Admin is accepted only by the bootstrap, presenter-enrollment, and presenter-recovery endpoints, and by `BeginApproval` for the approval of `kk init`. No thread or registration credential exists yet at that point. It is also accepted by the diagnose call and the `BeginApproval` of the user-scoped `replace-terminal-server` plan, which work from any directory.
+  - Admin can begin a presenter challenge or directly authorize an installation change, policy activation, or credential creation or rotation. See `automation_policies` and `automation_credentials` below.
   - Operational calls cannot substitute Admin for [human approval](../appendix-a-glossary.md#human-approval) or for a [`PolicyApproval`](../appendix-a-glossary.md#policy-approval).
 
 - **`approval_presenters`**: enrollments of foreground channels. A presenter (an [`ApprovalPresenter`](../appendix-a-glossary.md#approvalpresenter)) is an interactive CLI or TUI through which a human confirms an action.
@@ -121,13 +121,14 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - A per-repo row that names an automation caller, such as `approval_challenges.requester_cred_id`, holds this table's `cred_id`.
 
 - **`user_approval_challenges` and `user_human_approvals`**: approval records for operations that have no repository target.
-  - The approvals for `kk init` and first run are stored here. Their requester is the user's Admin bootstrap credential, because the repo has no registration credential yet. When an automation credential begins `kk init`, that credential is the requester instead, and the approval is a `PolicyApproval` from an `init` rule. The same holds for the user-scoped `replace-terminal-server` plan: its requester is Admin, or the automation credential when the caller presents one.
-  - The presenter-confirmed approvals for policy activation and for creating or rotating an automation credential are stored here too. Their `kind` is always `Human`.
+  - The approval for `kk init` is stored here. Its requester is the user's Admin bootstrap credential, because the repo has no registration credential yet. When an automation credential begins `kk init`, that credential is the requester instead, and the approval is a `PolicyApproval` from an `init` rule. The same holds for the user-scoped `replace-terminal-server` plan: its requester is Admin, or the automation credential when the caller presents one.
+  - The presenter-confirmed approvals for policy activation, credential creation or rotation, and installation changes are stored here too. Their `kind` is always `Human`.
   - They are the same two-phase challenge and one-use-capability records described below for `approval_challenges` and `human_approvals`.
   - Repository-scoped confirmations are stored only in the target repository database.
 
 - **`user_approved_operations` and `user_approved_operation_steps`**: durable records of approved operations whose authority must survive without a repo database.
   - They are durable claim envelopes and [idempotent](https://en.wikipedia.org/wiki/Idempotence) step journals. An idempotent step is safe to run again.
+  - A `ChangeDaemonInstallation` record holds the request id, service identity, old and proposed digests, validated definition, and either the explicit Admin credential id or the claimed human approval id. Only one change can be pending. Its steps record replacement, service reload, and verification. The user audit records the result.
   - They cover registration, unregister, and `replace-terminal-server`, among others.
   - Policy activation needs no journal here. It has no effect outside this database, so its approval is claimed and consumed in the one transaction that swaps the active row.
   - Creating or rotating an automation credential under a presenter approval is journaled here, because it writes a file.
@@ -148,6 +149,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - The row carries:
     - the stable identity;
     - references to the thread's [projections](../appendix-a-glossary.md#projection): the [bookmark](../appendix-a-glossary.md#bookmark) name, the [workspace](../appendix-a-glossary.md#workspace), the current [terminal binding](../appendix-a-glossary.md#terminal-binding), and the [harness](../appendix-a-glossary.md#harness);
+    - the resolved harness arguments, saved for reopen and replacement;
     - `thread_head_commit_id`;
     - the checkpoint fields `checkpoint_commit_id`, `checkpoint_change_id`, `checkpoint_op_id`, `bookmark_expected_commit_id`, and `bookmark_expected_op_id`;
     - `owned_stack_base_commit_id`;

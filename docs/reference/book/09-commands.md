@@ -132,11 +132,12 @@ The flow [fails closed](appendix-a-glossary.md#fail-closed): it stops rather tha
 
 ### What a policy can never approve
 
-Three kinds of operation never accept a `PolicyApproval`:
+These setup operations never accept a `PolicyApproval`:
 
 - activating a policy (`kk automation apply`);
 - creating or rotating an automation credential;
-- enrolling or recovering the approval presenter.
+- enrolling or recovering the approval presenter with Admin;
+- changing an existing daemon installation.
 
 Each of these needs a confirmation from the enrolled presenter or the Admin bootstrap credential. See [`kk automation`](#kk-automation) and [First run](#first-run).
 
@@ -297,6 +298,8 @@ The Admin path in the example stands for whatever path `kk daemon install` print
 - A later run that would change an existing installation, such as replacing the service definition after an upgrade, needs a confirmation at a foreground terminal or `--admin-credential-file <path>`.
 - With `--json`, the result includes the service state and the credential path.
 - It exits with code 0 once the daemon answers. It exits with code 4 when the host has no supported user service manager, and the message names `kkd --foreground`.
+
+On a changed install, `kk` starts the existing service definition if needed and contacts that daemon. If it cannot reach the daemon it exits with code 5 and leaves the definition in place. The bootstrap call binds the change to the installed and proposed definitions. An identical rerun after a lost reply resumes the same change. The initial install question is local to `kk`. The first approval for a repo is its registration by `kk init`.
 
 ### Hosts with no user service manager
 

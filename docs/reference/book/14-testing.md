@@ -98,6 +98,7 @@ Some terms used throughout this section:
   - `kk automation apply --admin-credential-file <path>` activates the [automation policy](appendix-a-glossary.md#automation-policy). `kk automation credential create <name> --admin-credential-file <path>` creates an [automation credential](appendix-a-glossary.md#automation-credential).
   - `kk init` run with that automation credential begins its approval with that credential, not with Admin. It succeeds under a matching `init` rule. With no `init` rule it exits with code 3 and registers nothing.
   - No presenter is enrolled at any point in the run.
+  - For an install change, try a stale definition, a lost response, and a daemon restart after the definition is written. Verify the old or requested definition, one journaled change, and the existing Admin identity. An unreachable installed daemon cannot authorize an overwrite.
   - At a terminal, the first-run question about installing the daemon is still asked.
 - **No prompt without a terminal.** With no terminal, `kk` never prompts.
   - Each command that would ask a question fails instead, changes nothing, and names the flag that answers the question. The cases include the target of [`choose-bookmark-target`](appendix-a-glossary.md#choose-bookmark-target), the daemon install question, and presenter enrollment.
@@ -322,6 +323,7 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
   - `kk ls` shows `working` whenever the harness is alive and not blocked.
   - It never shows `idle` or `finished`.
   - When a parent closes, an idle child's snapshot uses the warned rule, the same as close preflight.
+- **Codex permissions without a desktop.** With an empty workspace config and different settings in the real Codex home, launch with the documented user-config arguments. Verify a permitted workspace edit and a denied request outside the sandbox without a prompt. Repeat after reopen and replacement. Check that a conflicting launch argument cannot replace the generated home or hooks.
 - **Permission-prompt signal.** With `attention_events` proved, the named harness event makes the agent read `blocked`. Without that proof, a permission prompt changes nothing, and a crash still gives `blocked`.
 - **Close freeze and step order.** Close finds every process to freeze, records each one before signalling it, and runs its steps in a fixed order.
   - Roots:
@@ -555,7 +557,8 @@ A [projection](appendix-a-glossary.md#projection) is a changeable outside thing 
   - The returning `kkd` verifies the same server instance and continues the same bindings.
   - A platform mode that fails the proof is unsupported. It is not shipped with a weaker promise.
 - **macOS over SSH with no GUI login.** `kkd` and the server run in launchd's per-user domain, not the GUI domain.
-  - The same survival proof is the gate. It is an unproven gate until it passes on a real host with no GUI login.
+  - Start on a host with no graphical login. Disconnect the last SSH session after setup, reconnect, then run the crash, restart, and upgrade tests. A test in a graphical login cannot qualify this mode.
+  - For both headless modes, retain the OS version, supervisor and job settings, service domain or session, process ids **and start times** before and after each step, and the returning daemon’s observed binding. Qualify only the configuration tested. Until that evidence exists, report the mode as unverified and refuse unsupported setup with code 4.
 - **A full lifecycle with zero attached clients.** No Herdr client, overlay, popup, `ui` pane, or desktop session exists at any point in the test.
   - Under an automation credential and an activated policy, the test runs `kk init`, `kk new`, `kk close`, `kk reopen`, and a `kk repair` restart.
   - Each step reaches the same end state as it does with a client attached, and every safety proof runs.
@@ -1046,7 +1049,7 @@ Each module below has its own list of things its tests cover.
 
 `AuthEnforcer` and `ApprovalBroker` tests cover thread-scoped rejection across siblings and operational rejection of Admin. They also cover:
 
-- `BeginApproval` under Admin is accepted only for the approvals of `kk init`, first run, and the user-scoped `replace-terminal-server` plan; Admin cannot confirm the challenge and cannot begin any other approval
+- `BeginApproval` under explicit Admin can begin registration, user-scoped server replacement, and the presenter route for policy activation, credential creation or rotation, and installation changes. Admin cannot act as the confirming presenter
 - Admin passed with `--admin-credential-file` is accepted only by `kk automation apply`, `kk automation credential create` and `rotate`, and a `kk daemon install` that changes an existing installation; a first install needs no credential, and every operational method still rejects Admin
 - `kk init` begun by an automation credential uses that credential for `BeginApproval`, not Admin
 - the user-scoped `replace-terminal-server` plan begun by an automation credential uses that credential too; it runs only under a rule that allows `repair:replace-terminal-server`, accepts `server-wide`, and has `repos = ["*"]`
@@ -1077,7 +1080,7 @@ Each module below has its own list of things its tests cover.
 - **Consent is never matched by `*`.** A rule with `operations = ["*"]` does not match `consent:*`. Only a rule that names `consent:<purpose>` and lists the provider in `providers` does.
 - **A safety-proof refusal still refuses.** Under a rule with `accept = ["*"]`, each of these stops the plan exactly as it does for a human approval: drift, an `Unknown` freeze result, an unaccepted holder, a failed final proof, and a failed verified exit.
 - **`PolicyApproval` single use and drift.** A second claim of the same approval is refused. An expired one is refused. A changed plan digest is refused and needs a fresh `BeginApproval`. The approval is claimed into the operation journal before any external effect, and a crash resumes only that plan.
-- **What a `PolicyApproval` can never satisfy.** Activating a policy, creating or rotating an automation credential, and enrolling or recovering the presenter are each refused when offered a `PolicyApproval`.
+- **What a `PolicyApproval` can never satisfy.** Activating a policy, creating or rotating an automation credential, changing the daemon installation, and enrolling or recovering the presenter are each refused when offered a `PolicyApproval`.
 - **Principals.** `credential:<name>`, `thread:self`, `thread:descendant`, `thread:any`, `registration`, and `*` each match exactly the callers they name. A thread acting on a sibling does not match `thread:self` or `thread:descendant`.
 - **`--confirm`.** With a matching `allow` rule, `--confirm` still runs the human prompt.
 - **Agents.** `ConfirmApproval` from a descendant of an `agent` launcher stays refused. An agent's call is allowed only through a rule with a `thread:*` principal.
