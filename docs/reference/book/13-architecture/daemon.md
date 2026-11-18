@@ -32,8 +32,8 @@ Terminals live in a separate, [dedicated Herdr server](../appendix-a-glossary.md
   - On first start it creates the state directory and the Admin bootstrap credential if they are absent, and logs the credential's path.
   - `kk` never starts `kkd` in this mode. If `kkd` is not running, `kk` fails with exit code 5.
   - With no service manager to ask, `kkd` starts the Herdr server as a detached process in its own OS session. The server is then not a member of `kkd`'s session or [process group](https://en.wikipedia.org/wiki/Process_group).
-  - The same survival proof is a gate for this mode: the test kills `kkd` under the supervisor and checks that the server and the agents keep running. A supervisor that stops every process it started, as some container runtimes do, fails the gate. A platform mode that fails the gate is unsupported. This gate is unproven.
-  - The operator's supervisor is what restarts `kkd`. If nothing restarts it, the server and the agents keep running, and every `kk` command fails with exit code 5 until `kkd` is back.
+  - The same survival proof is a gate for this mode: the test kills `kkd` under the supervisor and checks that the server and the agents keep running. If a supervisor also stops the server or agents when restarting the daemon, that configuration fails the gate. A separate OS session alone does not prove survival. A platform mode that fails the gate is unsupported. This gate is unproven.
+  - The operator's supervisor is what restarts `kkd`. If nothing restarts it, the server and the agents keep running, and commands that need the daemon fail with exit code 5 until `kkd` is back.
 - **Reboot survival.** The service manager restarts `kkd` after a crash, logout, or reboot. In the `kkd --foreground` mode, the operator's supervisor does this instead.
   - Recovery on restart reads sqlite ([SQLite](https://www.sqlite.org/), kiki's database). Threads survive crashes and reboots.
   - Agent processes do not survive a reboot. Their threads read [`TerminalMissing`](../appendix-a-glossary.md#terminalmissing) afterwards.
@@ -261,11 +261,11 @@ Where the OS offers a process handle, such as a [pidfd](https://man7.org/linux/m
 The [automation policy](../appendix-a-glossary.md#automation-policy) is the set of rules that lets a plan run with no human confirming it. [Authority](../04-authority.md#automation-policy) owns its meaning. This section says where it lives in the daemon.
 
 - **The evaluator.** The policy evaluator is pure logic in `kiki-core`. It takes a canonical policy and one request, and it returns a `PolicyDecision`: `Allowed{rule}`, `RequireHuman{rule}`, or `NoMatch`. It opens no file and reads no database. See [Crate layout](crates.md#where-each-named-module-lives).
-- **Who calls it.** Only the approval broker calls it, and only inside `BeginApproval`. The broker supplies the four inputs:
+- **Who calls it.** Only the approval broker calls it, and only inside `BeginApproval`. The broker supplies these inputs:
   - the principal, which it works out from the caller's credential and, for a thread caller, from the [follows](../appendix-a-glossary.md#follows) graph;
   - the repo;
   - the operation name; and
-  - the plan's risk labels, which the preflight computed.
+  - the plan’s risk labels, which the preflight computed. For a consent plan the broker also supplies the normalized provider identity and current disclosure version.
 - **What it replaces.** The policy replaces only the human's confirm step. It runs after the preflight and before nothing else changes. Freeze, holder scans, the final proof, and verified exit run the same way under either kind of approval. A plan that a safety proof refuses is refused, whatever the policy says.
 - **When the policy is loaded.** `kkd` loads the active policy at three moments:
   - at daemon start, from the active row of `automation_policies` in the user database, before it serves any call;

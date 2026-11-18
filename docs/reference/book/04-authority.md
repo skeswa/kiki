@@ -50,11 +50,13 @@ An [`AutomationScoped<name>`](appendix-a-glossary.md#automation-credential) cred
 - is presented by a caller through the `KIKI_AUTOMATION_CREDENTIAL_FILE` environment variable or the `--automation-credential-file <path>` flag;
 - is user-scoped. It belongs to no single repo and no single thread.
 
-By itself, an automation credential may do only three things:
+For repo and thread work, an automation credential has these starting permissions. It can also look up its own prompt receipts and use the local status, list, and revoke methods described below.
 
 - read the [repo summary](appendix-a-glossary.md#repo-summary-read-scope) for every registered repo;
 - read the status and non-sensitive state of each registered thread. This is what `kk status`, `kk ls`, `kk events`, `kk wait`, and the diagnose step of `kk repair` need. A [sensitive read](#sensitive-reads) still needs a rule that allows `sensitive-read`;
 - call `BeginApproval` for any registered repo or thread, for `kk init`, and for the user-scoped `replace-terminal-server` plan.
+
+A plan begun with this credential can only receive a policy approval. Even with a terminal, a presenter cannot confirm that challenge. A person may begin a fresh plan with their own command credential.
 
 Every consequential thing it does goes through the [automation policy](#automation-policy). A rule names the credential as the principal `credential:<name>`. With no rule that allows the plan, the call fails closed.
 
@@ -92,7 +94,7 @@ These setup operations can never be approved by a `PolicyApproval`:
 - enrolling or recovering the approval presenter with Admin;
 - changing an existing daemon installation.
 
-Each of those needs the presenter or Admin. Otherwise a policy could be used to widen itself.
+An enrolled presenter or explicit Admin can authorize an installation change, policy activation, or automation credential creation or rotation. Presenter enrollment and recovery require Admin and a person at the terminal.
 
 ### `ApprovalPresenter`
 
@@ -174,7 +176,7 @@ For `RequireHuman` and `NoMatch`, what happens next depends on the caller:
 - **With a foreground terminal,** the presenter flow runs, exactly as in phase 2 above.
 - **Without a terminal,** the command [fails closed](appendix-a-glossary.md#fail-closed). It exits with [code 3](09-commands.md#exit-codes). Its message names the operation, the plan's risk labels, and the reason: no rule matched, or rule `<name>` requires a human.
 
-`kkd` still refuses `ConfirmApproval` from a process that is a descendant or session member of an agent launcher. So an agent can never confirm a human challenge. An agent gets approval authority only through a rule whose principal is one of the `thread:` values.
+`kkd` still refuses `ConfirmApproval` from a process that is a descendant or session member of an agent launcher. So an agent can never confirm a human challenge. An agent gets approval authority only through a rule whose principal matches its thread credential, including the wildcard `*`.
 
 ## Thread-scoped permissions
 
@@ -201,7 +203,7 @@ The transport checks both the credential's scope and the requested target. Suppl
 
 The following require a [`HumanApproval`](appendix-a-glossary.md#human-approval) bound to the exact method and target, even when the caller already holds a valid thread credential.
 
-One general rule applies to this list and to the whole book. Wherever the book says an operation needs a `HumanApproval`, a [`PolicyApproval`](#policyapproval) for the same plan satisfies it. The book keeps the name `HumanApproval` in those places and does not repeat this rule each time. The [three exceptions](#policyapproval) are policy activation, automation credential creation and rotation, and presenter enrollment and recovery.
+One general rule applies to this list and to the whole book. Wherever the book says an operation needs a `HumanApproval`, a [`PolicyApproval`](#policyapproval) for the same plan satisfies it. The book keeps the name `HumanApproval` in those places and does not repeat this rule each time. [Setup operations](#policyapproval) have their own bootstrap rules.
 
 The list:
 
@@ -326,7 +328,7 @@ accept     = ["*"]
 effect     = "allow"
 ```
 
-This rule hands every approval except provider-egress consent to any local caller, including every agent. kiki allows it because the owner decides the policy. It is not a default, and nothing sets it without an explicit activation.
+This rule hands every policy-eligible approval except provider-egress consent to any matching local caller, including every agent. kiki allows it because the owner decides the policy. It is not a default, and nothing sets it without an explicit activation.
 
 ### Risk labels
 
@@ -362,10 +364,11 @@ A rule matches a plan when all of these hold:
 
 1. `principals` contains a value that fits the caller.
 2. `repos` contains the plan's repo, or `*`.
-3. `operations` contains the plan's operation. `repair:*` covers every repair plan that has a `repair:` name, and `*` covers every operation except consent.
-4. For an `allow` rule only: every risk label of the plan is in `accept`. A plan with a label the rule does not accept is not matched by that rule.
+3. For consent, the rule explicitly lists the purpose and normalized provider, and its activation covers the current disclosure version. This applies to both effects.
+4. `operations` contains the plan's operation. `repair:*` covers every repair plan that has a `repair:` name, and `*` covers every operation except consent.
+5. For an `allow` rule only: every risk label of the plan is in `accept`. A plan with a label the rule does not accept is not matched by that rule.
 
-A `require-human` rule ignores `accept`. It matches on principals, repos, and operations alone, whatever risk labels the plan has.
+A `require-human` rule ignores `accept`. It matches on principals, repos, and operations, and on provider for a consent rule. Risk labels cannot narrow it.
 
 Then `kkd` picks the decision:
 

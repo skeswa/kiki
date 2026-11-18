@@ -168,7 +168,7 @@ Catch-up source queries must exclude `synthesized=true` rows. This prevents reop
 
 ## Read API
 
-This section says who can read a transcript and through which door. The human reads through a command; an agent may later read its own thread's transcript, but only after the human has agreed to send that text to the provider.
+This section says who can read a transcript and through which door. A person can use the transcript command. An agent may read its own transcript through MCP once the exact provider and purpose have a recorded consent grant.
 
 **Human reads.** The v1.x human CLI reads transcripts through `kk thread transcript`. Query modes cover by-change reads, full-text search, change ranges, tail reads, and filtering by anchored, tombstoned, or synthesized rows. The flag surface lives in [Commands](09-commands.md#kk-thread-transcript).
 
@@ -206,7 +206,7 @@ Provider-egress consent is a privacy policy record. It is not a `HumanApproval` 
 - A `*` in the rule's `operations` never matches a consent operation. A rule that approves everything else still gives no consent.
 - The rule counts only after `kk automation apply` activates it. Writing it in the config file grants nothing.
 - The rule stands in for the person's confirmation only. `kkd` still records the consent with the same tuple, and it writes an audit row with the rule name and the policy digest.
-- A change in provider, endpoint, account/tenant, or disclosure version still fails closed, unless the rule also lists the new provider identity.
+- A changed provider, endpoint, or account needs a fresh grant for the new identity. Each activated consent rule is bound to the disclosure version shown at activation. A changed disclosure requires a new activation or a fresh presenter grant.
 - Consent rules ship with the transcript features they gate, which are v1.x.
 
 **Storage and revocation.** Consent records live in the registered repo's SQLite database. They are inspectable and revocable. Revocation takes effect before the next provider-bound read. It does not recall content already sent. Revoking a record does not change the policy: while a consent rule stays active, it can give the consent again. To stop that, remove the rule and run `kk automation apply`, or run `kk automation revoke`.

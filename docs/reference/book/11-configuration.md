@@ -143,7 +143,7 @@ The second path exists so that a machine with no human can still use a provider-
 
 - The rule must list the operation as `consent:<purpose>`, for example `consent:catch_up`. A `*` in `operations` never matches a consent operation.
 - The rule must also carry `providers`, a list of normalized provider identities. A consent rule without `providers` is invalid. There is no `*` for providers.
-- The rule counts only after the policy is activated. Writing it in the file grants nothing. See [The file does nothing until it is activated](#the-file-does-nothing-until-it-is-activated).
+- The canonical rule shown at activation includes the current disclosure version. A disclosure change requires the operator to apply the rule again. Writing it in the file grants nothing. See [The file does nothing until it is activated](#the-file-does-nothing-until-it-is-activated).
 - The rule stands in for the human's confirmation of that one grant. The grant is still recorded in the repo database under the same key, and `kk privacy consent` can still inspect and revoke it.
 
 Consent rules ship with the provider-backed features they gate, which are v1.x. [Automation keys](#automation-keys) owns the rule schema.
@@ -282,7 +282,7 @@ A policy is a list of rules. Each rule is one `[[automation.rule]]` table. The d
 
 `name` identifies the rule. It appears in every audit row the rule produces and in the message `kk` prints when the rule approves or refuses a plan.
 
-`repos` says which registered repos the rule covers. A repo id is the UUID that `kk init` assigned. A canonical repo path is the repo's real path with symbolic links resolved. `*` covers every registered repo, and it also covers `kk init` for a repo that is not registered yet.
+`repos` says which registered repos the rule covers. A repo id is the UUID that `kk init` assigned. A canonical repo path is the repo's real path with symbolic links resolved. `kk init` matches its canonical path or `*` before registration. The user-wide `replace-terminal-server` plan requires `repos = ["*"]` because it can stop agents across every repo.
 
 `kk automation apply` checks the whole section before it activates anything. It refuses the policy if a rule lacks a required key, repeats a `name`, uses a value outside the allowed set, or has a key this table does not list. The active policy then stays as it was. This is stricter than the general rule that unknown keys only warn. A mistyped key in a rule about authority must not pass silently.
 
@@ -299,7 +299,7 @@ A principal is who is asking. A rule matches a caller when the caller is at leas
 | `registration`      | a caller that holds only the repo's registration credential                                                                     |
 | `*`                 | any caller at all                                                                                                               |
 
-An automation credential is a named credential made for scripts. It is created with `kk automation credential create <name>` and kept in `~/.config/kiki/automation/<name>.cred`. kiki never gives it to an agent. The `thread:` principals are the only way an agent gets authority from the policy.
+An automation credential is a named credential made for scripts. It is created with `kk automation credential create <name>` and kept in `~/.config/kiki/automation/<name>.cred`. kiki never gives it to an agent. An agent uses its thread credential. Rules can match it through a `thread:` principal or the wildcard `*`.
 
 A `thread:` principal covers any holder of the thread's credential. That is the thread's agent, and it is also a person who runs `kk` in that thread's workspace. kiki cannot tell the two apart, so a `thread:` rule applies to both.
 
@@ -342,7 +342,7 @@ Some plans carry risk. `kkd` works out the risk of each plan before it asks for 
 
 `accept` lists the labels an `allow` rule is willing to take on. An `allow` rule matches a plan only if every label on the plan is in the rule's `accept` list. With `accept` left empty, the rule matches only plans that carry no label.
 
-Only `allow` rules use `accept`. A `require-human` rule ignores it. Such a rule matches on `principals`, `repos`, and `operations` alone, whatever labels the plan carries.
+Only `allow` rules use `accept`. A `require-human` rule ignores it. Such a rule matches on `principals`, `repos`, and `operations`, plus the provider for a consent rule. It applies whatever labels the plan carries.
 
 #### `effect`
 
@@ -410,7 +410,7 @@ accept     = ["*"]
 effect     = "allow"
 ```
 
-Once activated, this rule hands every approval to any local caller. Any process running as you can then close and destroy threads, lose uncommitted work, abandon revisions, and stop the whole terminal server, with no person asked. That includes every agent and every script an agent starts. The safety proofs still run, and consent still needs its own rule. Nothing else stands in the way.
+Once activated, this rule allows any matching local credential to approve policy-eligible plans except provider consent. Any process running as you can then close and destroy threads, lose uncommitted work, abandon revisions, and stop the whole terminal server, with no person asked. That includes every agent and every script an agent starts. The safety proofs still run, and consent still needs its own rule. Nothing else stands in the way.
 
 Each `*` gives away one thing:
 

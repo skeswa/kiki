@@ -606,8 +606,8 @@ The operator in these stories runs kiki on a machine like a build server, a cont
      - A rule either allows the plan or requires a human. A rule that requires a human wins over any rule that allows.
      - Only a rule that allows uses `accept`. A rule that requires a human matches whatever risk labels the plan has.
      - A plan that no rule matches needs a human, as it does with no policy at all.
-     - An agent gets authority from the policy only through a `thread:` principal I chose to write. An agent can never confirm a human's approval.
-     - I may write `*` in every field. I understand that this hands every approval to any local caller, and the book says so plainly.
+     - An agent gets authority from the policy through rules that match its thread credential, including the wildcard principal. An agent can never confirm a human's approval.
+     - I may use `*` for principals, repos, operations, and accepted risks. This grants any matching local caller every policy-eligible operation except provider consent. Consent names a purpose and a provider.
 149. As an operator, I want a policy rule to replace only the human's confirmation and never a safety check, so that unattended does not mean unsafe.
      - The plan, its digest, the drift and expiry checks, the freeze, the holder scan, the final proof, and verified exit all still run.
      - A plan that a safety proof refuses is refused under any rule, even one that accepts every label.

@@ -93,12 +93,14 @@ A `PolicyApproval` is bound to the same things as a `HumanApproval`: the caller'
 
 ### The human path
 
-On `RequireHuman` or `NoMatch`, `kk` needs a person:
+An automation credential can claim only a policy approval. If its call gets `RequireHuman` or `NoMatch`, or requests `--confirm`, it exits with code 3. A person can begin a fresh plan with their normal command credential.
+
+For such a caller, on `RequireHuman` or `NoMatch`:
 
 1. `kk` verifies that its stdin/stdout terminal is in the [foreground](<https://en.wikipedia.org/wiki/Job_control_(Unix)>).
 2. The person confirms or cancels the challenge. `kk` sends the answer with its separately enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) credential.
 
-`ConfirmApproval` is refused when the presenter process is a descendant or [session](https://en.wikipedia.org/wiki/Process_group) member of any recorded `agent`-role launcher. So a `kk` started by an agent cannot confirm. An agent gets approvals only from a policy rule whose principal is `thread:self`, `thread:descendant`, or `thread:any`. This is approval hygiene under the cooperative model, not a security boundary.
+`ConfirmApproval` is refused when the presenter process is a descendant or [session](https://en.wikipedia.org/wiki/Process_group) member of any recorded `agent`-role launcher. So a `kk` started by an agent cannot confirm. An agent gets approvals only from a policy rule whose principal matches its thread credential, either explicitly or through `*`. This is approval hygiene under the cooperative model, not a security boundary.
 
 ### When no approval is available
 
@@ -139,7 +141,7 @@ These setup operations never accept a `PolicyApproval`:
 - enrolling or recovering the approval presenter with Admin;
 - changing an existing daemon installation.
 
-Each of these needs a confirmation from the enrolled presenter or the Admin bootstrap credential. See [`kk automation`](#kk-automation) and [First run](#first-run).
+Presenter enrollment and recovery require explicit Admin and a person at the terminal. For the other setup operations, either the enrolled presenter or explicit Admin can authorize the change. See [`kk automation`](#kk-automation) and [First run](#first-run).
 
 ### What does not exist
 
@@ -253,7 +255,7 @@ A person's approval needs an enrolled [`ApprovalPresenter`](appendix-a-glossary.
 - A policy rule can never enroll or recover a presenter.
 - A machine can run with no presenter at all. Then every approval comes from the activated policy, and an operation with no matching rule fails closed with exit code 3.
 
-### Which credential begins the first approvals
+### Which credential begins registration
 
 An approval is normally begun with a thread credential or a repo's registration credential. During `kk init`, neither exists yet: the registration credential is issued only when the registration completes.
 
@@ -264,7 +266,7 @@ An approval is normally begun with a thread credential or a repo's registration 
 
 ### A machine with no human
 
-A build server, a container, or a remote host may never have a person at a terminal. Such a machine is set up with four commands and no prompt:
+On a supported host with a user service manager, a setup script can use these commands without a terminal. On a qualified host without a service manager, start supervised `kkd --foreground` in place of the first command and use the Admin path it logs.
 
 1. `kk daemon install` installs and starts `kkd`. It creates the Admin bootstrap credential and prints the path of the credential file.
 2. `kk automation apply --admin-credential-file <path>` activates the `[automation]` policy written in the user config file.
@@ -294,7 +296,7 @@ The Admin path in the example stands for whatever path `kk daemon install` print
 
 - It installs `kkd` under the user's service manager: [launchd](https://en.wikipedia.org/wiki/Launchd) on macOS, a [systemd](https://en.wikipedia.org/wiki/Systemd) user unit on Linux. Then it starts the daemon.
 - A first install creates the [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential) and prints the path of its file. The file is outside every managed workspace.
-- A first install needs no approval and no credential. No daemon exists yet to give an approval, and the command registers no repo and starts no agent.
+- A first install requires both the service definition and prior bootstrap state to be absent. A missing definition alongside existing state reports an incomplete installation and preserves the existing Admin identity. A first install needs no approval and no credential. No daemon exists yet to give an approval, and the command registers no repo and starts no agent.
 - Running it again is safe. It reports that the daemon is installed and running, prints the same credential path, and creates no second credential.
 - A later run that would change an existing installation, such as replacing the service definition after an upgrade, needs a confirmation at a foreground terminal or `--admin-credential-file <path>`.
 - With `--json`, the result includes the service state and the credential path.
@@ -308,7 +310,7 @@ Many containers and CI ([continuous integration](https://en.wikipedia.org/wiki/C
 
 - `kkd --foreground` stays attached to the process that started it and does not register a service.
 - On its first start it creates the Admin bootstrap credential and logs the path of its file. This does what a first `kk daemon install` does on other hosts.
-- It starts the dedicated Herdr server as a detached process in its own [session](https://en.wikipedia.org/wiki/Process_group), so the server does not die with `kkd`.
+- It starts the dedicated Herdr server as a detached process in its own [session](https://en.wikipedia.org/wiki/Process_group), and must pass the survival test below under the actual supervisor.
 
 Two things here are [acceptance gates](appendix-a-glossary.md#acceptance-gate), not established facts:
 
@@ -351,7 +353,7 @@ More rules:
 - A policy that does not parse, or that names an unknown operation or risk label, is refused with exit code 2. The active policy stays as it was.
 - This step is the reason an agent cannot grant itself authority by editing a config file. As with presenter enrollment, it is hygiene under the cooperative same-user model, not a security boundary.
 
-The policy can be as wide as the user wants, including `principals = ["*"]`, `operations = ["*"]`, and `accept = ["*"]`. That policy hands every approval to any local caller, and the confirmation screen says so.
+The policy can be as wide as the user wants, including `principals = ["*"]`, `operations = ["*"]`, and `accept = ["*"]`. That policy allows any matching local credential to approve policy-eligible plans except provider consent, and the confirmation screen says so.
 
 ### `kk automation status`
 
@@ -389,7 +391,7 @@ A caller presents the credential in one of two ways:
 What the credential is:
 
 - It belongs to the user, not to one repo or thread. A policy rule names it as the principal `credential:<name>`.
-- By itself it may do three things:
+- For repo and thread work it starts with these permissions. It can also look up its own prompt receipts and use the local status, list, and revoke commands.
   - read the repo summary of every registered repo;
   - read each registered thread's status and non-sensitive state. That is what `kk status`, `kk ls`, `kk events`, `kk wait`, and `kk repair` without `--apply` need. A sensitive read, such as a transcript or a diff, still needs a rule that allows `sensitive-read`;
   - call `BeginApproval` for any registered repo or thread, for `kk init`, and for the user-scoped `replace-terminal-server` plan.
@@ -481,7 +483,7 @@ Thread creation requires a one-shot [approval](#foreground-approval-flow). In a 
 - the harness;
 - a digest of the initial input.
 
-With no policy rule, only a person at a foreground terminal can approve a new thread. So by default an agent cannot spawn one. An agent can create threads only when the activated policy has a rule with the `thread:any` principal that allows `new`. Neither path gives the CLI reusable Admin authority.
+With no policy rule, only a person at a foreground terminal can approve a new thread. So by default an agent cannot spawn one. An agent can create threads only when the activated policy has a rule that allows `new` for the `thread:any` or `*` principal. Neither path gives the CLI reusable Admin authority.
 
 Without a terminal and without a rule that allows the plan, `kk new` exits with code 3 and creates nothing.
 
@@ -783,7 +785,7 @@ It is how a script, or a person with no overlay, watches kiki. It reads kiki's o
 
 The repo stream carries summary-class fields only: the same kind of data as [`kk ls`](#kk-ls). It never carries transcript text or other content that needs a [sensitive read](04-authority.md#sensitive-reads). So it needs no approval, and a registration credential or an automation credential can read it.
 
-When a harness stops to ask its own permission question, the stream shows `agent_blocked`. Kiki never answers a harness's own prompt. On a machine with no person, the operator sets the harness's own permission settings ahead of time. A person can also answer later, through `kk attach` over SSH.
+When a harness with proven `attention_events` stops to ask its own permission question, the stream shows `agent_blocked`. Kiki never answers a harness's own prompt. On a machine with no person, the operator sets the harness's own permission settings ahead of time. A person can also answer later, through `kk attach` over SSH.
 
 ## `kk wait`
 

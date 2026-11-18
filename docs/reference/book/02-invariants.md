@@ -215,7 +215,7 @@ So kiki follows two rules:
 
 A closed list of commands is not pinned that way:
 
-- **The [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) and `jj workspace update-stale` in a managed workspace.** Both act on a working copy. The boundary snapshot is a kiki-run snapshot of a managed workspace. Kiki takes it at [agent quiescence](appendix-a-glossary.md#agent-quiescence) or a held harness boundary. For a harness that cannot prove quiescence, kiki may also take it at a lifecycle preflight, after warning the human that the agent may be working. The same warned rule covers a child's snapshot during a parent's close. Its purpose is that a pinned head contains every tracked edit before a checkpoint that precedes deletion or publication.
+- **The [boundary snapshot](appendix-a-glossary.md#boundary-snapshot) and `jj workspace update-stale` in a managed workspace.** Both act on a working copy. The boundary snapshot is a kiki-run snapshot of a managed workspace. Kiki takes it at [agent quiescence](appendix-a-glossary.md#agent-quiescence) or a held harness boundary. For a harness that cannot prove quiescence, kiki may also take it at a lifecycle preflight, after recording a warning in the preflight plan that the agent may be working. The same warned rule covers a child's snapshot during a parent's close. Its purpose is that a pinned head contains every tracked edit before a checkpoint that precedes deletion or publication.
 - **[Deliberate integration](appendix-a-glossary.md#deliberate-integration) of divergent operation heads.** This is what kiki does when a step needs one view and there are several.
 - **The human-invoked passthroughs.** These are the body of `kk status`, and the overlay's diff preview for the caller's own thread. The `kk` CLI runs these in the caller's own workspace as an explicit human request, exactly as if the human had typed the jj command.
 
@@ -314,7 +314,7 @@ kiki is fully operable [headless](appendix-a-glossary.md#headless). That word co
 
 **No human is required, when a policy says so.** An activated automation policy can stand in for the human's confirmation, as [Authority is explicit](#authority-is-explicit) states. Events that would call for a person's attention still surface as events and states that a script can read with [`kk events`](09-commands.md#kk-events) and `--json` output.
 
-One thing stays outside kiki's reach. kiki never answers a harness's own permission prompt. On a host with no human, the operator sets the harness's own permission settings. A waiting prompt still shows as a `blocked` agent.
+One thing stays outside kiki's reach. kiki never answers a harness's own permission prompt. On a host with no human, the operator sets the harness's own permission settings. A waiting prompt shows as `blocked` on harness versions with proven permission-prompt detection.
 
 See [Automation policy](04-authority.md#automation-policy) for the rules.
 

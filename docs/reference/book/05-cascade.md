@@ -279,7 +279,7 @@ The probe never snapshots. One kiki-run command does: the **boundary snapshot**.
 - one of these holds:
   - the agent is at [agent quiescence](appendix-a-glossary.md#agent-quiescence); or
   - its tool batch is held at a harness boundary; or
-  - in a lifecycle preflight for a harness that cannot prove quiescence, the human has been warned that the agent may be working. This warned rule also covers an idle child's snapshot during a parent's close;
+  - in a lifecycle preflight for a harness that cannot prove quiescence, the preflight plan warns the caller that the agent may be working. This warned rule also covers an idle child's snapshot during a parent's close;
 - the thread's [reconciliation lock](appendix-a-glossary.md#reconciliation-lock) is held;
 - the [repo jj lock](appendix-a-glossary.md#repo-jj-lock) is held, from the frontier sample until the fresh sample afterward;
 - a frontier sample shows exactly one operation head (the [operation frontier](appendix-a-glossary.md#operation-frontier) is the set of newest operations); and
@@ -647,11 +647,11 @@ When attempts for one intent keep failing their handshake, kiki stops retrying. 
 - keeps the agent hard-paused; and
 - raises a loud [attention event](appendix-a-glossary.md#attention-event).
 
-Resumption is an explicit human action, never another silent loop. A daemon restart resumes that recorded state and re-surfaces the blocked thread. It does not mint a fresh attempt against an [exhausted intent](appendix-a-glossary.md#exhausted-intent).
+Resumption needs an explicit repair request. A daemon restart resumes that recorded state and re-surfaces the blocked thread. It does not mint a fresh attempt against an [exhausted intent](appendix-a-glossary.md#exhausted-intent).
 
 ### Repairing an exhausted intent
 
-The human path out is `kk repair`. It diagnoses an exhausted intent to exactly two named plans, [`retry-delivery`](appendix-a-glossary.md#retry-delivery) and [`discard-delivery`](appendix-a-glossary.md#discard-delivery). (A [repair plan](appendix-a-glossary.md#repair-plan) is a named fix that `kk repair` offers.)
+The command for this is `kk repair`. It diagnoses an exhausted intent to exactly two named plans, [`retry-delivery`](appendix-a-glossary.md#retry-delivery) and [`discard-delivery`](appendix-a-glossary.md#discard-delivery). (A [repair plan](appendix-a-glossary.md#repair-plan) is a named fix that `kk repair` offers.)
 
 **`retry-delivery`** re-arms delivery in one journaled transaction. That transaction:
 

@@ -77,7 +77,7 @@ A permission prompt is the harness's own question, such as "may I run this comma
 
 - Kiki never answers a harness's permission prompt. No kiki setting, approval, or [automation policy](appendix-a-glossary.md#automation-policy) rule answers one. The policy approves kiki's own operations only.
 - On a host with no human, the operator decides ahead of time what the agent may do. They do that in the harness's own permission settings, so that the agent does not stop to ask.
-- If a prompt appears anyway, the agent waits. The "permission prompt" event still fires, the agent shows `blocked`, and the event appears in `kk events`. With the [`command` provider](#choosing-a-provider) set, the operator's program is told too.
+- If a prompt appears anyway, the agent waits. Where the adapter proves `attention_events`, the "permission prompt" event fires, the agent shows `blocked`, and the event appears in `kk events`. With the [`command` provider](#choosing-a-provider) set, the operator's program is told too.
 - A person can answer later. They connect to the host over SSH, run `kk attach`, and answer the prompt in the agent's pane.
 
 ## Notification transport

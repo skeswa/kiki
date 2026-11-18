@@ -452,7 +452,7 @@ Each entry below has the same shape: what the table stores, its columns, and the
   - **Delivery-attempt bounds** are durable on the same row. The limit is `[cascade] delivery_attempts` (default `3`):
     - `soft_redelivery_count` (default 0) counts barrier rebinds after contrary [delivery receipts](../appendix-a-glossary.md#delivery-receipt).
     - Replacement attempts are counted from the persisted `agent_sessions` rows whose `(startup_intent_id, startup_intent_epoch)` match the intent and its current [`delivery_epoch`](../appendix-a-glossary.md#delivery-epoch).
-    - [`delivery_exhausted_at`](../appendix-a-glossary.md#exhausted-intent) stops all further delivery attempts for the intent until a human acts.
+    - [`delivery_exhausted_at`](../appendix-a-glossary.md#exhausted-intent) stops all further delivery attempts for the intent until a caller applies a repair plan.
   - **Ordering.** `UNIQUE (thread_id, seq)` orders intents. Sequence allocation and insertion occur in one transaction.
   - **Recovery bundles** live under `~/.config/kiki/repos/<repo_id>/recovery/<intent_id>/`, outside the source workspace.
   - **Locking.** No lock is stored in the database. Restart recovery resumes from intent state, exact operation ids, and durable delivery proof. The runtime locks are in memory:
@@ -591,7 +591,8 @@ Each `prompt_requests` row records the requester credential id, request id, thre
   - The match key omits `session_id`, so fresh-session reopens match correctly.
 
 - **`provider_egress_consents`**: remembered, revocable grants that allow transcript text to be sent to a model provider.
-  - Columns: `(consent_id, thread_id, provider_identity, purpose: 'catch_up' | 'transcript_mcp', disclosure_version, granted_at, granted_by_presenter_id, revoked_at?)`.
+  - Columns: `(consent_id, thread_id, provider_identity, purpose: 'catch_up' | 'transcript_mcp', disclosure_version, granted_at, granted_by_presenter_id?, policy_approval_id?, revoked_at?)`.
+  - Exactly one source is present. The presenter id identifies a human grant. The claimed consent-specific policy approval identifies the rule, policy digest, and requesting credential for an unattended grant.
   - Consent is valid only for the exact thread, configured provider identity, purpose, and disclosed policy version.
   - Local preview is not [provider egress](../appendix-a-glossary.md#provider-egress).
   - Returning transcript-derived text through a hosted-model [MCP](https://modelcontextprotocol.io/) call is provider egress. It must check an active `transcript_mcp` grant before reading rows.
