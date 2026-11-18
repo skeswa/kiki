@@ -301,10 +301,9 @@ Each entry below has the same shape: what the table stores, its columns, and the
     6. the terminal-group close request;
     7. post-exit filesystem recheck;
     8. bookmark deletion;
-    9. optional exact revision abandonment;
-    10. workspace forget and directory delete;
-    11. credential revocation;
-    12. tombstoning.
+    9. workspace forget and directory delete;
+    10. credential revocation;
+    11. tombstoning.
   - Rules for the destroy steps:
     - Drift before termination takes verified resume.
     - Process termination is destroy's first irreversible step.
@@ -611,7 +610,7 @@ This section lists rules that must hold across columns and tables. Several of th
 
 - **Required ids.**
   - `thread_head_commit_id`, `checkpoint_commit_id`, `checkpoint_change_id`, `checkpoint_op_id`, `bookmark_expected_commit_id`, `bookmark_expected_op_id`, and `owned_stack_base_commit_id` are required in `Active`, `ClosePreflight`, `CloseCommit`, `CloseFailed`, `Closed`, and `ProjectionDiverged`.
-  - Destroy states retain every still-valid id until the corresponding journaled deletion or abandonment step.
+  - Destroy states retain every still-valid id until the corresponding journaled deletion step.
   - These ids may be null only in two cases: while the corresponding creation step has not completed, or after its exact destructive step is recorded.
 - **Checkpoint fields.**
   - `bookmark_expected_commit_id` is the [expected bookmark target](../appendix-a-glossary.md#expected-bookmark-target). It need not equal `thread_head_commit_id` while active.
@@ -643,7 +642,7 @@ This section lists rules that must hold across columns and tables. Several of th
 ### `threads` bookmark name
 
 - A non-destroyed thread's bookmark name is unique within the repo.
-- A rename normalization may not adopt a name another thread holds.
+- Creation checks the jj name as well as this constraint. Journal the expected absence and unique invocation before the create-only command. A retry must verify its attributed jj operation. A rename normalization may not adopt a name another thread holds.
 
 ### `thread_checkpoints` and `thread_checkpoint_successions`
 

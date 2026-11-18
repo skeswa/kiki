@@ -411,14 +411,14 @@ accept     = ["*"]
 effect     = "allow"
 ```
 
-Once activated, this rule allows any matching local credential to approve policy-eligible plans except provider consent. Any process running as you can then close and destroy threads, lose uncommitted work, abandon revisions, and stop the whole terminal server, with no person asked. That includes every agent and every script an agent starts. The safety proofs still run, and consent still needs its own rule. Nothing else stands in the way.
+Once activated, this rule allows any matching local credential to approve policy-eligible plans except provider consent. Any process running as you can then close and destroy threads, lose uncommitted work, and stop the whole terminal server, with no person asked. That includes every agent and every script an agent starts. The safety proofs still run, and consent still needs its own rule. Nothing else stands in the way.
 
 Each `*` gives away one thing:
 
 - `principals = ["*"]` lets every caller use the rule, agents included.
 - `repos = ["*"]` covers every repo, including ones registered later.
 - `operations = ["*"]` covers every operation except consent, including operations a later kiki version adds.
-- `accept = ["*"]` accepts every risk label, including `work-loss`, `abandon-revisions`, and labels a later kiki version adds.
+- `accept = ["*"]` accepts every risk label, including `work-loss` and labels a later kiki version adds.
 
 Prefer a rule that names one credential, the operations a script really runs, and the labels you have decided to accept.
 

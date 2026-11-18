@@ -235,7 +235,7 @@ The passthroughs are direct human jj use that happens to be spelled `kk`. `kkd` 
 Everything else is pinned, including the workspace-shaping commands:
 
 - `jj workspace add` names the exact head it builds on. It is the one pinned command that must not ignore the working copy, because its job is to write a new one.
-- `jj workspace forget`, bookmark placement, rebase, abandon, and push name an exact head and ignore the working copy.
+- `jj workspace forget`, bookmark placement, rebase, and push name an exact head and ignore the working copy.
 
 A pinned mutation does not snapshot the human's own working copy. It can still leave two operation heads when another operation lands at the same moment. That is one more reason kiki treats several heads as normal.
 

@@ -302,10 +302,9 @@ Publishing means opening a [pull request](https://docs.github.com/en/pull-reques
     - The proposal is a notification with an action that opens the ordinary close approval card.
     - Merge polling, notification, state updates, and the close proposal all ship with the v1.x GitHub integration rather than the coordination [acceptance slice](appendix-a-glossary.md#acceptance-slice).
 68. As a developer, I want a PR closed-without-merge to surface a notification but NOT auto-archive its thread, so that I can decide whether to keep iterating.
-69. As a developer, I want `kk thread destroy` to preserve jj revisions by default, so that ordinary cleanup never implies history loss or expands an inferred `jj abandon` revset.
+69. As a developer, I want `kk thread destroy` to preserve jj revisions, so that ordinary cleanup never implies history loss or expands an inferred `jj abandon` revset.
     - It deletes the local thread [projections](appendix-a-glossary.md#projection) through a method-bound journal.
-    - Abandoning revisions requires a separate `--abandon-revisions` approval.
-    - That approval names an exact validated chain with no registered or foreign descendants.
+    - Other bookmarks on the tip and on earlier commits survive destroy.
 70. As a developer, I want plain `kk close` to leave any open PR untouched, so that GitHub-visible state is preserved unless I deliberately change it.
     - `kk close --discard-pr` is the explicit "also close the PR" option.
 

@@ -31,6 +31,8 @@ Crash recovery continues from persisted saga state. It does not claim that [SQLi
 
 ### Destroy
 
+The optional abandonment mode below was removed by [D-0015](../../../journal/decisions/0015-create-only-bookmarks-and-preserve-revisions.md).
+
 Destroy removes kiki's thread identity and local projections but preserves jj revisions by default. Optional revision abandonment is a separately approved mode naming only the exact validated, unreferenced linear chain.
 
 Once an irreversible destroy step is recorded, failure enters `DestroyFailed`. Recovery may finish that plan. It may not infer that the old active or closed thread still exists intact.

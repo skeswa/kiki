@@ -469,7 +469,7 @@ What `kk` does with no arguments depends on whether the TUI has shipped and on w
 
 `<name>` is optional. It sets the thread's display name and its bookmark name.
 
-- With `<name>`, the thread uses that name. The name is human-owned, so the v1.x [auto-rename](appendix-a-glossary.md#auto-rename) feature never changes it.
+- With `<name>`, the thread uses that name. An existing jj bookmark with that name blocks creation even if no thread owns it. The name is human-owned, so the v1.x [auto-rename](appendix-a-glossary.md#auto-rename) feature never changes it.
 - Without `<name>`, the thread gets the placeholder name `unnamed-<short-hex>`, which kiki owns. In the [acceptance slice](appendix-a-glossary.md#acceptance-slice) this is true even when a prompt is supplied.
 - Deriving a name from the prompt is v1.x work.
 
@@ -1063,16 +1063,13 @@ In a policy rule the operation is `detach`. Without a terminal and without a rul
 
 `kk thread destroy <thread>` permanently removes kiki's records of a thread. It is a v1.x management command.
 
-It permanently removes kiki's thread [projections](appendix-a-glossary.md#projection) and management state; see [Threads](03-threads.md#destroy). Tracked jj revisions are preserved by default.
+It permanently removes kiki's thread [projections](appendix-a-glossary.md#projection) and management state; see [Threads](03-threads.md#destroy). Destroy preserves tracked jj revisions.
 
 ### Flags
 
 Important flags:
 
 - `--keep-log` retains the thread's transcript rows instead of deleting them. The view that reads those kept rows is future work; until it ships, no command shows them.
-- `--abandon-revisions` also abandons revisions, but only the exact validated linear owned chain named in the approval plan.
-  - The plan lists every change/commit id and every affected registered descendant.
-  - Ambiguous topology, foreign commits, or plan drift refuses the operation rather than widening the revset.
 
 ### Order of steps
 
@@ -1086,10 +1083,9 @@ For an active thread, destroy stops processes before it touches history. The ord
 6. terminal-group close request;
 7. [post-exit filesystem recheck](appendix-a-glossary.md#post-exit-filesystem-recheck);
 8. then bookmark deletion;
-9. the optional exact abandon;
-10. workspace forget and delete;
-11. credential revocation;
-12. and the tombstone.
+9. workspace forget and delete;
+10. credential revocation;
+11. the tombstone.
 
 Drift before termination takes the [verified-resume](appendix-a-glossary.md#verified-resume) path. Process termination is the first irreversible step. After it the thread can only finish the plan or become `DestroyFailed`. From `DestroyFailed`, `kk repair` offers [`retry-destroy`](appendix-a-glossary.md#retry-destroy), which resumes that exact plan.
 
@@ -1097,11 +1093,10 @@ The approval covers every process in the listed terminal containers at freeze ti
 
 ### Approval
 
-Destroy requires a one-shot [approval](#foreground-approval-flow) even when revisions are preserved.
+Destroy requires a one-shot [approval](#foreground-approval-flow) for the named local resources.
 
-- `--abandon-revisions` has a distinct method/argument digest and cannot reuse an approval issued for ordinary destroy.
 - A plain yes/no prompt detached from a method-and-target-bound capability is insufficient.
-- In a policy rule the operation is `destroy`. The plan carries `abandon-revisions` when that flag is given, and the same labels as close for what it stops and deletes: `live-processes`, `outside-holders`, and `work-loss`. `--accept-holder <pid>` works as it does for close.
+- The `destroy` policy operation carries the close labels that apply to its process and file inventory. `--accept-holder <pid>` works as it does for close.
 - Without a terminal, destroy runs only when a rule allows `destroy` and accepts every label on the plan. Otherwise it exits with code 3 and changes nothing.
 
 ## `kk repair`
@@ -1222,7 +1217,7 @@ Three notes on the approval column:
 ### Failed close and destroy
 
 - **[`retry-close`](appendix-a-glossary.md#retry-close)** resumes a `CloseFailed` thread's close journal from the step that failed. It re-runs exit verification by recorded identity and re-reads the workspace fingerprint before it forgets or deletes anything. Where the diagnosis instead proves a live terminal group and a responsive agent, it reports that the thread can return to `Active`.
-- **[`retry-destroy`](appendix-a-glossary.md#retry-destroy)** resumes a `DestroyFailed` thread's destroy journal in the same way. It applies exactly the approved plan, including the exact revision list when `--abandon-revisions` was approved.
+- **[`retry-destroy`](appendix-a-glossary.md#retry-destroy)** resumes only the approved removal of the thread's resources.
 
 ### Workspace plans
 

@@ -388,10 +388,9 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
   6. group close request
   7. post-exit filesystem recheck
   8. then bookmark deletion
-  9. optional exact abandon
-  10. workspace forget and delete
-  11. credential revocation
-  12. tombstone
+  9. workspace forget and delete
+  10. credential revocation
+  11. tombstone
   - Drift before termination takes verified resume.
   - Process termination is the first irreversible step. Crash injection after it yields only `DestroyFailed` or completion of the same plan.
 - **Approval scope.** A close, destroy, or restart approval covers every process in the listed terminal containers at freeze time.
@@ -452,11 +451,9 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
 - **Close approval binding.** A close approval is bound to the rendered plan and the preflight fingerprint.
   - Drift discovered after the freeze causes a verified resume and a fresh plan and approval.
   - The daemon never prompts while leaving a terminal group frozen.
-- **Destroy keeps revisions by default.** `kk thread destroy` deletes kiki projections and records only after an exact plan is confirmed.
-  - It preserves jj revisions by default.
-  - `--abandon-revisions` may abandon only the validated, unreferenced, single-parent owned chain named in a separate approved plan.
-  - It refuses shared, foreign, followed, or ambiguous topology.
-- **Destroy crash injection.** Crashes are injected before and after each of these: bookmark deletion, optional exact revision abandonment, terminal-group and workspace cleanup, and tombstoning.
+- **Bookmark creation and retry.** Try a human bookmark at the base, then race native creation at the exact proposed target. Crash after jj creates the name but before the placement row commits. Only the attributed create operation may be adopted or compensated. A competing name survives.
+- **Destroy keeps revisions.** Put extra bookmarks on the tip and on an interior commit. Destroy removes the managed bookmark and preserves both other names and their targets. A request to abandon revisions is rejected before any side effect.
+- **Destroy crash injection.** Crash around bookmark deletion, terminal and workspace cleanup, and tombstoning.
   - They yield only the recorded `DestroyCommit`, `DestroyFailed`, or `Destroyed` outcome.
   - After the first irreversible step, no recovery path relabels the thread `Active`, `Closed`, or `ProjectionDiverged`.
   - `kk repair` can only finish the exact approved plan, through `retry-destroy`.
@@ -923,7 +920,7 @@ A thread's [bookmark](appendix-a-glossary.md#bookmark) is a named pointer that m
   - `ahead` after `jj edit` of an earlier commit
   - `diverged` otherwise, for example after `jj rebase -r` moves the bookmarked commit somewhere else
   - Publish, close, and detach stay blocked for `ahead` and `diverged` until `choose-bookmark-target` is applied. No bookmark issue is raised for those two relationships.
-  - An unregistered descendant of the chain changes neither the relationship nor successor tracking. It blocks only rebase and abandon plans.
+  - An unregistered descendant of the chain changes neither the relationship nor successor tracking. It blocks only explicit rebase plans.
 - **Classification runs on kiki's own operations.** An explicit `ParentAdvance` rebase that carries a child's and a grandchild's bookmarks appends a succession row for each affected thread. It opens no second cascade intent for the attributed operation.
 - **Journaled checkpoint.** A journaled lifecycle checkpoint appends exactly one `thread_checkpoints` row and resets the expected target to the placed commit. A checkpoint placed on a workspace with unsnapshotted edits is followed by a `SameChange` succession at the next snapshot, not by an issue.
 

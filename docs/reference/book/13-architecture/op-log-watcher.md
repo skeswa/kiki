@@ -303,7 +303,7 @@ The [checkpoint relationship](../appendix-a-glossary.md#checkpoint-relationship)
 Notes on this test:
 
 - This test, and the successor tests below, need only the owned chain: a single-parent path that starts just after the thread's (evolved) base and ends at its head. The base is excluded. A commit on that path is "on the validated path" in the rules below.
-- The foreign-descendant condition of the owned-stack contract applies only to rebase and abandon plans. An unregistered descendant does not change a relationship or block successor tracking.
+- The foreign-descendant condition of the owned-stack contract applies only to explicit rebase plans. An unregistered descendant does not change a relationship or block successor tracking.
 - Unresolved bookmark issues are reported separately, by name, beside the relationship. They do not change it.
 - While the frontier is unmerged and its heads disagree about the thread, status prints "frontier unmerged" instead of a relationship.
 - `ahead` and `diverged` are not issues, but a checkpoint cannot move forward from them. Publish, close, and detach stay blocked for such a thread until [`choose-bookmark-target`](../appendix-a-glossary.md#choose-bookmark-target) is applied. That plan is offered for a thread with no open issue whose relationship is `ahead` or `diverged`.

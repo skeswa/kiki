@@ -344,7 +344,6 @@ A [risk label](appendix-a-glossary.md#risk-label) names one kind of harm a plan 
 | `outside-holders`    | accepts a holder outside the listed containers              |
 | `work-loss`          | has a non-empty loss inventory                              |
 | `discard-pending`    | discards pending reconciliation (`--discard-pending`)       |
-| `abandon-revisions`  | abandons revisions (`--abandon-revisions`)                  |
 | `backward-bookmark`  | moves a bookmark backward (`--allow-backwards`)             |
 | `server-wide`        | stops the whole terminal server (`replace-terminal-server`) |
 | `cross-thread`       | mutates or reads a thread other than the caller's own       |

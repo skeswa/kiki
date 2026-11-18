@@ -377,7 +377,7 @@ The developer presses `enter`. `kk close` then does the following, in order:
 3. It terminates the frozen processes with [verified exit](../appendix-a-glossary.md#verified-exit).
 4. Then it closes the terminal group, forgets the workspace, and marks the thread `Closed`.
 
-The developer specifically did not run `kk thread destroy`. That command is an irreversible deletion of kiki's thread record. It requires a one-use [human approval](../appendix-a-glossary.md#human-approval). It still preserves jj revisions unless a separate `--abandon-revisions` plan is approved (see [Threads · destroy](../03-threads.md#destroy)).
+The developer specifically did not run `kk thread destroy`. That command is an irreversible deletion of kiki's thread record. It requires a one-use [human approval](../appendix-a-glossary.md#human-approval). It still preserves jj revisions throughout destroy (see [Threads · destroy](../03-threads.md#destroy)).
 
 Then the developer spawns the replacement:
 
@@ -570,7 +570,7 @@ The patterns this storyboard demonstrates and the chapters that authorize them:
   - Act 9 is a stacked publish. There the parent merge reconciles the child onto the exact merged `main` commit at its safe boundary.
 - **Abandoning**: act 7's `kk close` of the wrong-direction `auth` thread (see [Threads · close](../03-threads.md#close), [Threads · destroy](../03-threads.md#destroy)).
   - Close retains the thread's transcript and kiki record for possible reuse.
-  - That is in contrast to approved `kk thread destroy`. Destroy removes that record but preserves jj revisions unless a separately approved abandonment plan is requested.
+  - Destroy removes the thread record and keeps the jj revisions.
 - **Cross-repo**: acts 1 (registration), 5 (`kestrel-www` copyright bump), 6 (`kestrel-docs` parallel work). One daemon, per-repo registration, `kk ls --all-repos` for the global view (see [Commands · `kk ls`](../09-commands.md#kk-ls)).
 - **Cascade in motion**: acts 4 and 8 (see [Cascade](../05-cascade.md), [Invariants](../02-invariants.md)).
   - Act 4 shows jj-native ancestor evolution followed by safe materialization.

@@ -70,7 +70,7 @@ At a checkpoint, kiki does all of the following in one journaled lifecycle actio
 The bookmark move follows strict rules:
 
 - It is pinned to that exact operation id and passes `--ignore-working-copy`. So it cannot [snapshot](https://docs.jj-vcs.dev/latest/working-copy/) the managed working copy. (A snapshot is jj recording the current files into the working-copy commit.)
-- It can still leave two operation heads when some other operation lands at the same moment. The journal that made the placement then owns the first integration of those heads. It re-places deterministically instead of raising an issue.
+- It can still leave two operation heads when some other operation lands at the same moment. The journal that made the placement then owns the first integration of those heads. For an existing managed bookmark it re-places deterministically. Initial creation stops on a competing claim to the name.
 - `--at-op=@` is not an acceptable substitute. It snapshots, and it fails when operation heads have [diverged](https://docs.jj-vcs.dev/latest/technical/concurrency/).
 - Kiki then verifies the resulting bookmark target and operation.
 - Kiki never resolves `@` a second time inside the mutating command.
@@ -175,7 +175,7 @@ Status must show the relationship between the expected target and the live head 
 - `ahead`: the head is an ancestor;
 - `diverged`.
 
-These tests need only a single-parent path between the two commits. The stricter owned-stack conditions below apply to rebase and abandon plans.
+These tests need only a single-parent path between the two commits. The stricter owned-stack conditions below apply to explicit rebases.
 
 A thread that reads `ahead` or `diverged` may have no open issue at all. Its exit is still `choose-bookmark-target`, as [Who may move the bookmark where](#who-may-move-the-bookmark-where) says.
 
@@ -213,7 +213,7 @@ The normative order is:
 1. **Allocate identities.** Allocate the stable thread, workspace, and bookmark identities and the terminal `provision_id`. Persist the exact chosen base and any follows anchors.
 2. **Create the workspace.** Create the jj workspace at that exact base.
 3. **Record the head.** Read the new workspace's exact `@` and persist it as `thread_head_commit_id`. (`jj workspace add` creates the workspace and its initial working-copy commit in one pinned command.)
-4. **Place the bookmark.** Create or move the thread bookmark to that exact commit, and persist the checkpoint placement.
+4. **Create the bookmark.** Prove the chosen local name is absent on the agreed frontier. Before calling `jj bookmark create` for the exact initial head, journal the invocation identity, name, target and starting operation. Verify the attributed operation introduced that name and persist the placement. On retry, only that operation proves this journal created it. A pre-existing name, a competing creation on another head, or ambiguous attribution stops creation. Preserve the foreign bookmark even if it names the same commit. Compensation may remove only a placement still proved to belong to this journal.
    - The bookmark is deliberately created **after** the initial working-copy change, because a bookmark does not follow a later `jj new`.
    - The next working-copy snapshot rewrites that commit and the bookmark follows it. That is native successor tracking, not drift.
 5. **Issue the credential.** Issue the [thread-scoped credential](appendix-a-glossary.md#threadscoped-credential) and install the launch-scoped harness configuration.
@@ -882,7 +882,7 @@ The catch-up is recorded as kiki-authored synthesized content. It is stored loca
 
 ## Destroy
 
-`kk thread destroy <thread>` is an approved, journaled destruction of kiki's thread record and local projections. By default it preserves every jj revision.
+`kk thread destroy <thread>` is an approved, journaled destruction of kiki's thread record and local projections. It preserves every jj revision.
 
 Deleting the local bookmark, workspace, transcript, and thread identity is still consequential. But “destroy thread” is not implicit permission to abandon history.
 
@@ -911,8 +911,7 @@ Preflight first refreshes the complete operation frontier. It then pins all of t
 - [follows edges](appendix-a-glossary.md#follows-edge);
 - descendants;
 - PR link;
-- unresolved recovery data;
-- whether revision abandonment was requested.
+- unresolved recovery data.
 
 Destroy always refuses while the thread has a follows child or an unresolved sync/recovery intent. The user must reconcile and detach children first.
 
@@ -920,20 +919,13 @@ A transitional `Creating` thread, or failed-creation cleanup, uses its lifecycle
 
 ### Abandoning revisions
 
-`--abandon-revisions` is a separate destructive mode with a separately approved exact-chain plan. To abandon a revision is to remove it from jj's visible history.
-
-The mode is available only when both of these hold:
-
-- every revision after the retained owned-stack base through the pinned head forms the validated single-parent chain;
-- no registered or foreign descendant exists outside that set.
-
-The flag never expands to descendants dynamically. Without it, non-linear or shared revision topology does not authorize history rewriting, and all revisions remain in jj.
+Destroy preserves every jj revision. Only the thread's own verified bookmark is removed. A user who wants to abandon commits can use jj directly. Other bookmarks may point to any commit on the thread's chain.
 
 ### The order of destroy steps
 
 Active destroy uses the same proven process quiescence and workspace inventory machinery as close.
 
-The approval explicitly authorizes deletion of the named workspace paths. An omitted untracked path remains protected. When `--abandon-revisions` is present, the approval also names every tracked revision authorized for abandonment.
+The approval covers deletion of the named workspace paths. An omitted untracked path remains protected.
 
 Kiki then, in journaled order:
 
@@ -941,14 +933,13 @@ Kiki then, in journaled order:
 2. runs the holder scan;
 3. runs the final proof, terminates the frozen processes with verified exit, requests the close of each container, and runs the post-exit filesystem recheck. This is the same order as close, and all of it happens before any jj mutation;
 4. deletes the local thread bookmark by name (bookmarks are deleted, not “abandoned”);
-5. only with `--abandon-revisions`, abandons exactly the separately approved revision ids, without a descendants selector, and verifies the resulting operation;
-6. forgets and deletes the workspace projections and revokes credentials;
-7. tombstones the thread row and deletes transcript rows unless `--keep-log` was approved.
+5. forgets and deletes the workspace projections and revokes credentials;
+6. tombstones the thread row and deletes transcript rows unless `--keep-log` was approved.
 
 ### Drift, failures, and what destroy leaves alone
 
 - Digest drift found before any process is terminated resumes the original active terminal group and requires a fresh approval.
-- Terminating processes is destroy's first irreversible step. A failure at or after it becomes a repairable failed lifecycle operation. That includes a failure after bookmark deletion or an optional destructive jj step. It never returns to `Active` or `Closed` by inference.
+- Terminating processes is destroy's first irreversible step. A failure at or after it becomes a repairable failed lifecycle operation. That includes a failure after bookmark deletion. It never returns to `Active` or `Closed` by inference.
 - Remote bookmarks and PRs are untouched. Changing them is a separate externally visible plan.
 - Loss-safety bundles under the repo's centralized `recovery/` directory are not deleted automatically. Destroy prints their paths so the user can handle them manually.
 
