@@ -775,13 +775,14 @@ The [cascade](appendix-a-glossary.md#cascade-reconciliation) state indicator is 
 
 ## `kk events`
 
-`kk events [--thread <t>] [--follow] [--since <seq>] [--json]` prints kiki's events as they are recorded. An event is one thing that happened to a thread, such as a state change, a cascade step, or an [attention event](appendix-a-glossary.md#attention-event). It ships in the [acceptance slice](appendix-a-glossary.md#acceptance-slice).
+`kk events [--thread <t>] [--detail] [--follow] [--since <cursor>] [--json]` prints recorded events. Each event includes a cursor that the caller can save to resume after that row.
 
 It is how a script, or a person with no overlay, watches kiki. It reads kiki's own event log, so it works with no Herdr client attached.
 
 - **Without `--thread`**, it prints the events of every thread in the caller's repo, through the `StreamRepoEvents` RPC. This is true even when the command runs inside a thread.
-- **With `--thread <t>`**, it prints one thread's events. Run in that thread's own context, it reads the thread's full stream through `StreamThreadEvents`. Run from anywhere else, it reads the repo stream narrowed to that thread.
-- `--since <seq>` starts after that sequence number. Every event carries a sequence number that only goes up, so a caller that reconnects can ask for exactly the events it missed.
+- **With `--thread <t>`**, filter the same summary stream to one stable thread ID. Its position is still `repo_seq`. Changing the working directory within the repo does not change the stream.
+- **`--detail --thread <t>`** explicitly selects the full `StreamThreadEvents` stream. It requires the thread's own credential on each connection. A registration or automation credential can still read the summary. `--detail` without `--thread` is a usage error.
+- **`--since <cursor>`** resumes strictly after the last returned event. Treat the cursor as opaque. It binds the format version, registration UUID, thread filter (or all), summary or detail, and position in that stream. A malformed cursor, bare number, unsupported version, or scope mismatch is a usage error (exit 2) before any rows are returned. The daemon checks read authority again on every resume. Gaps between numbers are normal in a filtered repo stream.
 - `--follow` keeps the stream open and prints new events as they happen. Without it, the command prints the stored events and exits with code 0.
 - `--json` prints one JSON object per line.
 

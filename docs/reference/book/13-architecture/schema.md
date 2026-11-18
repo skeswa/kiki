@@ -565,8 +565,7 @@ Each `prompt_requests` row records the requester credential id, request id, thre
   - Columns: `(thread_id, seq, repo_seq, kind, payload_json, recorded_at)` with `UNIQUE (thread_id, seq)` and `UNIQUE (repo_seq)`.
   - Each row is one event for one thread: a state transition, a cascade event, or a transcript append.
   - `seq` is the monotonic number that `StreamThreadEvents` carries. It only goes up, per thread. `kkd` allocates it and inserts the row in the same transaction as the change the event reports. So `seq` survives a `kkd` restart and never repeats or goes backward.
-  - `repo_seq` is a second monotonic number, counted across every thread in this repo database. `kkd` allocates it in the same transaction. `StreamRepoEvents` orders by it, and `kk events --since` without `--thread` names it.
-  - A client that reconnects compares the `seq` values it receives with the last one it saw. A gap tells it that it missed events.
+  - `repo_seq` orders every summary stream, including a single-thread filter. Full detail uses per-thread `seq`. The cursor carries the appropriate number and its stream scope. A jump in `repo_seq` on a filtered stream can mean other threads produced intervening events.
   - A row is a notice, not authority. The tables above remain the source of truth for state. See [gRPC](grpc.md).
 
 #### Transcript

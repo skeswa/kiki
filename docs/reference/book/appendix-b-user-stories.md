@@ -626,7 +626,7 @@ The operator in these stories runs kiki on a machine like a build server, a cont
 152. As an operator, I want `--json` output and a live event stream, so that I can watch a headless host with scripts.
      - `--json` works on every read command and on every command's final result. It changes only how the output is drawn. See [Output for scripts](09-commands.md#output-for-scripts).
      - [`kk events`](09-commands.md#kk-events) prints the event stream for one thread or for the whole repo.
-     - `--follow` keeps the stream open, and `--since <seq>` resumes after the last event my script saw.
+     - `--follow` keeps the stream open, and `--since <cursor>` resumes after the last event my script saw.
      - This is the command-line face of the event stream in story 82.
 153. As an operator, I want `kk wait [<thread>] --for <state>` to block until a thread reaches a state, so that a script can wait for an agent without polling. (Stage 2.)
      - The states are `quiescent`, `goal-complete`, `blocked`, `conflicted`, `closed`, and `issue`.

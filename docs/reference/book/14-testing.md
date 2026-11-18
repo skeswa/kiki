@@ -119,9 +119,8 @@ Some terms used throughout this section:
   - The output parses as JSON, and it carries every fact the plain rendering shows.
   - A refused or failed command still prints a JSON result and keeps its exit code.
 - **[`kk events`](09-commands.md#kk-events).** The command is the CLI face of the event streams.
-  - `kk events --thread <t>` prints the events `StreamThreadEvents` serves for that thread, in sequence order.
-  - Without `--thread` it prints the repo-wide events that `StreamRepoEvents` serves.
-  - `--since <seq>` starts after that sequence number, with no gap and no repeated event.
+  - Inside and outside B, `kk events --thread B` reads the same repo summary. Resume after B's ninth event at repo position 900 from the other directory. B's next matching event appears once, even if the repo sequence jumps.
+  - `--detail --thread B` uses B's full stream and requires B's credential. Reject a detail cursor on the summary stream, a cursor for a different thread or new registration, a bare number, and a resume after loss of read authority before emitting any event.
   - `--follow` keeps the stream open and prints new events as they happen. Without it the command prints what exists and exits 0.
   - `--json` prints each event as JSON.
   - On adapters with proven `attention_events`, a harness permission prompt produces `agent_blocked` in the stream. Without that proof, use a crash to test the blocked state. Kiki never answers the harness's own prompt.

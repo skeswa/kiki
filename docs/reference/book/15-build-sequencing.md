@@ -137,7 +137,7 @@ Build the smallest end-to-end path: `kk init`, `kk new <name>`, `kk attach`, and
 
 - the approval broker that `kk init` and `kk new` require;
 - the [automation policy](appendix-a-glossary.md#automation-policy) engine, [`PolicyApproval`](04-authority.md#policyapproval), [automation credentials](appendix-a-glossary.md#automation-credential), and [`kk automation`](09-commands.md#kk-automation). They are here because kiki's own end-to-end tests need unattended approvals: those tests present an automation credential and rely on an activated policy;
-- [`kk daemon install`](09-commands.md#kk-daemon-install), the [exit codes](09-commands.md#exit-codes), [`--json`](09-commands.md#output-for-scripts) on every command this stage ships, and [`kk events`](09-commands.md#kk-events) with the `StreamRepoEvents` call behind its repo-wide form;
+- [`kk daemon install`](09-commands.md#kk-daemon-install), the [exit codes](09-commands.md#exit-codes), [`--json`](09-commands.md#output-for-scripts) on every command this stage ships, and [`kk events`](09-commands.md#kk-events) with the `StreamRepoEvents` call behind every summary view, including a thread filter;
 - the attach half of [`TerminalClient`](appendix-a-glossary.md#terminalclient);
 - the minimal `ConfigLoader`;
 - [`kkd`](appendix-a-glossary.md#kkd) bootstrapped under the user's service manager, or run as `kkd --foreground` on a host that has none;
@@ -200,7 +200,7 @@ Stage 1 gate:
 - **No prompt without a terminal.** With no terminal, `kk` never prompts. A command that would ask a question fails, changes nothing, and names the flag that answers it.
 - **Scripting surface.** Every Stage 1 command prints its final result as JSON under `--json`, and the flag changes rendering only.
   - Each exit code from `0` to `5` is observed in its own case. Code `6` is observed with `kk wait` in Stage 2.
-  - `kk events` prints one thread's events and the repo-wide events, replays from `--since <seq>` with no gap, and keeps printing under `--follow`.
+  - `kk events` prints one thread's events and the repo-wide events, replays from `--since <cursor>` with no gap, and keeps printing under `--follow`.
 - **Launcher verification.** A launcher report is refused when its caller is not a child of the current server process, or when its pane's root process is not the caller. A report left over from a previous server lifetime that names a recycled Herdr id binds nothing and closes nothing.
   - A repeat of an accepted report from the same process identity gets the same answer. A different process presenting for a consumed role is refused and exits.
   - `agent` is the only [required role](appendix-a-glossary.md#required-role). A `shell` or `ui` launcher that does not report within `[timeouts] launcher_report` is recorded as absent with a warning, and provisioning still succeeds.

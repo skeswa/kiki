@@ -300,13 +300,13 @@ UIs subscribe through server-streaming RPCs rather than polling (asking again an
   - Each event carries its kind, its thread id, its sequence numbers, its time, and summary-class fields only. It never carries transcript text or any other [sensitive read](../04-authority.md#sensitive-reads).
   - It accepts the same credentials as `RepoThreadSummaries`: a thread or registration credential for its own repo, or an automation credential for any registered repo.
 
-On disconnect, clients reconnect and re-subscribe. Events carry a monotonic `seq` (a number that only goes up), so clients can detect gaps.
+On reconnect, authenticate the caller for the requested stream and filter again. Validate the cursor against that scope before reading rows. A cursor grants no read authority.
 
 `StreamThreadEvents.seq` is backed by the `thread_events` table in the repo database. `kkd` writes each event as a row and takes `seq` from that row. So `seq` keeps counting up across a `kkd` restart, and a client that reconnects can tell exactly which events it missed.
 
-`StreamRepoEvents` orders events by `repo_seq`, a second number on the same row that only goes up across the whole repo. Both streams take a starting sequence number and replay the stored rows after it before they follow new ones.
+`StreamRepoEvents` orders by `repo_seq` across the registration, even with a thread filter. `StreamThreadEvents` uses the thread's `seq`. Each stream emits a versioned cursor bound to its registration UUID, resolved thread filter, projection and last position. Accept only that scope on resume. Replay rows strictly after the position, then follow new rows without a gap at the replay boundary.
 
-**`kk events`.** [`kk events`](../09-commands.md#kk-events) is the command-line face of these two streams. With `--thread` in that thread's own context it reads `StreamThreadEvents`. Otherwise it reads `StreamRepoEvents`, with the thread filter when `--thread` is given. `--since <seq>` is the starting sequence number, and `--follow` keeps the stream open.
+**`kk events`.** The CLI always selects `StreamRepoEvents` for summary output, wherever it runs. Only `--detail --thread <t>` selects `StreamThreadEvents`, which requires the target thread's own credential. `--since` takes the returned cursor.
 
 **`kk wait`.** `kk wait` needs no method of its own. `kk` subscribes to `StreamRepoEvents` with the thread filter, then reads the thread's current summary, and then follows the stream until the summary shows the wanted state. Subscribing first means no change can slip between the read and the stream. An already-open issue is observable through the summary’s `has_open_issue` field. Every wait state is a summary-class field, so an automation credential can wait. The timeout is counted by `kk`: exit code 0 when the state is reached and 6 on timeout.
 

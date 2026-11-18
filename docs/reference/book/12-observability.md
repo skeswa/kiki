@@ -155,7 +155,7 @@ A headless host is a machine where kiki runs with no UI attached, and often with
 - **Follow changes with [`kk events`](09-commands.md#kk-events).** It prints the daemon's event stream: state changes, [attention events](appendix-a-glossary.md#attention-event), and cascade progress.
   - `--thread <t>` follows one thread. Without it, the command follows the whole repo.
   - `--follow` keeps the stream open.
-  - `--since <seq>` starts after an event the script already saw, so a script that reconnects misses nothing.
+  - `--since <cursor>` starts after an event the script already saw, so a script that reconnects misses nothing.
   - `--json` prints one JSON object per event.
 - **Block until something happens with [`kk wait`](09-commands.md#kk-wait).** `kk wait [<thread>] --for <state>` returns when the thread reaches the named state: `quiescent`, `goal-complete`, `blocked`, `conflicted`, `closed`, or `issue`. `--timeout <dur>` sets how long to wait. `kk wait` ships in Stage 2 of the [build sequence](15-build-sequencing.md); the other commands here are Stage 1.
 - **Branch on the exit code.** Every `kk` command ends with one of a small, fixed set of [exit codes](09-commands.md#exit-codes), so a script can tell what happened without reading text:
