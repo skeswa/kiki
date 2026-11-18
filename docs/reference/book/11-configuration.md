@@ -108,7 +108,7 @@ Acceptance-slice sections:
     codex = ["--ask-for-approval", "never", "--sandbox", "workspace-write"]
     ```
 
-    This asks Codex to return a failure when a command needs extra permission. Set the list before creating the thread. Kiki records its resolved launch arguments with the thread and uses them on reopen and replacement. A repeated `--harness-arg` supplies a replacement list for that launch configuration. The adapter refuses settings that defeat its hook isolation or conflict with enforced host restrictions before releasing the launch gate.
+    This asks Codex to return a failure when a command needs extra permission. Set the list before creating the thread. The creation plan displays the effective settings and binds the ordered list to its digest. Kiki records those approved launch arguments with the thread and uses them on reopen and replacement. A repeated `--harness-arg` supplies a replacement list for that launch configuration. The adapter refuses settings that defeat its hook isolation or conflict with enforced host restrictions before releasing the launch gate.
 - `[notifications]`: per-event `loud | soft | silent` behavior for acceptance-slice [attention events](appendix-a-glossary.md#attention-event), plus `os_provider` (`auto | notify-rust | osascript | herdr | command | off`) and `command`.
   - Per-event keys hot-reload.
   - `os_provider` and `command` resolve at the next dispatch.

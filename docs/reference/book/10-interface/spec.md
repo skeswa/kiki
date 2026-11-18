@@ -418,7 +418,7 @@ The `name` field is optional, as the name argument of `kk new [<name>]` is. Left
 
 Submitting the spawn form begins the one-shot approval flow required by `kk new`. It does not itself satisfy that flow. The flow has two phases:
 
-1. The daemon returns a canonical plan. The plan names the base/head, follows choice, workspace, harness, and initial-input digest.
+1. The daemon returns a canonical plan. The plan names the base/head, follows choice, workspace, harness, effective permission settings, ordered launch arguments, and initial-input digest.
 2. The overlay displays that plan in an approval card and confirms it through its enrolled foreground presenter.
 
 The same two-phase shape applies to publish, close, interrupt, reopen, and any cross-thread or consequential repair action. `kk thread destroy` has no overlay verb; it is CLI-only.

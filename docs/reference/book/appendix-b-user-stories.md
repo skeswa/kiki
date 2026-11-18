@@ -92,7 +92,7 @@ Each story is one short sentence. The bullets under a story are part of that sto
     - `kk ls` is the truthful list.
 21. As a developer, I want `kk` invocations inside a thread's terminal group to know which thread I am in, so that thread-acting commands work without specifying a target and a pane on some other Herdr server is never mistaken for a thread.
     - Kiki looks in this order:
-      1. an explicit target;
+      1. an explicit target for the command (skip this step when selecting the caller’s credential);
       2. then `KIKI_THREAD_ID` on the panes kiki provisions;
       3. then the Herdr pane identity of a pane I split myself;
       4. then cwd (the [working directory](https://en.wikipedia.org/wiki/Working_directory)).

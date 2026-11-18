@@ -33,7 +33,7 @@ Commands that act on a thread figure out which thread you mean in this order:
 3. Herdr pane identity
 4. current working directory
 
-Each step is a lookup, not a grant. Whatever step resolves the thread, the CLI then loads only that thread's credential, and [`kkd`](appendix-a-glossary.md#kkd) (kiki's background [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>)) authorizes the call against that credential (see [Authority](04-authority.md)).
+This order selects the target. For the caller’s identity, skip the target argument and resolve the calling environment, verified pane, or working directory. Load only the caller’s credential. Outside a thread, use the repo registration credential where applicable. An explicit automation credential identifies the caller directly. For example, `kk prompt B` run inside A presents A’s credential, even though B is the target. In every case, [`kkd`](appendix-a-glossary.md#kkd) (kiki's background [daemon](<https://en.wikipedia.org/wiki/Daemon_(computing)>)) authorizes the call against that credential (see [Authority](04-authority.md)).
 
 - **Environment.** Kiki sets the [environment variable](https://en.wikipedia.org/wiki/Environment_variable) `KIKI_THREAD_ID` explicitly on every [role pane](appendix-a-glossary.md#role-pane) it provisions. A role pane is a terminal pane kiki creates for a fixed job, such as running the agent.
   - A value that names no registered thread is an error. It does not fall through to a later step.
@@ -297,10 +297,10 @@ The Admin path in the example stands for whatever path `kk daemon install` print
 - It installs `kkd` under the user's service manager: [launchd](https://en.wikipedia.org/wiki/Launchd) on macOS, a [systemd](https://en.wikipedia.org/wiki/Systemd) user unit on Linux. Then it starts the daemon.
 - A first install creates the [Admin bootstrap credential](appendix-a-glossary.md#bootstrap-admin-credential) and prints the path of its file. The file is outside every managed workspace.
 - A first install requires both the service definition and prior bootstrap state to be absent. A missing definition alongside existing state reports an incomplete installation and preserves the existing Admin identity. A first install needs no approval and no credential. No daemon exists yet to give an approval, and the command registers no repo and starts no agent.
-- Running it again is safe. It reports that the daemon is installed and running, prints the same credential path, and creates no second credential.
+- A rerun first resumes any pending installation journal. Once the requested daemon is verified and no change is pending, it reports that the daemon is installed and running, prints the same credential path, and creates no second credential.
 - A later run that would change an existing installation, such as replacing the service definition after an upgrade, needs a confirmation at a foreground terminal or `--admin-credential-file <path>`.
 - With `--json`, the result includes the service state and the credential path.
-- It exits with code 0 once the daemon answers. It exits with code 4 when the host has no supported user service manager, and the message names `kkd --foreground`.
+- It exits with code 0 once the requested daemon answers and any installation journal has completed. It exits with code 4 when the host has no supported user service manager, and the message names `kkd --foreground`.
 
 On a changed install, `kk` starts the existing service definition if needed and contacts that daemon. If it cannot reach the daemon it exits with code 5 and leaves the definition in place. The bootstrap call binds the change to the installed and proposed definitions. An identical rerun after a lost reply resumes the same change. The initial install question is local to `kk`. The first approval for a repo is its registration by `kk init`.
 
@@ -480,8 +480,10 @@ Thread creation requires a one-shot [approval](#foreground-approval-flow). In a 
 - the resolved base/head;
 - the follows choice;
 - the workspace path;
-- the harness;
+- the harness and its ordered, resolved arguments, including the permission and sandbox settings the launcher will use;
 - a digest of the initial input.
+
+Resolve settings before approval. Save and launch that exact argument list. A change between preflight and claim invalidates the plan.
 
 With no policy rule, only a person at a foreground terminal can approve a new thread. So by default an agent cannot spawn one. An agent can create threads only when the activated policy has a rule that allows `new` for the `thread:any` or `*` principal. Neither path gives the CLI reusable Admin authority.
 
@@ -540,9 +542,9 @@ Use `kk prompt <thread> -m "Run the unit tests" --request-id <uuid> --json` to s
 
 Every submission needs a one-shot approval for the `prompt` operation. The plan shows the target thread and quoted prompt, and binds the exact bytes, request id, and live incarnation. A thread calling across threads also needs the `cross-thread` risk label. The daemon records the claim before submitting. Summary events and audit arguments omit the text.
 
-The harness must accept the text as a fresh user turn in that incarnation while it is ready for one. A busy agent, permission question, pending cascade delivery, repair, or missing adapter proof returns code 4. Kiki sends no keystrokes and queues nothing for later. An expired approval requires a fresh plan. A new submission to a replacement agent needs a fresh plan and request id.
+The harness must accept the text as a fresh user turn in that incarnation while it is ready for one. A busy agent, permission question, active workspace mutation, hard pause, incomplete tool batch, repair, or missing adapter proof returns code 4. A cascade waiting for the next safe hook may need this turn to make progress. In particular, when a completed batch has left an intent `Delivered`, the caller can submit the next user turn. Only the normal later hook can acknowledge the intent. Kiki sends no keystrokes and queues nothing for later. An expired approval requires a fresh plan. A new submission to a replacement agent needs a fresh plan and request id.
 
-Success returns the request id, thread id, incarnation id, and harness turn receipt. It means the harness accepted the turn. The agent may still be working. If the connection breaks, repeat the request with the same id. The caller gets the recorded outcome or an explicit unknown outcome (code 1) while acceptance cannot be proved. Kiki never resubmits an uncertain request to another incarnation.
+Success returns the request id, thread id, incarnation id, and harness turn receipt. It means the harness accepted the turn. The agent may still be working. If the connection breaks, repeat the request with the same id. With a replaced credential, reuse of an existing id is refused (code 4). With the original credential, the caller gets the recorded outcome or an explicit unknown outcome (code 1) while acceptance cannot be proved. Kiki never resubmits an uncertain request to another incarnation.
 
 ## `kk switch`
 
@@ -955,6 +957,7 @@ The projections stay, and cleanup is the approved [`cleanup-failed-reopen`](appe
 
 `--catch-up` ships with the v1.x transcript feature. It requests transcript-backed context and triggers the [provider-egress consent](appendix-a-glossary.md#provider-egress-consent) flow described in [Transcript](06-transcript.md#reopen-catch-up). [Provider egress](appendix-a-glossary.md#provider-egress) means sending content to the AI provider behind the harness.
 
+- When catch-up needs fresh interactive consent, preflight requests a presenter-confirmed reopen even if a rule allows reopen. An automation credential with no consent exits with code 3 before claim.
 - Because the closed credential is revoked, the daemon releases the preview only to the foreground presenter. It does so after the reopen approval is claimed and before the harness starts.
 - Declining catch-up continues cold unless the user cancels reopen entirely.
 - Without the flag, reopen never reads transcript rows for harness input.
@@ -1120,7 +1123,7 @@ Kiki may repair provably idempotent projection drift automatically in the backgr
 - A same-thread, non-destructive projection repair may use [`ThreadScoped`](appendix-a-glossary.md#threadscoped-credential).
 - Any destructive, revision-rewriting, topology-changing, or cross-thread plan requires a one-shot [approval](#foreground-approval-flow) bound to the repair id and target. In a policy rule the operation is `repair:<plan-name>`, for example `repair:terminate-orphans`. `repair:*` covers every such plan.
 - A plan that needs no approval in the thread's own context, such as `restart-agent`, needs one when any other caller applies it. In a policy rule that operation is `thread-op`, not `repair:<plan-name>`.
-- Without a terminal and without a rule that allows the plan, the apply exits with code 3 and changes nothing.
+- If the plan needs a fresh approval and none is available, a headless apply exits with code 3. A same-thread plan that needs no approval, or a retry that continues an approved journal, can proceed.
 
 Some plans need the caller to choose something. Each such choice is an argument to `--apply`, and it is part of the plan digest:
 

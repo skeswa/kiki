@@ -110,7 +110,7 @@ Terminals live in a separate, [dedicated Herdr server](../appendix-a-glossary.md
 
 When a command runs, kiki has to answer "Which thread am I in?". `ContextDiscovery` resolves this, in this order:
 
-1. **An explicit CLI target.**
+1. **An explicit CLI target** selects the thread the command acts on. Skip this step when resolving the caller and choosing its credential.
 2. **`KIKI_THREAD_ID` in the environment.** This is an [environment variable](https://en.wikipedia.org/wiki/Environment_variable). Kiki sets it explicitly on every [role pane](../appendix-a-glossary.md#role-pane). Herdr does not copy one pane's explicit environment into a split.
 3. **Herdr pane identity.** This step applies when the caller's `HERDR_SOCKET_PATH` is kiki's dedicated server.
    - `kk` sends the caller's `HERDR_WORKSPACE_ID`, `HERDR_TAB_ID`, and `HERDR_PANE_ID` to `kkd`.
@@ -121,7 +121,7 @@ When a command runs, kiki has to answer "Which thread am I in?". `ContextDiscove
    - Pane ids in an environment can go stale after a native pane move. The verification is what catches that.
 4. **The current [working directory](https://en.wikipedia.org/wiki/Working_directory).**
 
-**Callers outside Herdr.** A script, a CI job, or a human in a plain SSH session has no Herdr variables at all. Steps 1 and 4 resolve the thread for such a caller. Discovery never needs an attached Herdr client.
+**Callers outside Herdr.** A script, a CI job, or a human in a plain SSH session has no Herdr variables at all. An argument can locate the target. The working directory can locate the caller. Naming a target never loads its credential. Discovery never needs an attached Herdr client.
 
 **Popups and keybindings.** A command started from a Herdr popup or keybinding has no `HERDR_PANE_ID`. Herdr supplies `HERDR_ACTIVE_WORKSPACE_ID`, `HERDR_ACTIVE_TAB_ID`, and `HERDR_ACTIVE_PANE_ID` instead.
 

@@ -98,6 +98,7 @@ Some terms used throughout this section:
   - `kk automation apply --admin-credential-file <path>` activates the [automation policy](appendix-a-glossary.md#automation-policy). `kk automation credential create <name> --admin-credential-file <path>` creates an [automation credential](appendix-a-glossary.md#automation-credential).
   - `kk init` run with that automation credential begins its approval with that credential, not with Admin. It succeeds under a matching `init` rule. With no `init` rule it exits with code 3 and registers nothing.
   - No presenter is enrolled at any point in the run.
+  - Retry an installation change after writing the new definition but before reload, while the old daemon still answers. The retry finishes the existing journal and verifies the running version.
   - For an install change, try a stale definition, a lost response, and a daemon restart after the definition is written. Verify the old or requested definition, one journaled change, and the existing Admin identity. An unreachable installed daemon cannot authorize an overwrite.
   - At a terminal, the first-run question about installing the daemon is still asked.
 - **No prompt without a terminal.** With no terminal, `kk` never prompts.
@@ -122,7 +123,7 @@ Some terms used throughout this section:
   - `--since <seq>` starts after that sequence number, with no gap and no repeated event.
   - `--follow` keeps the stream open and prints new events as they happen. Without it the command prints what exists and exits 0.
   - `--json` prints each event as JSON.
-  - A harness permission prompt produces `agent_blocked` in the stream. Kiki never answers the harness's own prompt.
+  - On adapters with proven `attention_events`, a harness permission prompt produces `agent_blocked` in the stream. Without that proof, use a crash to test the blocked state. Kiki never answers the harness's own prompt.
   - All of this works with zero attached Herdr clients.
 - **[`kk wait`](09-commands.md#kk-wait).** `kk wait [<thread>] --for <state>` blocks until the thread reaches the state.
   - Each state is covered: `quiescent`, `goal-complete`, `blocked`, `conflicted`, `closed`, and `issue`.
@@ -325,6 +326,8 @@ Closing a thread deletes its workspace directory, so kiki first proves that noth
   - When a parent closes, an idle child's snapshot uses the warned rule, the same as close preflight.
 - **Codex permissions without a desktop.** With an empty workspace config and different settings in the real Codex home, launch with the documented user-config arguments. Verify a permitted workspace edit and a denied request outside the sandbox without a prompt. Repeat after reopen and replacement. Check that a conflicting launch argument cannot replace the generated home or hooks.
 - **Follow-up prompt.** On each real supported harness, submit a multiline prompt with command-like text and no attached viewer. Verify one literal user turn with the expected request id in the original conversation. Try a permission prompt between preflight and submission, a busy agent, a pending barrier, an incarnation change, and an unauthorized caller. None receives input. Lose the reply, restart the daemon, then retry concurrently with the same request id. Prove at most one turn and return its receipt when available. Refuse changed text under the same id. No prompt body appears in summaries or audit arguments.
+  - Run `kk prompt B` from unrelated thread A with only a `thread:self` allow rule. Verify refusal, then allow the cross-thread plan explicitly. After credential replacement, retry the old request id and verify refusal without a second turn.
+  - Leave an intent `Delivered` after the turn’s final tool call. Submit a prompt with no viewer. Verify that it starts the next turn and that acknowledgement waits for the proven hook evidence.
 - **Permission-prompt signal.** With `attention_events` proved, the named harness event makes the agent read `blocked`. Without that proof, a permission prompt changes nothing, and a crash still gives `blocked`.
 - **Close freeze and step order.** Close finds every process to freeze, records each one before signalling it, and runs its steps in a fixed order.
   - Roots:
@@ -1069,7 +1072,7 @@ Each module below has its own list of things its tests cover.
 [Automation policy](04-authority.md#automation-policy) tests cover the rules that let a [`PolicyApproval`](04-authority.md#policyapproval) stand in for the human's confirmation:
 
 - **Match.** A rule that matches the principal, repo, operation, and labels gives `Allowed`. `BeginApproval` returns a `PolicyApproval` in the same reply, the retried method runs, and `kk` prints the plan and "approved by rule `<name>`" with no prompt.
-- **No match.** With no matching rule the [decision](appendix-a-glossary.md#policy-decision) is `NoMatch`. At a foreground terminal the presenter flow runs as before. With no terminal the call exits with code 3, and the message names the operation, the plan's risk labels, and the reason.
+- **No match.** With no matching rule the [decision](appendix-a-glossary.md#policy-decision) is `NoMatch`. At a foreground terminal the presenter flow runs for a thread or registration caller. An automation requester gets code 3 even at a terminal. With no terminal the call exits with code 3, and the message names the operation, the plan's risk labels, and the reason.
 - **`require-human` beats `allow`.** When both kinds of rule match, the decision is `RequireHuman`, whatever order the rules are in.
 - **`require-human` ignores `accept`.** A `require-human` rule with no `accept` key matches a plan that carries risk labels, and a plan that carries none. It checks principals, repos, and operations. For consent it also checks the named provider and disclosure version. Adding an `accept` list to it changes nothing.
 - **A label that is not accepted means no match.** An `allow` rule matches only if every [risk label](appendix-a-glossary.md#risk-label) on the plan is in its `accept` list. An `allow` rule with no `accept` key matches only a plan with no labels.
@@ -1079,6 +1082,10 @@ Each module below has its own list of things its tests cover.
 - **[Activation](04-authority.md#activating-a-policy).** `kk automation apply` takes effect only after a foreground confirmation by the enrolled presenter, which shows the full canonical policy and a diff against the active one, or with the Admin credential. A thread credential, an automation credential, or a `PolicyApproval` cannot activate a policy.
 - **Layers.** An `[automation]` section in a repo, thread, environment, or `--config` layer is not read.
 - **Revoke.** `kk automation revoke` needs no approval, and any credential of this user may call it. After it, every evaluation is `NoMatch`. A `PolicyApproval` issued before the revoke can still be claimed until it expires. One whose credential was revoked cannot.
+- With no active policy, each local credential class can revoke a policy, credential, or consent. Test an automation requester with a foreground terminal and `--confirm`. It gets code 3 and no presenter challenge.
+- Open a projection issue on a closed thread before starting `kk wait --for issue`. With no further events, the first summary satisfies the wait.
+- Change Codex’s resolved sandbox argument after creation preflight. A stale approval cannot launch with the new permissions.
+- Allow reopen by policy but provide no consent for catch-up. On the interactive path, bind the presenter before claim and show the preview only to that presenter. An unattended caller gets code 3.
 - **Consent records.** Grant by policy with no enrolled presenter and verify its approval id and exact disclosure version. Change only the provider, then only the disclosure version. Neither old grant is valid.
 - **Consent is never matched by `*`.** A rule with `operations = ["*"]` does not match `consent:*`. Only a rule that names `consent:<purpose>` and lists the provider in `providers` does.
 - **A safety-proof refusal still refuses.** Under a rule with `accept = ["*"]`, each of these stops the plan exactly as it does for a human approval: drift, an `Unknown` freeze result, an unaccepted holder, a failed final proof, and a failed verified exit.

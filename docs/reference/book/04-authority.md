@@ -36,7 +36,7 @@ A [`RegistrationScoped<repo_id>`](appendix-a-glossary.md#registrationscoped) cre
 - is issued when `kk init` registers a repo, and revoked by `kk repo unregister`;
 - is written to `~/.config/kiki/repos/<repo_id>/credentials/registration` with mode `0600`;
 - is read by `kk` when no thread context resolves;
-- authorizes the [repo-summary read](appendix-a-glossary.md#repo-summary-read-scope) and `BeginApproval` for that repo, and nothing else.
+- authorizes the [repo-summary read](appendix-a-glossary.md#repo-summary-read-scope) and `BeginApproval` for that repo, and the [approval-free revokes](#revokes-that-need-no-approval) and setup reads available to all local credentials.
 
 `kk ls --all-repos` presents each repo's own registration credential.
 
@@ -148,7 +148,7 @@ Consequential commands all use one protocol. A confirmation prompt by itself is 
    - returns the canonical human-readable plan, its digest, and the [policy decision](#the-policy-decision).
 2. **Confirm.** Exactly one of two things supplies the confirmation.
    - **A policy rule.** When the decision is `Allowed`, `kkd` issues one [`PolicyApproval`](#policyapproval) for the already-bound plan in the same reply. Nobody is asked.
-   - **A human.** Otherwise the enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) proves that it owns the foreground controlling terminal. It displays the daemon-returned plan byte-for-byte, collects an explicit confirmation, and calls `ConfirmApproval(challenge_id)`. Confirmation issues one `HumanApproval` for the already-bound plan. Cancellation or expiry closes the challenge and issues nothing.
+   - **A human.** For a requester eligible for the human path, the enrolled [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter) proves that it owns the foreground controlling terminal. It displays the daemon-returned plan byte-for-byte, collects an explicit confirmation, and calls `ConfirmApproval(challenge_id)`. Confirmation issues one `HumanApproval` for the already-bound plan. Cancellation or expiry closes the challenge and issues nothing.
 3. **Retry with the approval.** The operational client retries the exact method, now carrying the approval id. In one SQLite transaction, the daemon:
    - verifies the caller, method, target, digest, expiry, and unused status;
    - claims the approval into one durable operation journal;
@@ -173,7 +173,8 @@ The policy decision is `kkd`'s answer to one question: does the active policy al
 
 For `RequireHuman` and `NoMatch`, what happens next depends on the caller:
 
-- **With a foreground terminal,** the presenter flow runs, exactly as in phase 2 above.
+- **With an automation credential,** stop with code 3. This includes `--confirm`, which asks for an approval that this credential cannot use.
+- **For other requesters with a foreground terminal,** the presenter flow runs as in phase 2.
 - **Without a terminal,** the command [fails closed](appendix-a-glossary.md#fail-closed). It exits with [code 3](09-commands.md#exit-codes). Its message names the operation, the plan's risk labels, and the reason: no rule matched, or rule `<name>` requires a human.
 
 `kkd` still refuses `ConfirmApproval` from a process that is a descendant or session member of an agent launcher. So an agent can never confirm a human challenge. An agent gets approval authority only through a rule whose principal matches its thread credential, including the wildcard `*`.
@@ -236,7 +237,7 @@ Three commands only take authority or permission away:
 - `kk automation credential revoke <name>`, which makes one automation credential stop working;
 - `kk privacy consent revoke`, which withdraws a remembered provider-egress consent.
 
-None of them needs an approval. Any credential of this user may call them: a thread, registration, or automation credential, or Admin.
+The permission to revoke is an explicit addition to the thread, registration, automation, and Admin credential allowlists. None of them needs an approval. Any credential of this user may call them: a thread, registration, or automation credential, or Admin.
 
 ### Unattended approval
 
@@ -425,13 +426,14 @@ Same-thread [transcript](appendix-a-glossary.md#thread-transcript) reads, once t
 
 For a thread-scoped or registration caller, the repo summary is the only cross-thread read available without approval. See [repo-summary read scope](appendix-a-glossary.md#repo-summary-read-scope).
 
-An automation credential belongs to no thread, so it has no "own thread" to read. Without approval it may read the repo summary of every registered repo, and each registered thread's status and non-sensitive state. That is what `kk status`, `kk ls`, `kk events`, `kk wait`, and the diagnose step of `kk repair` show: lifecycle and cascade state, the checkpoint relationship, open issues and their plans, and summary-class events. It may not read anything on the "contains none" list below without a `sensitive-read` rule.
+An automation credential belongs to no thread, so it has no "own thread" to read. Without approval it may read the repo summary of every registered repo, and each registered thread's status and non-sensitive state. That is what `kk status`, `kk ls`, `kk events`, `kk wait`, and the diagnose step of `kk repair` show: lifecycle and cascade state, the checkpoint relationship, open issues and their plans, and summary-class events. Thread repair diagnosis also exposes a narrow recovery choice to authorized diagnose callers. It returns the opaque intent and plan ids, exact operation id, candidate commit ids, and one edit-preservation answer per candidate. These fields are available only from diagnosis. Paths, file content, recovery bundles, and other intent details require a sensitive read.
 
 The repo summary's complete field set is:
 
 - repo and thread id, display name, bookmark display name, and the followed parent's id/name;
 - lifecycle state, three-valued cascade state, [agent display state](appendix-a-glossary.md#agent-display-states), and [checkpoint relationship](appendix-a-glossary.md#checkpoint-relationship) (`current | behind | ahead | diverged`);
 - [terminal target](appendix-a-glossary.md#terminal-target) (the dedicated server's address and instance, and the current binding's terminal-group and agent-pane refs), one-line revision description, and the last-agent-event category and timestamp that Activity ordering uses;
+- a `has_open_issue` boolean for `kk wait --for issue`, including on closed threads;
 - after GitHub integration ships: PR number, PR state, and [CI](https://en.wikipedia.org/wiki/Continuous_integration) roll-up.
 
 It contains none of the following:

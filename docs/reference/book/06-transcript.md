@@ -122,6 +122,8 @@ Catch-up gives a reopened thread's agent some context from the earlier conversat
 
 A closed thread has no live thread credential. `BeginApproval` therefore discloses that catch-up was requested but returns no transcript text. (`BeginApproval` is the call that starts a one-shot approval: a [human approval](appendix-a-glossary.md#human-approval), or a [`PolicyApproval`](appendix-a-glossary.md#policy-approval) when a rule in the activated [automation policy](appendix-a-glossary.md#automation-policy) allows the plan.)
 
+If preflight finds no applicable consent and a person at a terminal wants catch-up, request the human reopen path (`require_human`) before issuing the reopen approval. This binds the presenter even if a rule could approve reopen. An automation credential cannot take this path and exits with code 3 before claim.
+
 The daemon releases the preview at one point only: after the exact reopen approval is claimed into its durable journal, and before the harness starts. It releases the preview:
 
 - only to the same enrolled foreground presenter (see [`ApprovalPresenter`](appendix-a-glossary.md#approvalpresenter)); and

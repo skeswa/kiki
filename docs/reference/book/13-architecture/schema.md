@@ -558,7 +558,7 @@ Four of these tables form the [operation-history cache](../appendix-a-glossary.m
 
 #### Follow-up prompt requests
 
-Each `prompt_requests` row records the requester credential id, request id, thread id, incarnation id, text digest, approved operation id, outcome, and optional harness turn receipt. The pair of requester and request id is unique. Insert it in the same transaction as the approval claim. Only the first claim may send. A crash between claim and receipt leaves the outcome unknown until the original harness record proves acceptance. The row holds no prompt text.
+Each `prompt_requests` row records the requester credential id, request id, thread id, incarnation id, text digest, approved operation id, outcome, and optional harness turn receipt. The request id is unique across this repo, including retired credential generations. A different requester presenting an existing id receives a generic refusal and no receipt. It cannot send a second turn. Insert it in the same transaction as the approval claim. Only the first claim may send. A crash between claim and receipt leaves the outcome unknown until the original harness record proves acceptance. The row holds no prompt text.
 
 #### Thread events
 

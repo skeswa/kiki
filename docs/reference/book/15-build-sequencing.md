@@ -357,7 +357,7 @@ Stage 2 gate:
 - **`kk wait`.** `kk wait --for <state>` exits 0 when the thread reaches `quiescent`, `blocked`, `closed`, or `issue`, and exits 6 when `--timeout` runs out first. The `conflicted` and `goal-complete` states are checked in Stage 3, with the cascade and the goal report that produce them.
 - **Headless lifecycle.** With zero attached Herdr clients, and under an automation credential and an activated policy, `kk close`, `kk reopen`, and the `restart-agent` repair each run to their end state. Every safety proof still runs. The script is not the thread, so the `restart-agent` repair needs a rule that allows `thread-op`.
   - A close whose plan carries `live-processes` or `work-loss` runs only under a rule that accepts those labels. Otherwise it is refused with exit code 3 and nothing is frozen.
-  - A harness permission prompt raises `agent_blocked`, which shows in `kk events`. Kiki does not answer the prompt.
+  - With proven `attention_events`, a harness permission prompt raises `agent_blocked` in `kk events`. Without that proof, check that a crash reports the blocked state. Kiki does not answer the prompt.
 
 ### Stage 3: follows and cascade
 

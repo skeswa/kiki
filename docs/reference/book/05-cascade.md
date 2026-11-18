@@ -362,7 +362,7 @@ Recovery pauses the agent and preserves the files at risk:
 3. Run jj's stale-workspace recovery. Then, from the exact resulting operation, enumerate every visible successor and divergent commit for the affected working-copy change id. For each one, include the operation predecessor record that links it to the pre-recovery commit.
 4. Verify that the pre-materialization edits are represented either in the materialized commit or in explicitly named recovery/divergent commits.
 5. If exactly one recovery successor can be selected safely, make the conflict-bearing result visible in the workspace and resume with conflict framing. Otherwise, leave the thread in `RecoveryRequired`, preserve the recovery record, and require an explicit choice. kiki never makes that choice itself.
-6. Transition `RecoveryRequired → Reconciling → Materialized` only after the selected workspace state visibly contains the edits, and kiki has verified the result against the bundle. Record the selected commit, the choice of plan, and the recovery-bundle location on the intent.
+6. Transition `RecoveryRequired → Reconciling → Materialized` only after the selected workspace state visibly contains the edits and kiki has verified the result against the bundle. Record the selected commit, the choice of plan, and the recovery-bundle location on the intent.
 
 For an ambiguous result, `kk repair <thread> --json` lists the intent id, repair id, exact operation id, and candidate commit ids. For each candidate it reports whether kiki verified every saved edit there. Apply `choose-recovery-successor` with `--target <full-commit-id>` to select a verified candidate. The policy can approve that choice. It never picks the commit.
 
